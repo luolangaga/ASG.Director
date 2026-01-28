@@ -50,7 +50,12 @@
       "output": "dist",
       "buildResources": "."
     },
-    "publish": [],
+    "publish": [
+      {
+        "provider": "github",
+        "private": true
+      }
+    ],
     "win": {
       "target": [
         "nsis",
