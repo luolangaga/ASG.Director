@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字体管理器</title>
+    <style>
+        :root {
+            --primary-color: #ffd700;
+            --bg-color: #16213e;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-color: #fff;
+            --border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            margin: 0;
+            color: var(--primary-color);
+        }
+
+        .section {
+            margin-bottom: 25px;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            color: #64b5f6;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: #9aa4b2;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .font-list {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            min-height: 60px;
+            margin-bottom: 15px;
+        }
+
+        .font-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-add {
+            background: linear-gradient(135deg, #4caf50 0%, #43a047 100%);
+            color: #fff;
+            width: 100%;
+        }
+
+        .btn-delete {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+            color: #1a1a2e;
+            padding: 12px 24px;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-color);
+            padding: 10px 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h3>🔤 字体管理器</h3>
+    </div>
+
+    <div class="section">
+        <div class="section-title">已安装字体</div>
+        <div class="info-text">
+            这里的字体可以被导播页面的各个组件使用。在导播页面开启编辑模式后，双击任何文字组件即可选择字体。
+        </div>
+        <div id="fontList" class="font-list"></div>
+        <button class="btn btn-add" onclick="selectCustomFont()">
+            ➕ 添加字体文件 (TTF/OTF/WOFF)
+        </button>
+    </div>
+
+    <div class="footer">
+        <button class="btn btn-save" onclick="window.close()">完成并返回</button>
+    </div>
+
+    <script>
+        async function init() {
+            await loadFontList()
+        }
+
+        async function loadFontList() {
+            try {
+                const result = await window.electronAPI.getCustomFonts()
+                const fontListEl = document.getElementById('fontList')
+
+                if (!result.success || !result.fonts.length) {
+                    fontListEl.innerHTML = '<div style="color: #888; text-align: center; padding: 10px;">暂无自定义字体</div>'
+                    return
+                }
+
+                fontListEl.innerHTML = result.fonts.map(font => `
+                    <div class="font-item">
+                        <div>
+                            <span style="color: #ffd700; font-weight: bold;">${font.fontFamily}</span>
+                            <span style="color: #888; font-size: 12px; margin-left: 10px;">${font.fileName}</span>
+                        </div>
+                        <button class="btn btn-delete" onclick="deleteFont('${font.fileName}')">删除</button>
+                    </div>
+                `).join('')
+            } catch (error) {
+                console.error('加载字体列表失败:', error)
+                alert('加载字体列表失败: ' + error.message)
+            }
+        }
+
+        async function selectCustomFont() {
+            try {
+                const result = await window.electronAPI.selectCustomFont()
+                if (result.success) {
+                    await loadFontList()
+                } else if (!result.canceled) {
+                    alert('导入字体失败: ' + (result.error || '未知错误'))
+                }
+            } catch (error) {
+                alert('导入字体失败: ' + error.message)
+            }
+        }
+
+        async function deleteFont(fileName) {
+            if (!confirm(`确定要删除字体 "${fileName}" 吗？`)) return
+            try {
+                const result = await window.electronAPI.deleteCustomFont(fileName)
+                if (result.success) {
+                    await loadFontList()
+                } else {
+                    alert('删除字体失败: ' + (result.error || '未知错误'))
+                }
+            } catch (error) {
+                alert('删除字体失败: ' + error.message)
+            }
+        }
+
+        init()
+    </script>
+</body>
+
+</html>

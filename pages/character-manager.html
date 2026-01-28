@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASG导播 - 角色管理</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      color: #fff;
+      min-height: 100vh;
+      overflow-y: auto;
+    }
+
+    /* 顶部导航栏 */
+    .top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 30px;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .nav-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-title h1 {
+      font-size: 20px;
+      background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    /* 主内容区 */
+    .main-container {
+      margin-top: 60px;
+      padding: 30px;
+      min-height: calc(100vh - 60px);
+    }
+
+    /* 标签页 */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 6px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 14px 24px;
+      background: transparent;
+      border: none;
+      border-radius: 10px;
+      color: #888;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .tab:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #ccc;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+      color: #1a1a2e;
+    }
+
+    .tab-count {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    .tab.active .tab-count {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    /* 工具栏 */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 16px;
+    }
+
+    .search-box {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #ffd700;
+      box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+    }
+
+    .search-box::before {
+      content: '🔍';
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 16px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+      color: #1a1a2e;
+    }
+
+    .btn-primary:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    /* 角色网格 */
+    .characters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .character-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .character-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(255, 215, 0, 0.3);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .character-card.selected {
+      border-color: #ffd700;
+      box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3);
+    }
+
+    .character-images {
+      display: flex;
+      height: 180px;
+      background: rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+
+    .character-images .half-img,
+    .character-images .big-img {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .character-images img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .character-images .no-image {
+      color: #666;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .image-label {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      color: #aaa;
+    }
+
+    .character-info {
+      padding: 16px;
+    }
+
+    .character-info-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .character-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .delete-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+    }
+
+    .character-card:hover .delete-btn {
+      opacity: 1;
+    }
+
+    .delete-btn:hover {
+      background: rgba(239, 68, 68, 0.4);
+      transform: scale(1.1);
+    }
+
+    .character-status {
+      display: flex;
+      gap: 8px;
+    }
+
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .status-badge.has-half {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .status-badge.has-big {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    .status-badge.missing {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: scale(0.9);
+      transition: all 0.3s;
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .modal-close {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #ffd700;
+      box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+    }
+
+    .form-group select option {
+      background: #1a1a2e;
+    }
+
+    .image-upload-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .image-upload {
+      background: rgba(0, 0, 0, 0.2);
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .image-upload:hover {
+      border-color: rgba(255, 215, 0, 0.4);
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .image-upload.has-image {
+      border-style: solid;
+      border-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .image-upload .preview {
+      width: 100%;
+      height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .image-upload .preview img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .image-upload .placeholder {
+      color: #666;
+      font-size: 48px;
+    }
+
+    .image-upload .label {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .image-upload .hint {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .modal-footer {
+      padding: 20px 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    /* 统计信息 */
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 24px;
+      padding: 16px 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .stat-icon.survivors {
+      background: rgba(34, 197, 94, 0.2);
+    }
+
+    .stat-icon.hunters {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .stat-icon.big {
+      background: rgba(59, 130, 246, 0.2);
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #888;
+    }
+
+    .empty-state .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+
+    .empty-state p {
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
+    /* Toast 提示 */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 16px 24px;
+      background: rgba(0, 0, 0, 0.9);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 14px;
+      z-index: 2000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-left: 4px solid #4ade80;
+    }
+
+    .toast.error {
+      border-left: 4px solid #f87171;
+    }
+
+    /* 加载状态 */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 215, 0, 0.2);
+      border-top-color: #ffd700;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* 确认对话框 */
+    .confirm-content {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .confirm-content .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .confirm-content p {
+      font-size: 16px;
+      color: #ccc;
+      margin-bottom: 8px;
+    }
+
+    .confirm-content .warning {
+      font-size: 14px;
+      color: #f87171;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 顶部导航 -->
+  <div class="top-nav">
+    <div class="nav-title">
+      <span style="font-size: 24px;">🎭</span>
+      <h1>角色管理</h1>
+    </div>
+    <div class="nav-actions">
+      <button class="btn btn-secondary" onclick="refreshCharacters()">
+        <span>🔄</span> 刷新
+      </button>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main-container">
+    <!-- 统计信息 -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-icon survivors">👤</div>
+        <div>
+          <div class="stat-value" id="survivorCount">0</div>
+          <div class="stat-label">求生者</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon hunters">👹</div>
+        <div>
+          <div class="stat-value" id="hunterCount">0</div>
+          <div class="stat-label">监管者</div>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon big">🖼️</div>
+        <div>
+          <div class="stat-value" id="bigImageCount">0</div>
+          <div class="stat-label">全身图</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="tabs">
+      <button class="tab active" data-type="survivor" onclick="switchTab('survivor')">
+        <span>👤</span> 求生者
+        <span class="tab-count" id="survivorTabCount">0</span>
+      </button>
+      <button class="tab" data-type="hunter" onclick="switchTab('hunter')">
+        <span>👹</span> 监管者
+        <span class="tab-count" id="hunterTabCount">0</span>
+      </button>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索角色名称..." oninput="filterCharacters()">
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">
+        <span>➕</span> 添加角色
+      </button>
+    </div>
+
+    <!-- 角色网格 -->
+    <div class="characters-grid" id="charactersGrid">
+      <div class="loading">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加/编辑模态框 -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">添加角色</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>角色名称</label>
+          <input type="text" id="characterName" placeholder="请输入角色名称">
+        </div>
+        <div class="form-group">
+          <label>角色类型</label>
+          <select id="characterType">
+            <option value="survivor">求生者</option>
+            <option value="hunter">监管者</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>角色图片</label>
+          <div class="image-upload-group" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="image-upload" id="headerImageUpload" onclick="selectImage('header')">
+              <div class="preview" id="headerImagePreview">
+                <span class="placeholder">📷</span>
+              </div>
+              <div class="label">头像</div>
+              <div class="hint">推荐尺寸: 120×120 或 300×300</div>
+            </div>
+            <div class="image-upload" id="halfImageUpload" onclick="selectImage('half')">
+              <div class="preview" id="halfImagePreview">
+                <span class="placeholder">📷</span>
+              </div>
+              <div class="label">半身图</div>
+              <div class="hint">推荐尺寸: 560×622</div>
+            </div>
+            <div class="image-upload" id="bigImageUpload" onclick="selectImage('big')">
+              <div class="preview" id="bigImagePreview">
+                <span class="placeholder">📷</span>
+              </div>
+              <div class="label">全身图</div>
+              <div class="hint">推荐尺寸: 554×724 (求生) / 686×840 (监管)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveCharacter()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认模态框 -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <h2 class="modal-title">确认删除</h2>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-content">
+          <div class="icon">⚠️</div>
+          <p>确定要删除角色 "<span id="deleteCharacterName"></span>" 吗？</p>
+          <p class="warning">此操作将删除该角色的所有图片，且无法恢复！</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">取消</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // 状态
+    let characters = { survivors: [], hunters: [] }
+    let currentTab = 'survivor'
+    let editingCharacter = null
+    let deleteTarget = null
+    let selectedHeaderImage = null
+    let selectedHalfImage = null
+    let selectedBigImage = null
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      loadCharacters()
+    })
+
+    // 加载角色列表
+    async function loadCharacters() {
+      try {
+        const result = await window.electronAPI.characterGetAll()
+        if (result.success) {
+          characters = result.data
+          updateStats()
+          renderCharacters()
+        } else {
+          showToast('加载角色列表失败: ' + result.error, 'error')
+        }
+      } catch (error) {
+        showToast('加载角色列表失败: ' + error.message, 'error')
+      }
+    }
+
+    // 更新统计信息
+    function updateStats() {
+      const survivorCount = characters.survivors.length
+      const hunterCount = characters.hunters.length
+      const bigImageCount = characters.survivors.filter(c => c.hasBigImage).length +
+        characters.hunters.filter(c => c.hasBigImage).length
+
+      document.getElementById('survivorCount').textContent = survivorCount
+      document.getElementById('hunterCount').textContent = hunterCount
+      document.getElementById('bigImageCount').textContent = bigImageCount
+      document.getElementById('survivorTabCount').textContent = survivorCount
+      document.getElementById('hunterTabCount').textContent = hunterCount
+    }
+
+    // 切换标签页
+    function switchTab(type) {
+      currentTab = type
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.type === type)
+      })
+      renderCharacters()
+    }
+
+    // 过滤角色
+    function filterCharacters() {
+      renderCharacters()
+    }
+
+    // 渲染角色列表
+    function renderCharacters() {
+      const grid = document.getElementById('charactersGrid')
+      const searchText = document.getElementById('searchInput').value.toLowerCase()
+      const list = currentTab === 'survivor' ? characters.survivors : characters.hunters
+
+      const filtered = list.filter(c => c.name.toLowerCase().includes(searchText))
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="icon">🔍</div>
+            <p>${searchText ? '没有找到匹配的角色' : '暂无角色数据'}</p>
+            <button class="btn btn-primary" onclick="openAddModal()">
+              <span>➕</span> 添加角色
+            </button>
+          </div>
+        `
+        return
+      }
+
+      grid.innerHTML = filtered.map(char => `
+        <div class="character-card" onclick="openEditModal('${char.name}')">
+          <div class="character-images" style="display:grid; grid-template-columns: 1fr 1fr 1fr;">
+            <div class="header-img" style="flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;">
+              ${char.hasHeaderImage
+          ? `<img src="file:///${char.headerImage.replace(/\\/g, '/')}" alt="${char.name}" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.parentElement.innerHTML='<div class=\\'no-image\\'>加载失败</div>'">`
+          : '<div class="no-image">无头像</div>'
+        }
+              <span class="image-label">头像</span>
+            </div>
+            <div class="half-img">
+              ${char.hasHalfImage
+          ? `<img src="file:///${char.halfImage.replace(/\\/g, '/')}" alt="${char.name}" onerror="this.parentElement.innerHTML='<div class=\\'no-image\\'>加载失败</div>'">`
+          : '<div class="no-image">无半身图</div>'
+        }
+              <span class="image-label">半身</span>
+            </div>
+            <div class="big-img">
+              ${char.hasBigImage
+          ? `<img src="file:///${char.bigImage.replace(/\\/g, '/')}" alt="${char.name}" onerror="this.parentElement.innerHTML='<div class=\\'no-image\\'>加载失败</div>'">`
+          : '<div class="no-image">无全身图</div>'
+        }
+              <span class="image-label">全身</span>
+            </div>
+          </div>
+          <div class="character-info">
+            <div class="character-info-header">
+              <div class="character-name">${char.name}</div>
+              <button class="delete-btn" onclick="event.stopPropagation(); openDeleteModal('${char.name}', '${char.type}')" title="删除角色">🗑️</button>
+            </div>
+            <div class="character-status">
+              ${char.hasHeaderImage ? '<span class="status-badge has-half">头像</span>' : ''}
+              ${char.hasHalfImage ? '<span class="status-badge has-half">半身图</span>' : ''}
+              ${char.hasBigImage ? '<span class="status-badge has-big">全身图</span>' : ''}
+            </div>
+          </div>
+        </div>
+      `).join('')
+    }
+
+    // 打开添加模态框
+    function openAddModal() {
+      editingCharacter = null
+      selectedHeaderImage = null
+      selectedHalfImage = null
+      selectedBigImage = null
+      document.getElementById('modalTitle').textContent = '添加角色'
+      document.getElementById('characterName').value = ''
+      document.getElementById('characterType').value = currentTab
+      document.getElementById('characterType').disabled = false
+      resetImagePreviews()
+      document.getElementById('editModal').classList.add('active')
+    }
+
+    // 打开编辑模态框
+    async function openEditModal(name) {
+      const list = currentTab === 'survivor' ? characters.survivors : characters.hunters
+      const char = list.find(c => c.name === name)
+      if (!char) return
+
+      editingCharacter = char
+      selectedHeaderImage = null
+      selectedHalfImage = null
+      selectedBigImage = null
+      document.getElementById('modalTitle').textContent = '编辑角色'
+      document.getElementById('characterName').value = char.name
+      document.getElementById('characterType').value = char.type
+      document.getElementById('characterType').disabled = true
+
+      // 加载图片预览
+      resetImagePreviews()
+      if (char.hasHeaderImage) {
+        const headerResult = await window.electronAPI.characterGetImageBase64(char.headerImage)
+        if (headerResult.success) {
+          setImagePreview('header', headerResult.data)
+        }
+      }
+      if (char.hasHalfImage) {
+        const halfResult = await window.electronAPI.characterGetImageBase64(char.halfImage)
+        if (halfResult.success) {
+          setImagePreview('half', halfResult.data)
+        }
+      }
+      if (char.hasBigImage) {
+        const bigResult = await window.electronAPI.characterGetImageBase64(char.bigImage)
+        if (bigResult.success) {
+          setImagePreview('big', bigResult.data)
+        }
+      }
+
+      document.getElementById('editModal').classList.add('active')
+    }
+
+    // 关闭模态框
+    function closeModal() {
+      document.getElementById('editModal').classList.remove('active')
+      editingCharacter = null
+      selectedHeaderImage = null
+      selectedHalfImage = null
+      selectedBigImage = null
+    }
+
+    // 重置图片预览
+    function resetImagePreviews() {
+      document.getElementById('headerImagePreview').innerHTML = '<span class="placeholder">📷</span>'
+      document.getElementById('halfImagePreview').innerHTML = '<span class="placeholder">📷</span>'
+      document.getElementById('bigImagePreview').innerHTML = '<span class="placeholder">📷</span>'
+      document.getElementById('headerImageUpload').classList.remove('has-image')
+      document.getElementById('halfImageUpload').classList.remove('has-image')
+      document.getElementById('bigImageUpload').classList.remove('has-image')
+    }
+
+    // 设置图片预览
+    function setImagePreview(type, src) {
+      const previewId = type === 'header' ? 'headerImagePreview' : (type === 'half' ? 'halfImagePreview' : 'bigImagePreview')
+      const uploadId = type === 'header' ? 'headerImageUpload' : (type === 'half' ? 'halfImageUpload' : 'bigImageUpload')
+      document.getElementById(previewId).innerHTML = `<img src="${src}" alt="预览">`
+      document.getElementById(uploadId).classList.add('has-image')
+    }
+
+    // 选择图片
+    async function selectImage(type) {
+      try {
+        const result = await window.electronAPI.characterSelectImage(type)
+        if (result.success && !result.canceled) {
+          if (type === 'header') {
+            selectedHeaderImage = result.path
+          } else if (type === 'half') {
+            selectedHalfImage = result.path
+          } else {
+            selectedBigImage = result.path
+          }
+
+          // 加载预览
+          const base64Result = await window.electronAPI.characterGetImageBase64(result.path)
+          if (base64Result.success) {
+            setImagePreview(type, base64Result.data)
+          }
+        }
+      } catch (error) {
+        showToast('选择图片失败: ' + error.message, 'error')
+      }
+    }
+
+    // 保存角色
+    async function saveCharacter() {
+      const name = document.getElementById('characterName').value.trim()
+      const type = document.getElementById('characterType').value
+
+      if (!name) {
+        showToast('请输入角色名称', 'error')
+        return
+      }
+
+      try {
+        let result
+        if (editingCharacter) {
+          // 更新角色
+          result = await window.electronAPI.characterUpdate({
+            oldName: editingCharacter.name,
+            newName: name !== editingCharacter.name ? name : null,
+            type,
+            headerImagePath: selectedHeaderImage,
+            halfImagePath: selectedHalfImage,
+            bigImagePath: selectedBigImage
+          })
+        } else {
+          // 添加角色
+          if (!selectedHeaderImage && !selectedHalfImage && !selectedBigImage) {
+            showToast('请至少选择一张图片', 'error')
+            return
+          }
+          result = await window.electronAPI.characterAdd({
+            name,
+            type,
+            headerImagePath: selectedHeaderImage,
+            halfImagePath: selectedHalfImage,
+            bigImagePath: selectedBigImage
+          })
+        }
+
+        if (result.success) {
+          showToast(editingCharacter ? '角色已更新' : '角色已添加', 'success')
+          closeModal()
+          await loadCharacters()
+        } else {
+          showToast('操作失败: ' + result.error, 'error')
+        }
+      } catch (error) {
+        showToast('操作失败: ' + error.message, 'error')
+      }
+    }
+
+    // 打开删除确认
+    function openDeleteModal(name, type, event) {
+      if (event) event.stopPropagation()
+      deleteTarget = { name, type }
+      document.getElementById('deleteCharacterName').textContent = name
+      document.getElementById('deleteModal').classList.add('active')
+    }
+
+    // 关闭删除确认
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').classList.remove('active')
+      deleteTarget = null
+    }
+
+    // 确认删除
+    async function confirmDelete() {
+      if (!deleteTarget) return
+
+      try {
+        const result = await window.electronAPI.characterDelete(deleteTarget)
+        if (result.success) {
+          showToast('角色已删除', 'success')
+          closeDeleteModal()
+          await loadCharacters()
+        } else {
+          showToast('删除失败: ' + result.error, 'error')
+        }
+      } catch (error) {
+        showToast('删除失败: ' + error.message, 'error')
+      }
+    }
+
+    // 刷新角色列表
+    async function refreshCharacters() {
+      try {
+        await window.electronAPI.characterRefresh()
+        await loadCharacters()
+        showToast('角色列表已刷新', 'success')
+      } catch (error) {
+        showToast('刷新失败: ' + error.message, 'error')
+      }
+    }
+
+    // 显示 Toast
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast')
+      toast.textContent = message
+      toast.className = 'toast ' + type
+      toast.classList.add('show')
+      setTimeout(() => toast.classList.remove('show'), 3000)
+    }
+
+    // 从角色卡片触发删除（需要修改渲染函数添加删除按钮）
+    document.addEventListener('contextmenu', (e) => {
+      const card = e.target.closest('.character-card')
+      if (card) {
+        e.preventDefault()
+        const name = card.querySelector('.character-name').textContent
+        openDeleteModal(name, currentTab)
+      }
+    })
+  </script>
+</body>
+
+</html>

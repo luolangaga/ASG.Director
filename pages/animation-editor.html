@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASG 动画编辑器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/animation-editor.css">
+</head>
+
+<body>
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <span class="toolbar-title">🎬 动画编辑器</span>
+        <div class="toolbar-actions">
+            <button class="btn btn-secondary btn-sm" onclick="createNewAnimation()">➕ 新建动画</button>
+            <button class="btn btn-primary btn-sm" onclick="saveAllAnimations()">💾 保存全部</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- 左侧动画列表 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">动画列表</span>
+                <span id="animationCount" class="animation-count">0 个</span>
+            </div>
+
+            <!-- 分类筛选 -->
+            <div class="category-filter">
+                <button class="category-btn active" data-category="all" onclick="filterByCategory('all')">全部</button>
+                <button class="category-btn" data-category="entrance" onclick="filterByCategory('entrance')">🚀
+                    开场</button>
+                <button class="category-btn" data-category="select" onclick="filterByCategory('select')">👆 选择</button>
+                <button class="category-btn" data-category="blink" onclick="filterByCategory('blink')">✨ 闪烁</button>
+                <button class="category-btn" data-category="custom" onclick="filterByCategory('custom')">🎨 自定义</button>
+            </div>
+
+            <div class="animation-list" id="animationList">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">🎬</div>
+                    <div class="empty-state-title">暂无动画</div>
+                    <div class="empty-state-desc">点击上方"新建动画"创建您的第一个动画</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间编辑区 -->
+        <div class="editor-area" id="editorArea" style="display: none;">
+            <!-- 预览区域 -->
+            <div class="preview-section">
+                <div class="preview-header">
+                    <span class="preview-title">动画预览</span>
+                    <div class="preview-controls">
+                        <button class="btn btn-ghost btn-sm" onclick="playAnimation()">▶ 播放</button>
+                        <button class="btn btn-ghost btn-sm" onclick="stopAnimation()">⏹ 停止</button>
+                        <button class="btn btn-ghost btn-sm" onclick="resetPreview()">🔄 重置</button>
+                    </div>
+                </div>
+                <div class="preview-box">
+                    <div class="preview-content" id="previewContent">
+                        <div class="preview-demo-box" id="previewDemoBox">预览</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 时间轴 -->
+            <div class="timeline-section">
+                <div class="timeline-header">
+                    <span class="timeline-title">时间轴</span>
+                    <div class="timeline-controls">
+                        <button class="btn btn-ghost btn-sm" onclick="addKeyframe()">➕ 关键帧</button>
+                        <span class="timeline-time" id="timelineTime">0.00s</span>
+                    </div>
+                </div>
+                <div class="timeline-container">
+                    <div class="timeline-ruler" id="timelineRuler"></div>
+                    <div class="timeline-track" id="timelineTrack">
+                        <div class="timeline-playhead" id="timelinePlayhead"></div>
+                    </div>
+                    <div class="keyframes-container" id="keyframesContainer"></div>
+                </div>
+            </div>
+
+            <!-- 代码编辑器 -->
+            <div class="code-section">
+                <div class="code-header">
+                    <span class="code-title">CSS 代码编辑</span>
+                    <button class="btn btn-ghost btn-sm" onclick="applyCode()">✓ 应用代码</button>
+                </div>
+                <textarea class="code-editor" id="codeEditor" placeholder="在此输入自定义 CSS 动画代码..."></textarea>
+            </div>
+        </div>
+
+        <!-- 空状态占位 -->
+        <div class="editor-area editor-placeholder" id="editorPlaceholder">
+            <div class="empty-state">
+                <div class="empty-state-icon">✨</div>
+                <div class="empty-state-title">选择或创建动画</div>
+                <div class="empty-state-desc">从左侧列表选择一个动画进行编辑，或点击"新建动画"创建</div>
+            </div>
+        </div>
+
+        <!-- 右侧属性面板 -->
+        <div class="properties-panel" id="propertiesPanel" style="display: none;">
+            <div class="properties-section">
+                <div class="properties-section-title">基本信息</div>
+                <div class="property-group">
+                    <label class="property-label">动画名称</label>
+                    <input type="text" class="property-input" id="propName" placeholder="输入动画名称">
+                </div>
+                <div class="property-group">
+                    <label class="property-label">动画类型</label>
+                    <select class="property-input" id="propCategory">
+                        <option value="entrance">🚀 开场动画</option>
+                        <option value="select">👆 选择动画</option>
+                        <option value="blink">✨ 闪烁效果</option>
+                        <option value="custom">🎨 自定义动画</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="properties-section">
+                <div class="properties-section-title">动画参数</div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">持续时间 (秒)</label>
+                        <input type="number" class="property-input" id="propDuration" value="1" min="0.1" max="10"
+                            step="0.1">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">延迟 (秒)</label>
+                        <input type="number" class="property-input" id="propDelay" value="0" min="0" max="5" step="0.1">
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">缓动函数</label>
+                    <select class="property-input" id="propEasing">
+                        <option value="ease">ease (默认)</option>
+                        <option value="linear">linear (线性)</option>
+                        <option value="ease-in">ease-in (淡入)</option>
+                        <option value="ease-out">ease-out (淡出)</option>
+                        <option value="ease-in-out">ease-in-out (淡入淡出)</option>
+                        <option value="cubic-bezier(0.68, -0.55, 0.265, 1.55)">弹性效果</option>
+                        <option value="cubic-bezier(0.25, 0.46, 0.45, 0.94)">柔和效果</option>
+                        <option value="cubic-bezier(0.87, 0, 0.13, 1)">强调效果</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">重复次数</label>
+                    <select class="property-input" id="propIterationCount">
+                        <option value="1">1 次</option>
+                        <option value="2">2 次</option>
+                        <option value="3">3 次</option>
+                        <option value="infinite">无限循环</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">播放方向</label>
+                    <select class="property-input" id="propDirection">
+                        <option value="normal">正向</option>
+                        <option value="reverse">反向</option>
+                        <option value="alternate">交替</option>
+                        <option value="alternate-reverse">反交替</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">填充模式</label>
+                    <select class="property-input" id="propFillMode">
+                        <option value="forwards">保持结束状态 (forwards)</option>
+                        <option value="backwards">应用开始状态 (backwards)</option>
+                        <option value="both">两者 (both)</option>
+                        <option value="none">无 (none)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 动画效果快捷生成 -->
+            <div class="properties-section">
+                <div class="properties-section-title">快捷效果</div>
+                <div class="preset-grid">
+                    <button class="preset-btn" onclick="applyPreset('fadeIn')">淡入</button>
+                    <button class="preset-btn" onclick="applyPreset('fadeOut')">淡出</button>
+                    <button class="preset-btn" onclick="applyPreset('slideInLeft')">左滑入</button>
+                    <button class="preset-btn" onclick="applyPreset('slideInRight')">右滑入</button>
+                    <button class="preset-btn" onclick="applyPreset('slideInUp')">上滑入</button>
+                    <button class="preset-btn" onclick="applyPreset('slideInDown')">下滑入</button>
+                    <button class="preset-btn" onclick="applyPreset('zoomIn')">放大</button>
+                    <button class="preset-btn" onclick="applyPreset('zoomOut')">缩小</button>
+                    <button class="preset-btn" onclick="applyPreset('rotateIn')">旋转入</button>
+                    <button class="preset-btn" onclick="applyPreset('bounce')">弹跳</button>
+                    <button class="preset-btn" onclick="applyPreset('shake')">抖动</button>
+                    <button class="preset-btn" onclick="applyPreset('pulse')">脉冲</button>
+                    <button class="preset-btn" onclick="applyPreset('flash')">闪烁</button>
+                    <button class="preset-btn" onclick="applyPreset('glow')">发光</button>
+                    <button class="preset-btn" onclick="applyPreset('dissolve')">溶解</button>
+                </div>
+            </div>
+
+            <!-- 应用目标 -->
+            <div class="properties-section">
+                <div class="properties-section-title">应用目标</div>
+                <div class="target-list" id="targetList">
+                    <label class="target-item">
+                        <input type="checkbox" value="survivor1"> 求生者1
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="survivor2"> 求生者2
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="survivor3"> 求生者3
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="survivor4"> 求生者4
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="hunter"> 监管者
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="teamALogo"> 队伍A Logo
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="teamBLogo"> 队伍B Logo
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="mapInfo"> 地图信息
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="background"> 背景图片
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="timerProgressBar"> 倒计时进度条
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="timerBox"> 倒计时
+                    </label>
+                    <label class="target-item">
+                        <input type="checkbox" value="customComponents"> 自定义组件
+                    </label>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="properties-section" style="border-bottom: none;">
+                <button class="btn btn-primary" style="width: 100%; margin-bottom: 8px;"
+                    onclick="saveCurrentAnimation()">💾 保存动画</button>
+                <button class="btn btn-danger" style="width: 100%;" onclick="deleteCurrentAnimation()">🗑️ 删除动画</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建动画模态框 -->
+    <div class="modal-overlay" id="newAnimationModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">新建动画</span>
+                <button class="modal-close" onclick="closeNewAnimationModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="property-group" style="margin-bottom: 20px;">
+                    <label class="property-label">动画名称</label>
+                    <input type="text" class="property-input" id="newAnimationName" placeholder="例如：角色入场、选中闪烁">
+                </div>
+
+                <label class="property-label" style="margin-bottom: 12px; display: block;">选择动画类型</label>
+                <div class="type-selector">
+                    <div class="type-option selected" data-type="entrance">
+                        <span class="type-option-icon">🚀</span>
+                        <span class="type-option-name">开场动画</span>
+                        <span class="type-option-desc">元素首次出现时播放</span>
+                    </div>
+                    <div class="type-option" data-type="select">
+                        <span class="type-option-icon">👆</span>
+                        <span class="type-option-name">选择动画</span>
+                        <span class="type-option-desc">选中角色/道具时播放</span>
+                    </div>
+                    <div class="type-option" data-type="blink">
+                        <span class="type-option-icon">✨</span>
+                        <span class="type-option-name">闪烁效果</span>
+                        <span class="type-option-desc">等待/高亮状态循环播放</span>
+                    </div>
+                    <div class="type-option" data-type="custom">
+                        <span class="type-option-icon">🎨</span>
+                        <span class="type-option-name">自定义动画</span>
+                        <span class="type-option-desc">完全自定义的CSS动画</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeNewAnimationModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmNewAnimation()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="./js/animation-editor-logic.js"></script>
+</body>
+
+</html>

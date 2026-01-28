@@ -1,0 +1,101 @@
+{
+  "name": "asg-director",
+  "version": "2.7.1",
+  "description": "第五人格赛事导播端",
+  "main": "main.js",
+  "scripts": {
+    "start": "chcp 65001 && cross-env NODE_ENV=development electron . --dev",
+    "dev": "chcp 65001 && cross-env NODE_ENV=development electron . --dev",
+    "postinstall": "node postinstall.js",
+    "postinstall:mirror": "cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron node postinstall.js",
+    "plugin:pack": "node plugins/tools/package-plugin.js",
+    "optimize:images": "node scripts/optimize-images.js",
+    "clean:bundle": "node -e \"const fs=require('fs');['ASG.Director.7z','vuepress-docs','docs'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('删除:',p)}catch(e){}})\"",
+    "prebuild": "npm run clean:bundle",
+    "postbuild": "npm run analyze:bundle",
+    "analyze:bundle": "node scripts/analyze-bundle.js",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:msix": "cross-env ELECTRON_BUILDER_CACHE=./node_modules/app-builder-bin NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR= electron-builder --win nsis",
+    "build:mac": "electron-builder --mac",
+    "builds": "powershell -Command \"$cache = Join-Path $env:LOCALAPPDATA 'app-builder'; $src = Join-Path $cache 'nsis-resources-3.4.1.7z'; $destdir = Join-Path $cache 'nsis-resources-3.4.1'; if (-Not (Test-Path $destdir)) { New-Item -ItemType Directory -Path $destdir | Out-Null }; Copy-Item -Path $src -Destination (Join-Path $destdir 'nsis-resources-3.4.1.7z') -Force; $env:NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR = 'http://localhost:8000/'; $env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'; $env:ELECTRON_BUILDER_CACHE = Join-Path $env:LOCALAPPDATA 'app-builder'; npm run build\""
+  },
+  "author": "ASG",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ASG/ASG.Director"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1",
+    "sharp": "^0.34.5"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^8.0.0",
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
+    "bilibili-live-ws": "^6.3.1",
+    "form-data": "^4.0.5",
+    "rcedit": "^5.0.2",
+    "ws": "^8.16.0",
+    "yauzl": "^3.2.0"
+  },
+  "build": {
+    "appId": "com.asg.director",
+    "productName": "Idvevent导播端",
+    "directories": {
+      "output": "dist",
+      "buildResources": "."
+    },
+    "publish": [],
+    "win": {
+      "target": [
+        "nsis",
+        "appx"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "appx": {
+      "displayName": "Idvevent导播端",
+      "identityName": "com.asg.director",
+      "publisher": "CN=ASG",
+      "publisherDisplayName": "ASG",
+      "backgroundColor": "#FFFFFF"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "updater-v2.js",
+      "postinstall.js",
+      "package.json",
+      "assets/**/*",
+      "pages/**/*",
+      "plugins/**/*",
+      "scripts/**/*",
+      "utils/**/*",
+      "build/**/*",
+      "!**/*.md",
+      "!*.md",
+      "!**/*.txt",
+      "!*.txt",
+      "!**/*.7z",
+      "!**/*.zip",
+      "!**/*.rar",
+      "!vuepress-docs/**/*",
+      "!docs/**/*",
+      "!node_modules/.cache",
+      "!dist/**/*",
+      "!temp-*/**/*",
+      "!ASG.Director.7z"
+    ],
+    "asarUnpack": [
+      "node_modules/rcedit/**/*"
+    ]
+  }
+}

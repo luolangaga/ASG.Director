@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASG插件商店</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+
+    h1 { font-size: 28px; font-weight: 600; color: #fff; }
+    .subtitle { color: #888; margin-top: 6px; }
+
+    .badge {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #bbb;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 14px;
+    }
+
+    .tabs { display: flex; gap: 8px; }
+
+    .tab {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+      color: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: rgba(33,150,243,0.25);
+      border-color: rgba(33,150,243,0.45);
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .search input {
+      background: none;
+      border: none;
+      color: #e0e0e0;
+      font-size: 14px;
+      outline: none;
+      width: 220px;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary { background: #2196F3; color: #fff; }
+    .btn-primary:hover { background: #1976D2; }
+
+    .btn-secondary { background: rgba(255,255,255,0.1); color: #e0e0e0; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.18); }
+
+    .btn-danger { background: rgba(244,67,54,0.2); color: #f44336; }
+    .btn-danger:hover { background: rgba(244,67,54,0.3); }
+
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .list { display: flex; flex-direction: column; gap: 12px; }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+
+    .name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-size: 12px;
+      font-weight: normal;
+      color: #bbb;
+      background: rgba(255,255,255,0.1);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .desc { color: #aaa; margin-top: 6px; font-size: 14px; }
+    .meta { color: #666; margin-top: 4px; font-size: 12px; }
+
+    .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+      border: 1px dashed rgba(255,255,255,0.15);
+      border-radius: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      color: #fff;
+      z-index: 2000;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(6px);
+    }
+
+    .toast.success { background: rgba(76,175,80,0.7); }
+    .toast.error { background: rgba(244,67,54,0.7); }
+    .toast.info { background: rgba(33,150,243,0.7); }
+    .toast.warning { background: rgba(255,152,0,0.7); }
+
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      padding: 20px;
+    }
+
+    .modal {
+      width: 520px;
+      max-width: 100%;
+      background: rgba(26,26,46,0.95);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .modal h2 { font-size: 18px; color: #fff; margin-bottom: 10px; }
+    .modal p { color: #bbb; font-size: 14px; line-height: 1.55; }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+
+    .form-row { display: flex; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .form-group label { color: #bbb; font-size: 13px; }
+    .form-group input, .form-group textarea {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      color: #e0e0e0;
+      padding: 10px 12px;
+      outline: none;
+      font-size: 14px;
+    }
+    .form-group textarea { min-height: 88px; resize: vertical; }
+    .file-pill {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px dashed rgba(255,255,255,0.18);
+      color: #bbb;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>🧩 ASG插件商店</h1>
+        <div class="subtitle">浏览并安装插件包（安装/更新后将提示重启）</div>
+      </div>
+      <div class="badge" id="envBadge">环境：-</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab active" id="tabBrowse" onclick="switchTab('browse')">🏪 浏览商店</button>
+        <button class="tab" id="tabInstalled" onclick="switchTab('installed')">📦 已安装</button>
+        <button class="tab" id="tabMine" onclick="switchTab('mine')">👤 我的上传</button>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div class="search" id="searchBox">
+          <span>🔍</span>
+          <input id="searchInput" placeholder="搜索插件..." />
+        </div>
+        <button class="btn btn-secondary" onclick="openUpload()">📤 上传插件包</button>
+        <button class="btn btn-secondary" onclick="refresh()">🔄 刷新</button>
+      </div>
+    </div>
+
+    <div id="content" class="list"></div>
+  </div>
+
+  <div class="modal-mask" id="restartMask">
+    <div class="modal">
+      <h2>需要重启</h2>
+      <p id="restartText">插件已安装/更新完成，需要重启 ASG.Director 才会生效。</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeRestart()">稍后</button>
+        <button class="btn btn-primary" onclick="restartNow()">立即重启</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="uploadMask">
+    <div class="modal">
+      <h2>📤 上传插件包</h2>
+      <p>选择一个 <b>.asgplugin</b> 文件并填写信息后上传到商店。</p>
+
+      <div class="form-group">
+        <label>插件包文件 *</label>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="file-pill" id="uploadFileLabel">未选择文件</div>
+          <button class="btn btn-secondary" onclick="selectUploadFile()">选择文件</button>
+        </div>
+        <input type="hidden" id="uploadFilePath" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label>插件名称 *</label>
+          <input id="uploadName" placeholder="例如：比分板增强" />
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>版本号 *</label>
+          <input id="uploadVersion" placeholder="例如：1.0.0" value="1.0.0" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>作者 *</label>
+        <input id="uploadAuthor" placeholder="你的名字/昵称" />
+      </div>
+
+      <div class="form-group">
+        <label>简介</label>
+        <textarea id="uploadDescription" placeholder="描述一下插件功能（可选）..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>PackageId（可选，留空自动生成；填写已有可更新旧版本）</label>
+        <input id="uploadPackageId" placeholder="建议与插件 package.json 的 name 一致" />
+      </div>
+
+      <div class="form-group">
+        <label><input type="checkbox" id="uploadPublic" checked /> 公开发布</label>
+      </div>
+
+      <div class="form-group">
+        <label><input type="checkbox" id="uploadAutoIncrementVersion" /> 🔄 同ID包自动版本递增（将覆盖上方版本号）</label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeUpload()">取消</button>
+        <button class="btn btn-primary" id="uploadBtn" onclick="uploadNow()">上传</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      tab: 'browse',
+      search: '',
+      storeItems: [],
+      installedItems: [],
+      myItems: [],
+      busyIds: new Set()
+    }
+
+    function toast(message, type = 'info') {
+      const el = document.createElement('div')
+      el.className = `toast ${type}`
+      el.textContent = message
+      document.body.appendChild(el)
+      setTimeout(() => el.remove(), 2800)
+    }
+
+    function setEnvBadge(text) {
+      const el = document.getElementById('envBadge')
+      el.textContent = text
+    }
+
+    async function loadEnv() {
+      try {
+        const env = await window.electronAPI.getEnvironment()
+        const label = env?.currentEnv === 'development' ? '开发' : '生产'
+        setEnvBadge(`环境：${label}（${env?.config?.api || '-'}）`)
+      } catch {
+        setEnvBadge('环境：-')
+      }
+    }
+
+    function compareVersion(a, b) {
+      // 简单 semver 比较：1.2.3
+      const pa = String(a || '0').split('.').map(n => parseInt(n, 10) || 0)
+      const pb = String(b || '0').split('.').map(n => parseInt(n, 10) || 0)
+      const len = Math.max(pa.length, pb.length)
+      for (let i = 0; i < len; i++) {
+        const da = pa[i] || 0
+        const db = pb[i] || 0
+        if (da > db) return 1
+        if (da < db) return -1
+      }
+      return 0
+    }
+
+    function byPackageId(list) {
+      const map = new Map()
+      for (const it of list || []) {
+        map.set(it.packageId, it)
+      }
+      return map
+    }
+
+    function render() {
+      const content = document.getElementById('content')
+
+      if (state.tab === 'browse') {
+        const q = state.search.trim().toLowerCase()
+        const installedMap = byPackageId(state.installedItems)
+
+        const filtered = (state.storeItems || []).filter(it => {
+          if (!q) return true
+          const name = (it.name || '').toLowerCase()
+          const desc = (it.description || '').toLowerCase()
+          const author = (it.author || '').toLowerCase()
+          const pid = (it.packageId || '').toLowerCase()
+          return name.includes(q) || desc.includes(q) || author.includes(q) || pid.includes(q)
+        })
+
+        if (filtered.length === 0) {
+          content.innerHTML = `<div class="empty">🏪 商店暂无插件（或未匹配到搜索条件）</div>`
+          return
+        }
+
+        content.innerHTML = filtered.map(it => {
+          const installed = installedMap.get(it.packageId)
+          const hasUpdate = installed && compareVersion(it.version, installed.version) > 0
+          const busy = state.busyIds.has(it.id)
+
+          let primaryText = '安装'
+          if (installed && !hasUpdate) primaryText = '已安装'
+          if (hasUpdate) primaryText = '更新'
+
+          return `
+            <div class="card">
+              <div class="row">
+                <div>
+                  <div class="name">
+                    ${escapeHtml(it.name || it.packageId || '未命名插件')}
+                    <span class="pill">v${escapeHtml(it.version || '-') }</span>
+                    ${installed ? `<span class="pill">本地：v${escapeHtml(installed.version || '-') }</span>` : ''}
+                    ${hasUpdate ? `<span class="pill" style="color:#ffb74d;">可更新</span>` : ''}
+                  </div>
+                  <div class="desc">${escapeHtml(it.description || '暂无描述')}</div>
+                  <div class="meta">${it.author ? `作者：${escapeHtml(it.author)}` : ''}${it.packageId ? `${it.author ? ' · ' : ''}ID：${escapeHtml(it.packageId)}` : ''}</div>
+                </div>
+                <div>
+                  <button class="btn btn-primary" ${busy || (installed && !hasUpdate) ? 'disabled' : ''} onclick="installFromStore(${it.id})">
+                    ${busy ? '⏳ 处理中' : (hasUpdate ? '⬆️ 更新' : (installed ? '✅ 已安装' : '⬇️ 安装'))}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `
+        }).join('')
+      } else if (state.tab === 'installed') {
+        const list = state.installedItems || []
+        if (list.length === 0) {
+          content.innerHTML = `<div class="empty">📦 当前没有安装任何用户插件</div>`
+          return
+        }
+
+        content.innerHTML = list.map(it => {
+          const busy = state.busyIds.has(it.packageId)
+          return `
+            <div class="card">
+              <div class="row">
+                <div>
+                  <div class="name">
+                    ${escapeHtml(it.name || it.packageId)}
+                    <span class="pill">v${escapeHtml(it.version || '-')}</span>
+                  </div>
+                  <div class="desc">${escapeHtml(it.description || '暂无描述')}</div>
+                  <div class="meta">${it.author ? `作者：${escapeHtml(it.author)} · ` : ''}ID：${escapeHtml(it.packageId)}</div>
+                  <div class="actions">
+                    <button class="btn btn-secondary" ${busy ? 'disabled' : ''} onclick="exportPlugin('${escapeJs(it.packageId)}')">📦 导出</button>
+                    <button class="btn btn-danger" ${busy ? 'disabled' : ''} onclick="uninstall('${escapeJs(it.packageId)}')">🗑️ 卸载</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `
+        }).join('')
+      } else {
+        const list = state.myItems || []
+        if (list.length === 0) {
+          content.innerHTML = `<div class="empty">👤 你还没有上传任何插件包</div>`
+          return
+        }
+
+        content.innerHTML = list.map(it => {
+          const busyKey = `my:${it.id}`
+          const busy = state.busyIds.has(busyKey)
+          const visibilityText = it.isPublic ? '公开' : '私有'
+          const toggleText = it.isPublic ? '设为私有' : '设为公开'
+          return `
+            <div class="card">
+              <div class="row">
+                <div>
+                  <div class="name">
+                    ${escapeHtml(it.name || it.packageId || '未命名插件')}
+                    <span class="pill">v${escapeHtml(it.version || '-')}</span>
+                    <span class="pill">${visibilityText}</span>
+                  </div>
+                  <div class="desc">${escapeHtml(it.description || '暂无描述')}</div>
+                  <div class="meta">${it.author ? `作者：${escapeHtml(it.author)}` : ''}${it.packageId ? `${it.author ? ' · ' : ''}ID：${escapeHtml(it.packageId)}` : ''}</div>
+                  <div class="actions">
+                    <button class="btn btn-secondary" ${busy ? 'disabled' : ''} onclick="setMyVisibility(${it.id}, ${!it.isPublic})">${toggleText}</button>
+                    <button class="btn btn-danger" ${busy ? 'disabled' : ''} onclick="deleteMyPack(${it.id})">🗑️ 删除</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `
+        }).join('')
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[c]))
+    }
+
+    function escapeJs(s) {
+      return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    }
+
+    async function loadInstalled() {
+      const res = await window.electronAPI.pluginStoreGetInstalled()
+      if (!res?.success) throw new Error(res?.error || '获取已安装插件失败')
+      state.installedItems = res.data || []
+    }
+
+    async function loadMyPacks() {
+      const res = await window.electronAPI.pluginStoreGetMyPacks()
+      if (!res?.success) throw new Error(res?.error || '获取我的插件包失败')
+      const list = Array.isArray(res.data) ? res.data : []
+      state.myItems = list.map(it => ({
+        id: it.id,
+        packageId: it.packageId,
+        name: it.name,
+        version: it.version,
+        author: it.author,
+        description: it.description,
+        isPublic: !!it.isPublic
+      })).filter(it => it.id != null)
+    }
+
+    async function loadStore() {
+      const res = await window.electronAPI.pluginStoreGetPacks({ page: 1, pageSize: 200 })
+      if (!res?.success) throw new Error(res?.error || '获取商店列表失败')
+
+      const data = res.data
+      const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : [])
+
+      state.storeItems = items.map(it => ({
+        id: it.id,
+        packageId: it.packageId,
+        name: it.name,
+        version: it.version,
+        author: it.author,
+        description: it.description
+      })).filter(it => it.id != null)
+    }
+
+    async function refresh() {
+      try {
+        await loadInstalled()
+        if (state.tab === 'browse') {
+          await loadStore()
+        } else if (state.tab === 'mine') {
+          await loadMyPacks()
+        }
+        render()
+        toast('已刷新', 'info')
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      }
+    }
+
+    async function ensureLoggedIn(actionName) {
+      const auth = await window.electronAPI.getAuthStatus()
+      if (!auth?.isLoggedIn) {
+        toast(`请先登录 ASG 账号再${actionName || '进行此操作'}`, 'error')
+        return false
+      }
+      return true
+    }
+
+    async function switchTab(tab) {
+      if (tab === 'mine') {
+        const ok = await ensureLoggedIn('查看/管理我的插件包')
+        if (!ok) {
+          tab = 'browse'
+        }
+      }
+
+      state.tab = tab
+      document.getElementById('tabBrowse').classList.toggle('active', tab === 'browse')
+      document.getElementById('tabInstalled').classList.toggle('active', tab === 'installed')
+      document.getElementById('tabMine').classList.toggle('active', tab === 'mine')
+      document.getElementById('searchBox').style.display = tab === 'browse' ? '' : 'none'
+
+      try {
+        if (tab === 'browse') {
+          if (!state.storeItems?.length) await loadStore()
+        } else if (tab === 'mine') {
+          await loadMyPacks()
+        }
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      }
+
+      render()
+    }
+
+    async function exportPlugin(pluginId) {
+      if (!pluginId) return
+      if (state.busyIds.has(pluginId)) return
+      state.busyIds.add(pluginId)
+      render()
+      try {
+        const res = await window.electronAPI.pluginStoreExportPlugin(pluginId)
+        if (!res?.success) throw new Error(res?.error || '导出失败')
+        toast('已导出插件包', 'success')
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      } finally {
+        state.busyIds.delete(pluginId)
+        render()
+      }
+    }
+
+    async function deleteMyPack(id) {
+      if (id == null) return
+      const ok = await ensureLoggedIn('删除插件包')
+      if (!ok) return
+      if (!confirm('确定要删除这个插件包吗？此操作不可恢复。')) return
+
+      const busyKey = `my:${id}`
+      if (state.busyIds.has(busyKey)) return
+      state.busyIds.add(busyKey)
+      render()
+
+      try {
+        const res = await window.electronAPI.pluginStoreDeletePack(id)
+        if (!res?.success) throw new Error(res?.error || '删除失败')
+        toast('已删除', 'success')
+        await loadMyPacks()
+        render()
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      } finally {
+        state.busyIds.delete(busyKey)
+        render()
+      }
+    }
+
+    async function setMyVisibility(id, isPublic) {
+      if (id == null) return
+      const ok = await ensureLoggedIn('更新插件包可见性')
+      if (!ok) return
+
+      const busyKey = `my:${id}`
+      if (state.busyIds.has(busyKey)) return
+      state.busyIds.add(busyKey)
+      render()
+
+      try {
+        const res = await window.electronAPI.pluginStoreSetVisibility(id, isPublic)
+        if (!res?.success) throw new Error(res?.error || '更新失败')
+        toast('已更新', 'success')
+        await loadMyPacks()
+        render()
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      } finally {
+        state.busyIds.delete(busyKey)
+        render()
+      }
+    }
+
+    async function installFromStore(id) {
+      if (state.busyIds.has(id)) return
+      state.busyIds.add(id)
+      render()
+
+      try {
+        const res = await window.electronAPI.pluginStoreDownloadPack(id)
+        if (!res?.success) throw new Error(res?.error || '安装失败')
+
+        await loadInstalled()
+        await loadStore()
+        render()
+
+        toast(res.message || '插件已安装/更新', 'success')
+
+        if (res.requiresRestart) {
+          openRestart('插件已安装/更新完成，需要重启 ASG.Director 才会生效。')
+        }
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      } finally {
+        state.busyIds.delete(id)
+        render()
+      }
+    }
+
+    async function uninstall(pluginId) {
+      if (!pluginId) return
+      if (state.busyIds.has(pluginId)) return
+      state.busyIds.add(pluginId)
+      render()
+
+      try {
+        const res = await window.electronAPI.pluginStoreUninstall(pluginId)
+        if (!res?.success) throw new Error(res?.error || '卸载失败')
+
+        await loadInstalled()
+        render()
+
+        toast(res.removed ? '插件已卸载' : '插件不存在或已卸载', 'success')
+
+        if (res.requiresRestart) {
+          openRestart('插件已卸载，需要重启 ASG.Director 才会彻底生效。')
+        }
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      } finally {
+        state.busyIds.delete(pluginId)
+        render()
+      }
+    }
+
+    function openRestart(text) {
+      document.getElementById('restartText').textContent = text
+      document.getElementById('restartMask').style.display = 'flex'
+    }
+
+    function closeRestart() {
+      document.getElementById('restartMask').style.display = 'none'
+    }
+
+    async function restartNow() {
+      try {
+        await window.electronAPI.restartApp()
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      }
+    }
+
+    function openUpload() {
+      ;(async () => {
+        const ok = await ensureLoggedIn('上传插件包')
+        if (!ok) return
+        document.getElementById('uploadMask').style.display = 'flex'
+      })()
+    }
+
+    function closeUpload() {
+      document.getElementById('uploadMask').style.display = 'none'
+    }
+
+    async function selectUploadFile() {
+      try {
+        const res = await window.electronAPI.pluginStoreSelectFile()
+        if (!res?.success) throw new Error(res?.error || '选择文件失败')
+        if (res.canceled) return
+
+        document.getElementById('uploadFilePath').value = res.filePath
+        document.getElementById('uploadFileLabel').textContent = res.fileName || res.filePath
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      }
+    }
+
+    async function uploadNow() {
+      const btn = document.getElementById('uploadBtn')
+      btn.disabled = true
+      btn.textContent = '上传中...'
+      try {
+        const ok = await ensureLoggedIn('上传插件包')
+        if (!ok) return
+
+        const metadata = {
+          filePath: document.getElementById('uploadFilePath').value,
+          name: document.getElementById('uploadName').value,
+          version: document.getElementById('uploadVersion').value,
+          author: document.getElementById('uploadAuthor').value,
+          description: document.getElementById('uploadDescription').value,
+          packageId: document.getElementById('uploadPackageId').value,
+          isPublic: document.getElementById('uploadPublic').checked,
+          autoIncrementVersion: document.getElementById('uploadAutoIncrementVersion').checked
+        }
+
+        const res = await window.electronAPI.pluginStoreUploadPack(metadata)
+        if (!res?.success) throw new Error(res?.error || '上传失败')
+
+        toast('上传成功', 'success')
+        closeUpload()
+        if (state.tab === 'mine') {
+          await loadMyPacks()
+          render()
+        } else {
+          await loadStore()
+          if (state.tab !== 'browse') {
+            await switchTab('browse')
+          } else {
+            render()
+          }
+        }
+      } catch (e) {
+        toast(e.message || String(e), 'error')
+      } finally {
+        btn.disabled = false
+        btn.textContent = '上传'
+      }
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      state.search = e.target.value || ''
+      render()
+    })
+
+    if (window.electronAPI && window.electronAPI.on) {
+      window.electronAPI.on('auth-expired', () => {
+        try {
+          toast('登录已过期，请在主界面重新登录', 'error')
+          if (state.tab === 'mine') {
+            switchTab('browse')
+          }
+        } catch (e) {
+          console.warn('auth-expired handler error', e)
+        }
+      })
+    }
+
+    ;(async () => {
+      await loadEnv()
+      await refresh()
+    })()
+  </script>
+</body>
+</html>

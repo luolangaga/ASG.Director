@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ASG导播 - 比分板</title>
+
+  <link rel="stylesheet" href="./css/scoreboard.css">
+</head>
+
+<body>
+  <div class="drag-bar"></div>
+  <div class="edit-hint">编辑模式 - 拖拽元素调整位置和大小 | 按 F3 选择背景 | 按 F2 退出 | 双击组件设置字体</div>
+  <img id="backgroundImage" src="" alt="背景">
+
+  <!-- Logo Container -->
+  <div id="teamLogoContainer" class="draggable" style="left: 150px; top: 50px; width: 80px; height: 80px;">
+    <img id="teamLogo" src="" alt="队伍logo" style="display: none;">
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <!-- Score Container -->
+  <div id="scoreContainer" class="draggable" style="left: 50px; top: 140px; width: 300px;">
+    <div id="bigScore">0</div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <!-- Team Name Container -->
+  <div id="teamNameContainer" class="draggable" style="left: 50px; top: 220px; width: 300px;">
+    <div id="teamName">A队</div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <div id="recordContainer" class="draggable" style="left: 50px; top: 250px; width: 300px;">
+    <div id="record">0胜 0平 0负</div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <div id="boListContainer" class="draggable" style="left: 400px; top: 100px; width: 400px;">
+    <div id="boList" class="bo-list"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <!-- 字体选择器弹窗 -->
+  <div id="fontSelectorModal" onclick="if(event.target===this) closeFontSelector()">
+    <div class="modal-content">
+      <h3 style="color:#ffd700; margin-bottom: 15px;">选择字体</h3>
+      <div id="fontSelectorList"></div>
+
+      <!-- 字体大小设置 -->
+      <div class="font-color-section" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: #ddd;">字体大小 (px)</h4>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="number" id="fontSizeInput" min="8" max="250" step="1"
+            style="width: 80px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff;">
+          <input type="range" id="fontSizeRange" min="8" max="250" step="1" style="flex: 1;">
+        </div>
+      </div>
+
+      <!-- 颜色选择部分 -->
+      <div class="font-color-section" style="margin-top: 15px;">
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: #ddd;">文字颜色</h4>
+        <div class="color-picker-container" style="display: flex; align-items: center; gap: 10px;">
+          <input type="color" id="textColorPicker" value="#ffffff"
+            style="width: 40px; height: 30px; padding: 0; border: none; background: none; cursor: pointer;" />
+          <div class="color-presets-inline" style="display: flex; gap: 8px;">
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #ffffff;"
+              data-color="#ffffff"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #ffd700;"
+              data-color="#ffd700"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #ff4444;"
+              data-color="#ff4444"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #64ffda;"
+              data-color="#64ffda"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #64b5f6;"
+              data-color="#64b5f6"></div>
+          </div>
+        </div>
+      </div>
+      <button onclick="closeFontSelector()"
+        style="margin-top:20px; width:100%; padding:10px; background:#333; color:#fff; border:1px solid #555; cursor:pointer;">取消</button>
+    </div>
+  </div>
+
+  <div id="snapLineV" class="snap-line snap-line-v"></div>
+  <div id="snapLineH" class="snap-line snap-line-h"></div>
+  <div id="coordDisplay">X: 0 | Y: 0</div>
+
+  <script src="./js/signalr.min.js"></script>
+  <script src="./js/scoreboard-logic.js"></script>
+</body>
+
+</html>

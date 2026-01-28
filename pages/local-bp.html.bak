@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>本地BP控制</title>
+  <link rel="stylesheet" href="./css/local-bp.css">
+</head>
+
+<body>
+  <!-- 顶部菜单栏 -->
+  <div class="top-menu">
+    <div class="logo">🎬 本地BP控制台</div>
+    <div class="menu-tabs">
+      <button class="menu-tab active" data-page="bp" onclick="switchPage('bp')">
+        <span class="tab-icon">🎮</span>BP控制
+      </button>
+      <button class="menu-tab" data-page="baseinfo" onclick="switchPage('baseinfo')">
+        <span class="tab-icon">🗺️</span>对局基础信息
+      </button>
+      <button class="menu-tab" data-page="talents" onclick="switchPage('talents')">
+        <span class="tab-icon">🧠</span>天赋与技能
+      </button>
+      <button class="menu-tab" data-page="score" onclick="switchPage('score')">
+        <span class="tab-icon">📊</span>比分管理
+      </button>
+      <button class="menu-tab" data-page="postmatch" onclick="switchPage('postmatch')">
+        <span class="tab-icon">📈</span>赛后数据
+      </button>
+    </div>
+    <button class="menu-tab" onclick="LocalBPOnboarding.forceStart()" title="新手引导"
+      style="margin-left:auto; background:rgba(255,255,255,0.1); color:#ffd700;">
+      <span class="tab-icon">❓</span>帮助
+    </button>
+  </div>
+
+  <div class="main-wrapper">
+    <!-- ========== BP控制页 ========== -->
+    <div id="page-bp" class="page-content active">
+      <div class="container">
+        <h1>BP控制</h1>
+
+        <div class="controls">
+          <button class="btn btn-primary" onclick="updateFrontend()">更新前端显示</button>
+          <button class="btn btn-success" onclick="openCharacterDisplay()">角色展示</button>
+          <button class="btn btn-danger" onclick="resetBp()">重置BP</button>
+          <button class="btn btn-danger" style="background:#feb2b2; color:#c53030; border:1px solid #fc8181;"
+            onclick="resetBp(true)">重置BP (保留全局禁用)</button>
+          <button class="btn btn-warning" onclick="openAllFrontendWindows()">一键打开所有窗口</button>
+        </div>
+
+        <div class="scroll-container">
+          <div class="bp-grid">
+            <!-- 左侧：选角与名字 -->
+            <div class="bp-col-left">
+              <!-- 当前选择显示 -->
+              <div class="section">
+                <div class="section-title">当前选择</div>
+                <div class="selected-display">
+                  <div class="slot" id="slot-0" onclick="openPickModal('survivor', 0)">
+                    <div class="slot-label">求生1</div>
+                    <input type="text" class="slot-search" placeholder="搜..." onclick="event.stopPropagation()"
+                      oninput="handleSlotSearch(this, 0, 'survivor')"
+                      onkeydown="handleSlotSearchKey(event, 0, 'survivor')">
+                    <div class="slot-character" id="char-0">
+                      <img id="default-img-0" class="default-image"
+                        style="display:none; width:100%; height:100%; object-fit:contain;" />
+                      <span id="char-text-0">未选择</span>
+                    </div>
+                    <div class="slot-player-name" id="slot-player-0" style="font-size: 10px; color: #718096;"></div>
+                    <div class="slot-talents" id="slot-talents-0" style="display: flex; gap: 2px;"></div>
+                    <button class="slot-blink-btn" onclick="event.stopPropagation(); triggerBlink(0)">闪烁</button>
+                  </div>
+                  <div class="slot" id="slot-1" onclick="openPickModal('survivor', 1)">
+                    <div class="slot-label">求生2</div>
+                    <input type="text" class="slot-search" placeholder="搜..." onclick="event.stopPropagation()"
+                      oninput="handleSlotSearch(this, 1, 'survivor')"
+                      onkeydown="handleSlotSearchKey(event, 1, 'survivor')">
+                    <div class="slot-character" id="char-1">
+                      <img id="default-img-1" class="default-image"
+                        style="display:none; width:100%; height:100%; object-fit:contain;" />
+                      <span id="char-text-1">未选择</span>
+                    </div>
+                    <div class="slot-player-name" id="slot-player-1" style="font-size: 10px; color: #718096;"></div>
+                    <div class="slot-talents" id="slot-talents-1" style="display: flex; gap: 2px;"></div>
+                    <button class="slot-blink-btn" onclick="event.stopPropagation(); triggerBlink(1)">闪烁</button>
+                  </div>
+                  <div class="slot" id="slot-2" onclick="openPickModal('survivor', 2)">
+                    <div class="slot-label">求生3</div>
+                    <input type="text" class="slot-search" placeholder="搜..." onclick="event.stopPropagation()"
+                      oninput="handleSlotSearch(this, 2, 'survivor')"
+                      onkeydown="handleSlotSearchKey(event, 2, 'survivor')">
+                    <div class="slot-character" id="char-2">
+                      <img id="default-img-2" class="default-image"
+                        style="display:none; width:100%; height:100%; object-fit:contain;" />
+                      <span id="char-text-2">未选择</span>
+                    </div>
+                    <div class="slot-player-name" id="slot-player-2" style="font-size: 10px; color: #718096;"></div>
+                    <div class="slot-talents" id="slot-talents-2" style="display: flex; gap: 2px;"></div>
+                    <button class="slot-blink-btn" onclick="event.stopPropagation(); triggerBlink(2)">闪烁</button>
+                  </div>
+                  <div class="slot" id="slot-3" onclick="openPickModal('survivor', 3)">
+                    <div class="slot-label">求生4</div>
+                    <input type="text" class="slot-search" placeholder="搜..." onclick="event.stopPropagation()"
+                      oninput="handleSlotSearch(this, 3, 'survivor')"
+                      onkeydown="handleSlotSearchKey(event, 3, 'survivor')">
+                    <div class="slot-character" id="char-3">
+                      <img id="default-img-3" class="default-image"
+                        style="display:none; width:100%; height:100%; object-fit:contain;" />
+                      <span id="char-text-3">未选择</span>
+                    </div>
+                    <div class="slot-player-name" id="slot-player-3" style="font-size: 10px; color: #718096;"></div>
+                    <div class="slot-talents" id="slot-talents-3" style="display: flex; gap: 2px;"></div>
+                    <button class="slot-blink-btn" onclick="event.stopPropagation(); triggerBlink(3)">闪烁</button>
+                  </div>
+                  <div class="slot" id="slot-hunter" onclick="openPickModal('hunter', 4)">
+                    <div class="slot-label">监管</div>
+                    <input type="text" class="slot-search" placeholder="搜..." onclick="event.stopPropagation()"
+                      oninput="handleSlotSearch(this, 4, 'hunter')" onkeydown="handleSlotSearchKey(event, 4, 'hunter')">
+                    <div class="slot-character" id="char-hunter">
+                      <img id="default-img-hunter" class="default-image"
+                        style="display:none; width:100%; height:100%; object-fit:contain;" />
+                      <span id="char-text-hunter">未选择</span>
+                    </div>
+                    <div class="slot-player-name" id="slot-player-4" style="font-size: 10px; color: #718096;"></div>
+                    <div class="slot-talents" id="slot-talents-hunter" style="display: flex; gap: 2px;"></div>
+                    <div class="slot-talents" id="slot-skills-hunter" style="display: flex; gap: 2px; margin-top: 2px;">
+                    </div>
+                    <button class="slot-blink-btn" onclick="event.stopPropagation(); triggerBlink(4)">闪烁</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右侧：Ban位与天赋快捷 -->
+            <div class="bp-col-right">
+              <!-- Ban位 -->
+              <div class="section">
+                <div class="section-title">Ban位</div>
+                <div class="ban-panels">
+                  <div class="ban-panel">
+                    <div class="ban-panel-header">
+                      <div class="ban-panel-title">求生者Ban</div>
+                      <button class="btn btn-primary btn-small" onclick="openBanModal('ban-survivor')">添加</button>
+                    </div>
+                    <div class="ban-list" id="ban-survivor-list" onclick="openBanModal('ban-survivor')"></div>
+                    <input type="text" class="slot-search ban-search" placeholder="快速添加..."
+                      oninput="handleBanSearch(this, 'ban-survivor')"
+                      onkeydown="handleBanSearchKey(event, 'ban-survivor')">
+                  </div>
+                  <div class="ban-panel">
+                    <div class="ban-panel-header">
+                      <div class="ban-panel-title">监管者Ban</div>
+                      <button class="btn btn-primary btn-small" onclick="openBanModal('ban-hunter')">添加</button>
+                    </div>
+                    <div class="ban-list" id="ban-hunter-list" onclick="openBanModal('ban-hunter')"></div>
+                    <input type="text" class="slot-search ban-search" placeholder="快速添加..."
+                      oninput="handleBanSearch(this, 'ban-hunter')" onkeydown="handleBanSearchKey(event, 'ban-hunter')">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 全局禁选 -->
+              <div class="section">
+                <div class="section-title">全局禁选</div>
+                <div class="ban-panels">
+                  <div class="ban-panel">
+                    <div class="ban-panel-header">
+                      <div class="ban-panel-title">全局Ban求生</div>
+                      <button class="btn btn-primary btn-small" onclick="openBanModal('global-survivor')">添加</button>
+                    </div>
+                    <div class="ban-list" id="global-ban-survivor-list" onclick="openBanModal('global-survivor')"></div>
+                    <input type="text" class="slot-search ban-search" placeholder="快速添加..."
+                      oninput="handleBanSearch(this, 'global-survivor')"
+                      onkeydown="handleBanSearchKey(event, 'global-survivor')">
+                  </div>
+                  <div class="ban-panel">
+                    <div class="ban-panel-header">
+                      <div class="ban-panel-title">全局Ban监管</div>
+                      <button class="btn btn-primary btn-small" onclick="openBanModal('global-hunter')">添加</button>
+                    </div>
+                    <div class="ban-list" id="global-ban-hunter-list" onclick="openBanModal('global-hunter')"></div>
+                    <input type="text" class="slot-search ban-search" placeholder="快速添加..."
+                      oninput="handleBanSearch(this, 'global-hunter')"
+                      onkeydown="handleBanSearchKey(event, 'global-hunter')">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 选角通过“点击卡槽→弹窗选择”完成 -->
+    <!-- page-bp end -->
+    <!-- ========== 天赋与技能页 ========== -->
+    <div id="page-talents" class="page-content">
+      <div class="container">
+        <h1>天赋与技能设置</h1>
+        <div class="scroll-container">
+          <div id="talent-skill-section" class="talent-skill-section">
+            <!-- 求生者天赋 -->
+            <div class="talent-panel">
+              <div class="talent-panel-title">🧠 求生者天赋设置</div>
+              <div class="survivor-talent-selector">
+                <div class="survivor-talent-tabs">
+                  <div class="survivor-tab active" onclick="selectSurvivorForTalent(0)">求生1</div>
+                  <div class="survivor-tab" onclick="selectSurvivorForTalent(1)">求生2</div>
+                  <div class="survivor-tab" onclick="selectSurvivorForTalent(2)">求生3</div>
+                  <div class="survivor-tab" onclick="selectSurvivorForTalent(3)">求生4</div>
+                </div>
+                <div id="current-survivor-talents" class="current-survivor-talents">请先选择一个求生者</div>
+                <div class="talent-grid" id="survivor-talent-grid">
+                  <div class="talent-item" data-talent="回光返照" onclick="toggleSurvivorTalent('回光返照')">
+                    <img src="../assets/talents/回光返照.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">回光返照</div>
+                  </div>
+                  <div class="talent-item" data-talent="化险为夷" onclick="toggleSurvivorTalent('化险为夷')">
+                    <img src="../assets/talents/化险为夷.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">化险为夷</div>
+                  </div>
+                  <div class="talent-item" data-talent="膝跳反射" onclick="toggleSurvivorTalent('膝跳反射')">
+                    <img src="../assets/talents/膝跳反射.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">膝跳反射</div>
+                  </div>
+                  <div class="talent-item" data-talent="飞轮效应" onclick="toggleSurvivorTalent('飞轮效应')">
+                    <img src="../assets/talents/飞轮效应.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">飞轮效应</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 监管者天赋与技能 -->
+            <div class="skill-panel">
+              <div class="talent-panel-title">👹 监管者设置</div>
+              <div style="margin-bottom: 15px;">
+                <div class="skill-panel-title">天赋</div>
+                <div class="talent-grid" id="hunter-talent-grid">
+                  <div class="talent-item" data-talent="挽留" onclick="toggleHunterTalent('挽留')">
+                    <img src="../assets/talents/挽留.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">挽留</div>
+                  </div>
+                  <div class="talent-item" data-talent="底牌" onclick="toggleHunterTalent('底牌')">
+                    <img src="../assets/talents/底牌.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">底牌</div>
+                  </div>
+                  <div class="talent-item" data-talent="张狂" onclick="toggleHunterTalent('张狂')">
+                    <img src="../assets/talents/张狂.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">张狂</div>
+                  </div>
+                  <div class="talent-item" data-talent="禁闭空间" onclick="toggleHunterTalent('禁闭空间')">
+                    <img src="../assets/talents/禁闭空间.png" class="talent-icon" onerror="this.style.display='none'">
+                    <div class="talent-name">禁闭空间</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="skill-panel-title">辅助技能</div>
+                <div class="skill-grid" id="hunter-skill-grid">
+                  <div class="skill-item" data-skill="闪现" onclick="toggleHunterSkill('闪现')">
+                    <img src="../assets/skills/闪现.png" class="skill-icon" onerror="this.style.display='none'">
+                    <div class="skill-name">闪现</div>
+                  </div>
+                  <div class="skill-item" data-skill="传送" onclick="toggleHunterSkill('传送')">
+                    <img src="../assets/skills/传送.png" class="skill-icon" onerror="this.style.display='none'">
+                    <div class="skill-name">传送</div>
+                  </div>
+                  <div class="skill-item" data-skill="窥视者" onclick="toggleHunterSkill('窥视者')">
+                    <img src="../assets/skills/窥视者.png" class="skill-icon" onerror="this.style.display='none'">
+                    <div class="skill-name">插眼</div>
+                  </div>
+                  <div class="skill-item" data-skill="兴奋" onclick="toggleHunterSkill('兴奋')">
+                    <img src="../assets/skills/兴奋.png" class="skill-icon" onerror="this.style.display='none'">
+                    <div class="skill-name">金身</div>
+                  </div>
+                  <div class="skill-item" data-skill="失常" onclick="toggleHunterSkill('失常')">
+                    <img src="../assets/skills/失常.png" class="skill-icon" onerror="this.style.display='none'">
+                    <div class="skill-name">失常</div>
+                  </div>
+                  <div class="skill-item" data-skill="巡视者" onclick="toggleHunterSkill('巡视者')">
+                    <img src="../assets/skills/巡视者.png" class="skill-icon" onerror="this.style.display='none'">
+                    <div class="skill-name">狗子</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 对局基础信息页 ========== -->
+    <div id="page-baseinfo" class="page-content">
+      <div class="container">
+        <h1>对局基础信息</h1>
+
+        <div class="controls" style="margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="saveMatchBase(true)">保存</button>
+          <button class="btn btn-danger" onclick="resetMatchBase()">重置</button>
+        </div>
+
+        <div class="scroll-container">
+          <!-- 地图设置 -->
+          <div class="section-title">地图</div>
+          <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:260px;">
+              <label>地图名称</label>
+              <select id="baseMapName" class="player-name-input" onchange="updateMatchBaseMapName(this.value)"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>队伍信息</span>
+            <button class="btn btn-warning btn-small" onclick="swapTeamInfo()"
+              style="background:#f59e0b;border-color:#f59e0b;">
+              🔄 快速轮换AB队
+            </button>
+          </div>
+          <div class="baseinfo-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:10px;">
+              <div style="font-weight:900;margin-bottom:8px;">队伍A</div>
+
+              <div class="team-header-compact">
+                <img id="baseTeamALogoPreview" class="team-logo-compact" alt="Logo" />
+                <div class="team-info-fields">
+                  <label>队伍名称</label>
+                  <input type="text" id="baseTeamAName" class="player-name-input" placeholder="A队" style="height:28px;"
+                    oninput="updateMatchBaseTeamName('A', this.value)">
+                  <div class="team-btn-group">
+                    <button class="btn btn-primary btn-small" style="padding:2px 8px;font-size:11px;"
+                      onclick="selectTeamLogoForBase('A')">选Logo</button>
+                    <button class="btn btn-danger btn-small" style="padding:2px 8px;font-size:11px;"
+                      onclick="clearTeamLogoForBase('A')">清除</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:8px;">
+                <label
+                  style="display:block;margin-bottom:4px;font-size:12px;font-weight:bold;color:#718096;">成员列表</label>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <!-- Member 0 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamAMember0" placeholder="成员1"
+                      oninput="updateMatchBaseMember('A', 0, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamAMember0Hunter"
+                          onchange="updateMemberRoles('A', 0)">屠</label>
+                      <label><input type="checkbox" id="baseTeamAMember0Survivor"
+                          onchange="updateMemberRoles('A', 0)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 1 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamAMember1" placeholder="成员2"
+                      oninput="updateMatchBaseMember('A', 1, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamAMember1Hunter"
+                          onchange="updateMemberRoles('A', 1)">屠</label>
+                      <label><input type="checkbox" id="baseTeamAMember1Survivor"
+                          onchange="updateMemberRoles('A', 1)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 2 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamAMember2" placeholder="成员3"
+                      oninput="updateMatchBaseMember('A', 2, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamAMember2Hunter"
+                          onchange="updateMemberRoles('A', 2)">屠</label>
+                      <label><input type="checkbox" id="baseTeamAMember2Survivor"
+                          onchange="updateMemberRoles('A', 2)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 3 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamAMember3" placeholder="成员4"
+                      oninput="updateMatchBaseMember('A', 3, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamAMember3Hunter"
+                          onchange="updateMemberRoles('A', 3)">屠</label>
+                      <label><input type="checkbox" id="baseTeamAMember3Survivor"
+                          onchange="updateMemberRoles('A', 3)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 4 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamAMember4" placeholder="成员5"
+                      oninput="updateMatchBaseMember('A', 4, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamAMember4Hunter"
+                          onchange="updateMemberRoles('A', 4)">屠</label>
+                      <label><input type="checkbox" id="baseTeamAMember4Survivor"
+                          onchange="updateMemberRoles('A', 4)">人</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:10px;">
+              <div style="font-weight:900;margin-bottom:8px;">队伍B</div>
+
+              <div class="team-header-compact">
+                <img id="baseTeamBLogoPreview" class="team-logo-compact" alt="Logo" />
+                <div class="team-info-fields">
+                  <label>队伍名称</label>
+                  <input type="text" id="baseTeamBName" class="player-name-input" placeholder="B队" style="height:28px;"
+                    oninput="updateMatchBaseTeamName('B', this.value)">
+                  <div class="team-btn-group">
+                    <button class="btn btn-primary btn-small" style="padding:2px 8px;font-size:11px;"
+                      onclick="selectTeamLogoForBase('B')">选Logo</button>
+                    <button class="btn btn-danger btn-small" style="padding:2px 8px;font-size:11px;"
+                      onclick="clearTeamLogoForBase('B')">清除</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:8px;">
+                <label
+                  style="display:block;margin-bottom:4px;font-size:12px;font-weight:bold;color:#718096;">成员列表</label>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <!-- Member 0 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamBMember0" placeholder="成员1"
+                      oninput="updateMatchBaseMember('B', 0, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamBMember0Hunter"
+                          onchange="updateMemberRoles('B', 0)">屠</label>
+                      <label><input type="checkbox" id="baseTeamBMember0Survivor"
+                          onchange="updateMemberRoles('B', 0)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 1 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamBMember1" placeholder="成员2"
+                      oninput="updateMatchBaseMember('B', 1, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamBMember1Hunter"
+                          onchange="updateMemberRoles('B', 1)">屠</label>
+                      <label><input type="checkbox" id="baseTeamBMember1Survivor"
+                          onchange="updateMemberRoles('B', 1)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 2 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamBMember2" placeholder="成员3"
+                      oninput="updateMatchBaseMember('B', 2, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamBMember2Hunter"
+                          onchange="updateMemberRoles('B', 2)">屠</label>
+                      <label><input type="checkbox" id="baseTeamBMember2Survivor"
+                          onchange="updateMemberRoles('B', 2)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 3 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamBMember3" placeholder="成员4"
+                      oninput="updateMatchBaseMember('B', 3, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamBMember3Hunter"
+                          onchange="updateMemberRoles('B', 3)">屠</label>
+                      <label><input type="checkbox" id="baseTeamBMember3Survivor"
+                          onchange="updateMemberRoles('B', 3)">人</label>
+                    </div>
+                  </div>
+                  <!-- Member 4 -->
+                  <div class="member-compact-row">
+                    <input type="text" id="baseTeamBMember4" placeholder="成员5"
+                      oninput="updateMatchBaseMember('B', 4, this.value)">
+                    <div class="member-roles">
+                      <label><input type="checkbox" id="baseTeamBMember4Hunter"
+                          onchange="updateMemberRoles('B', 4)">屠</label>
+                      <label><input type="checkbox" id="baseTeamBMember4Survivor"
+                          onchange="updateMemberRoles('B', 4)">人</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 上场阵容选择 -->
+        <div class="section">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>上场阵容</span>
+            <button class="btn btn-success btn-small" onclick="applyLineup()"
+              style="background:#10b981;border-color:#10b981;">
+              ✓ 应用到赛后数据
+            </button>
+          </div>
+          <div style="background:#f7fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-weight:700;margin-bottom:8px;color:#2d3748;">选择队伍</label>
+              <div style="display:flex;gap:10px;">
+                <label
+                  style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;">
+                  <input type="radio" name="lineupTeam" value="A" onchange="updateLineupOptions()" checked>
+                  <span style="font-weight:600;">队伍A</span>
+                </label>
+                <label
+                  style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:#fff;border:2px solid #e2e8f0;border-radius:8px;">
+                  <input type="radio" name="lineupTeam" value="B" onchange="updateLineupOptions()">
+                  <span style="font-weight:600;">队伍B</span>
+                </label>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div>
+                <label style="display:block;font-weight:700;margin-bottom:8px;color:#2d3748;">求生者 (选择4个)</label>
+                <div style="display:flex;flex-direction:column;gap:6px;" id="survivorLineupOptions">
+                  <!-- 动态生成 -->
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-weight:700;margin-bottom:8px;color:#2d3748;">监管者 (选择1个)</label>
+                <div style="display:flex;flex-direction:column;gap:6px;" id="hunterLineupOptions">
+                  <!-- 动态生成 -->
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;padding:12px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px;">
+              <div style="font-weight:700;color:#065f46;margin-bottom:8px;">当前上场阵容：</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <div>
+                  <span style="color:#6b7280;font-size:12px;">求生者：</span>
+                  <span id="currentSurvivorsDisplay" style="font-weight:600;color:#059669;">未选择</span>
+                </div>
+                <div>
+                  <span style="color:#6b7280;font-size:12px;">监管者：</span>
+                  <span id="currentHunterDisplay" style="font-weight:600;color:#dc2626;">未选择</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 比分管理页 ========== -->
+  <div id="page-score" class="page-content">
+    <div class="container">
+      <h1>比分管理</h1>
+
+      <div class="controls" style="margin-bottom: 12px;">
+        <button class="btn btn-primary" onclick="addBo()">新增BO</button>
+        <button class="btn btn-primary" onclick="saveScoreData()">保存</button>
+        <button class="btn btn-danger" onclick="resetScore()">重置</button>
+        <button class="btn btn-success" onclick="openScoreboardWindow('teamA')">A比分</button>
+        <button class="btn btn-success" onclick="openScoreboardWindow('teamB')">B比分</button>
+      </div>
+
+      <div class="scroll-container">
+        <div style="display:flex;gap:10px;margin-bottom:10px;">
+          <div style="flex:1;">
+            <label>A队 <span style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></label>
+            <input type="text" id="scoreTeamAName" class="player-name-input" placeholder="A队" readonly
+              style="background:#f0f0f0; cursor:not-allowed; color:#666;">
+          </div>
+          <div style="flex:1;">
+            <label>B队 <span style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></label>
+            <input type="text" id="scoreTeamBName" class="player-name-input" placeholder="B队" readonly
+              style="background:#f0f0f0; cursor:not-allowed; color:#666;">
+          </div>
+        </div>
+
+        <!-- 新增：展示控制区域 -->
+        <div
+          style="background: rgba(102, 126, 234, 0.08); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; padding: 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;">
+          <div style="flex: 1; min-width: 150px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">当前展示BO</label>
+            <select id="displayRoundSelect" class="player-name-input" onchange="updateScoreboardDisplayConfig()"
+              style="width: 100%;">
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">前台展示模式</label>
+            <select id="displayModeSelect" class="player-name-input" onchange="updateScoreboardDisplayConfig()"
+              style="width: 100%;">
+              <option value="auto">自动 (根据比赛进度)</option>
+              <option value="upper">固定显示 上半局</option>
+              <option value="lower">固定显示 下半局</option>
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">当前局势
+              (Auto时使用)</label>
+            <select id="displayHalfSelect" class="player-name-input" onchange="updateScoreboardDisplayConfig()"
+              style="width: 100%;">
+              <option value="1">上半局</option>
+              <option value="2">下半局</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="score-summary">
+          <div class="score-card">
+            <div style="font-weight:800;font-size:14px;" id="scoreTeamALabel">A队</div>
+            <div class="team-wins" style="color:#64b5f6;" id="scoreTeamAWins">0</div>
+            <div style="color:#666;font-size:11px;" id="scoreTeamARecord">0胜 0平 0负</div>
+          </div>
+          <div style="display:flex;align-items:center;font-size:20px;font-weight:900;color:#999;">VS</div>
+          <div class="score-card">
+            <div style="font-weight:800;font-size:14px;" id="scoreTeamBLabel">B队</div>
+            <div class="team-wins" style="color:#ef5350;" id="scoreTeamBWins">0</div>
+            <div style="color:#666;font-size:11px;" id="scoreTeamBRecord">0胜 0平 0负</div>
+          </div>
+        </div>
+
+        <div id="boScoreList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 赛后数据页 ========== -->
+  <div id="page-postmatch" class="page-content">
+    <div class="container">
+      <h1>赛后数据</h1>
+
+      <div class="controls" style="margin-bottom: 12px;">
+        <button class="btn btn-primary" onclick="savePostMatch()">保存</button>
+        <button class="btn btn-danger" onclick="resetPostMatch()">重置</button>
+        <button class="btn btn-success" onclick="openPostMatchWindow()">打开窗口</button>
+      </div>
+
+      <div class="scroll-container">
+        <div class="section">
+          <div class="section-title">基本信息</div>
+          <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;">
+            <div><label>标题</label><input type="text" id="pmTitle" class="player-name-input" value="赛后数据"></div>
+            <div><label>副标题</label><input type="text" id="pmSubTitle" class="player-name-input" value="MATCH STATS">
+            </div>
+            <div><label>局标识</label><input type="text" id="pmGameLabel" class="player-name-input" value="GAME 1"></div>
+            <div style="grid-column: span 2;"><label>地图 <span
+                  style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></label>
+              <select id="pmMapName" class="player-name-input" disabled
+                style="background:#f0f0f0; cursor:not-allowed; color:#666;"></select>
+            </div>
+          </div>
+
+          <div
+            style="margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(102,126,234,0.05); border: 1px solid rgba(102,126,234,0.1);">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="file" id="pmOcrFile" accept="image/*" style="font-size:11px; flex:1;">
+              <button class="btn btn-primary btn-small" id="pmOcrBtn" onclick="ocrFillPostMatch()">OCR识别</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">队伍信息</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="background:#f7fafc;border:2px solid #e2e8f0;border-radius:8px;padding:8px;">
+              <div style="font-weight:800;font-size:13px;margin-bottom:5px;">队伍A <span
+                  style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></div>
+              <input type="text" id="pmTeamAName" class="player-name-input" placeholder="队伍A" readonly
+                style="background:#eeeeee; cursor:not-allowed; color:#666;">
+              <div style="display:flex;gap:5px;margin-top:5px;">
+                <input type="text" id="pmTeamAMeta" class="player-name-input" placeholder="备注" style="flex:2;">
+                <input type="number" id="pmTeamAScore" class="player-name-input" value="0" style="flex:1;">
+              </div>
+            </div>
+            <div style="background:#f7fafc;border:2px solid #e2e8f0;border-radius:8px;padding:8px;">
+              <div style="font-weight:800;font-size:13px;margin-bottom:5px;">队伍B <span
+                  style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></div>
+              <input type="text" id="pmTeamBName" class="player-name-input" placeholder="队伍B" readonly
+                style="background:#eeeeee; cursor:not-allowed; color:#666;">
+              <div style="display:flex;gap:5px;margin-top:5px;">
+                <input type="text" id="pmTeamBMeta" class="player-name-input" placeholder="备注" style="flex:2;">
+                <input type="number" id="pmTeamBScore" class="player-name-input" value="0" style="flex:1;">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">选手数据</div>
+          <div class="pm-table-wrapper">
+            <table class="pm-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:#4a5568;color:#fff;">
+                  <th style="padding:5px;">选手</th>
+                  <th style="padding:5px;">修机</th>
+                  <th style="padding:5px;">板窗</th>
+                  <th style="padding:5px;">救人</th>
+                  <th style="padding:5px;">治疗</th>
+                  <th style="padding:5px;">牵制</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input id="pmS1Name" class="player-name-input" placeholder="S1"></td>
+                  <td><input id="pmS1Decode" type="number" class="player-name-input"></td>
+                  <td><input id="pmS1Pallet" type="number" class="player-name-input"></td>
+                  <td><input id="pmS1Rescue" type="number" class="player-name-input"></td>
+                  <td><input id="pmS1Heal" type="number" class="player-name-input"></td>
+                  <td><input id="pmS1Chase" type="number" class="player-name-input"></td>
+                </tr>
+                <tr>
+                  <td><input id="pmS2Name" class="player-name-input" placeholder="S2"></td>
+                  <td><input id="pmS2Decode" type="number" class="player-name-input"></td>
+                  <td><input id="pmS2Pallet" type="number" class="player-name-input"></td>
+                  <td><input id="pmS2Rescue" type="number" class="player-name-input"></td>
+                  <td><input id="pmS2Heal" type="number" class="player-name-input"></td>
+                  <td><input id="pmS2Chase" type="number" class="player-name-input"></td>
+                </tr>
+                <tr>
+                  <td><input id="pmS3Name" class="player-name-input" placeholder="S3"></td>
+                  <td><input id="pmS3Decode" type="number" class="player-name-input"></td>
+                  <td><input id="pmS3Pallet" type="number" class="player-name-input"></td>
+                  <td><input id="pmS3Rescue" type="number" class="player-name-input"></td>
+                  <td><input id="pmS3Heal" type="number" class="player-name-input"></td>
+                  <td><input id="pmS3Chase" type="number" class="player-name-input"></td>
+                </tr>
+                <tr>
+                  <td><input id="pmS4Name" class="player-name-input" placeholder="S4"></td>
+                  <td><input id="pmS4Decode" type="number" class="player-name-input"></td>
+                  <td><input id="pmS4Pallet" type="number" class="player-name-input"></td>
+                  <td><input id="pmS4Rescue" type="number" class="player-name-input"></td>
+                  <td><input id="pmS4Heal" type="number" class="player-name-input"></td>
+                  <td><input id="pmS4Chase" type="number" class="player-name-input"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-top:10px;">
+            <div><label>监管选手</label><input type="text" id="pmHunterName" class="player-name-input" placeholder="选手名">
+            </div>
+            <div><label>监管角色</label><input type="text" id="pmHunterRole" class="player-name-input" placeholder="角色名">
+            </div>
+            <div><label>剩余密码机</label><input type="number" id="pmHunterRemaining" class="player-name-input" value="0">
+            </div>
+            <div><label>破坏木板</label><input type="number" id="pmHunterPalletDestroy" class="player-name-input" value="0">
+            </div>
+            <div><label>命中</label><input type="number" id="pmHunterHit" class="player-name-input" value="0"></div>
+            <div><label>恐怖震慑</label><input type="number" id="pmHunterTerror" class="player-name-input" value="0">
+            </div>
+            <div><label>击倒</label><input type="number" id="pmHunterDown" class="player-name-input" value="0"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div> <!-- page-postmatch end -->
+  </div> <!-- main-wrapper end -->
+
+
+  <!-- 选角弹窗 -->
+  <div class="modal" id="pickModal" onclick="closePickModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="pickModalTitle">选择角色</div>
+        <button class="modal-close" onclick="closePickModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="character-grid" id="pick-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/local-bp-logic.js"></script>
+  <script src="./js/localbp-onboarding.js"></script>
+</body>
+
+</html>

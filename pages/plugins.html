@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>插件管理 - ASG.Director</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    
+    .subtitle {
+      color: #888;
+      margin-bottom: 30px;
+    }
+    
+    .plugin-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .plugin-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+    
+    .plugin-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+    
+    .plugin-card.disabled {
+      opacity: 0.5;
+    }
+    
+    .plugin-card.error {
+      border-color: #ff4444;
+    }
+    
+    .plugin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .plugin-info {
+      flex: 1;
+    }
+    
+    .plugin-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .plugin-name .version {
+      font-size: 12px;
+      font-weight: normal;
+      color: #888;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    
+    .plugin-name .builtin {
+      font-size: 11px;
+      font-weight: normal;
+      color: #4CAF50;
+      background: rgba(76, 175, 80, 0.2);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    
+    .plugin-description {
+      color: #aaa;
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    
+    .plugin-author {
+      color: #666;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    
+    .plugin-state {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .plugin-state.active {
+      color: #4CAF50;
+      background: rgba(76, 175, 80, 0.2);
+    }
+    
+    .plugin-state.inactive {
+      color: #ff9800;
+      background: rgba(255, 152, 0, 0.2);
+    }
+    
+    .plugin-state.error {
+      color: #f44336;
+      background: rgba(244, 67, 54, 0.2);
+    }
+    
+    .plugin-state .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    
+    .plugin-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .btn-primary {
+      background: #2196F3;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1976D2;
+    }
+    
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e0e0e0;
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-danger {
+      background: rgba(244, 67, 54, 0.2);
+      color: #f44336;
+    }
+    
+    .btn-danger:hover {
+      background: rgba(244, 67, 54, 0.3);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    
+    .empty-state .icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+    }
+    
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .search-box input {
+      background: none;
+      border: none;
+      color: #e0e0e0;
+      font-size: 14px;
+      outline: none;
+      width: 200px;
+    }
+    
+    .search-box input::placeholder {
+      color: #666;
+    }
+    
+    .plugin-error {
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(244, 67, 54, 0.1);
+      border-radius: 6px;
+      color: #f44336;
+      font-size: 13px;
+    }
+    
+    /* 通知样式 */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    
+    .notification.info {
+      background: #2196F3;
+    }
+    
+    .notification.success {
+      background: #4CAF50;
+    }
+    
+    .notification.warning {
+      background: #ff9800;
+    }
+    
+    .notification.error {
+      background: #f44336;
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧩 插件管理</h1>
+    <p class="subtitle">管理 ASG.Director 的扩展功能</p>
+    
+    <div class="toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="搜索插件...">
+      </div>
+      <div>
+        <button class="btn btn-secondary" onclick="openPluginStore()" style="margin-right: 8px;">
+          🏪 插件商店
+        </button>
+        <button class="btn btn-secondary" onclick="refreshPlugins()">
+          🔄 刷新
+        </button>
+      </div>
+    </div>
+    
+    <div id="pluginList" class="plugin-list">
+      <!-- 插件列表将动态生成 -->
+    </div>
+  </div>
+  
+  <script>
+    // 状态映射
+    const stateLabels = {
+      'active': '运行中',
+      'inactive': '未激活',
+      'loading': '加载中',
+      'error': '错误',
+      'disabled': '已禁用'
+    }
+    
+    // 加载插件列表
+    async function loadPlugins() {
+      const listEl = document.getElementById('pluginList')
+      
+      try {
+        const plugins = await window.plugins.getAllPlugins()
+        
+        if (plugins.length === 0) {
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">📦</div>
+              <p>没有安装任何插件</p>
+              <p style="margin-top: 10px; font-size: 13px;">
+                将插件放入 plugins 目录后重启应用
+              </p>
+            </div>
+          `
+          return
+        }
+        
+        listEl.innerHTML = plugins.map(plugin => `
+          <div class="plugin-card ${plugin.state === 'disabled' ? 'disabled' : ''} ${plugin.state === 'error' ? 'error' : ''}" data-id="${plugin.id}">
+            <div class="plugin-header">
+              <div class="plugin-info">
+                <div class="plugin-name">
+                  ${plugin.name}
+                  <span class="version">v${plugin.version}</span>
+                  ${plugin.isBuiltin ? '<span class="builtin">内置</span>' : ''}
+                </div>
+                <div class="plugin-description">${plugin.description || '暂无描述'}</div>
+                ${plugin.author ? `<div class="plugin-author">作者: ${plugin.author}</div>` : ''}
+              </div>
+              <div class="plugin-state ${plugin.state}">
+                <span class="dot"></span>
+                ${stateLabels[plugin.state] || plugin.state}
+              </div>
+            </div>
+            
+            ${plugin.error ? `<div class="plugin-error">⚠️ ${plugin.error}</div>` : ''}
+            
+            <div class="plugin-actions">
+              ${plugin.state === 'active' ? `
+                <button class="btn btn-danger" onclick="disablePlugin('${plugin.id}')">
+                  ⏹️ 禁用
+                </button>
+              ` : `
+                <button class="btn btn-primary" onclick="enablePlugin('${plugin.id}')">
+                  ▶️ 启用
+                </button>
+              `}
+              <button class="btn btn-secondary" onclick="reloadPlugin('${plugin.id}')">
+                🔄 重载
+              </button>
+              <button class="btn btn-secondary" onclick="showSettings('${plugin.id}')">
+                ⚙️ 设置
+              </button>
+            </div>
+          </div>
+        `).join('')
+      } catch (error) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">❌</div>
+            <p>加载插件列表失败</p>
+            <p style="margin-top: 10px; font-size: 13px;">${error.message}</p>
+          </div>
+        `
+      }
+    }
+    
+    // 启用插件
+    async function enablePlugin(pluginId) {
+      try {
+        await window.plugins.enablePlugin(pluginId)
+        showNotification('插件已启用', 'success')
+        loadPlugins()
+      } catch (error) {
+        showNotification('启用失败: ' + error.message, 'error')
+      }
+    }
+    
+    // 禁用插件
+    async function disablePlugin(pluginId) {
+      try {
+        await window.plugins.disablePlugin(pluginId)
+        showNotification('插件已禁用', 'success')
+        loadPlugins()
+      } catch (error) {
+        showNotification('禁用失败: ' + error.message, 'error')
+      }
+    }
+    
+    // 重载插件
+    async function reloadPlugin(pluginId) {
+      try {
+        await window.plugins.reloadPlugin(pluginId)
+        showNotification('插件已重载', 'success')
+        loadPlugins()
+      } catch (error) {
+        showNotification('重载失败: ' + error.message, 'error')
+      }
+    }
+    
+    // 显示设置
+    async function showSettings(pluginId) {
+      const settings = await window.plugins.getPluginSettings(pluginId)
+      console.log('Plugin settings:', settings)
+      showNotification('设置功能开发中...', 'info')
+    }
+    
+    // 刷新列表
+    function refreshPlugins() {
+      loadPlugins()
+      showNotification('已刷新', 'info')
+    }
+
+    // 打开插件商店
+    async function openPluginStore() {
+      try {
+        if (!window.electronAPI || typeof window.electronAPI.openPluginStore !== 'function') {
+          showNotification('无法打开插件商店：electronAPI 未注入', 'error')
+          return
+        }
+        const result = await window.electronAPI.openPluginStore()
+        if (result && result.success === false) {
+          showNotification('打开插件商店失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (error) {
+        showNotification('打开插件商店失败: ' + error.message, 'error')
+      }
+    }
+    
+    // 显示通知
+    function showNotification(message, type = 'info') {
+      const notification = document.createElement('div')
+      notification.className = `notification ${type}`
+      notification.textContent = message
+      document.body.appendChild(notification)
+      
+      setTimeout(() => {
+        notification.remove()
+      }, 3000)
+    }
+    
+    // 搜索功能
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase()
+      const cards = document.querySelectorAll('.plugin-card')
+      
+      cards.forEach(card => {
+        const name = card.querySelector('.plugin-name').textContent.toLowerCase()
+        const desc = card.querySelector('.plugin-description').textContent.toLowerCase()
+        
+        if (name.includes(query) || desc.includes(query)) {
+          card.style.display = ''
+        } else {
+          card.style.display = 'none'
+        }
+      })
+    })
+    
+    // 监听插件通知
+    if (window.plugins && window.plugins.onNotification) {
+      window.plugins.onNotification((data) => {
+        showNotification(data.message, data.type)
+      })
+    }
+    
+    // 初始加载
+    loadPlugins()
+  </script>
+</body>
+</html>

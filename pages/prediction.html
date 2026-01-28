@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竞猜结果</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    h1 {
+      font-size: 28px;
+      color: #ffd700;
+      text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+    }
+    
+    .match-info {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.08) 100%);
+      border-radius: 16px;
+      padding: 30px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    
+    .teams-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 20px;
+    }
+    
+    .team {
+      text-align: center;
+      flex: 1;
+      max-width: 200px;
+    }
+    
+    .team-logo {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 140, 0, 0.15) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 15px;
+      font-size: 42px;
+      font-weight: bold;
+      color: #ffd700;
+      border: 2px solid rgba(255, 215, 0, 0.3);
+    }
+    
+    .team-logo img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    .team-name {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    
+    .team-votes {
+      font-size: 36px;
+      font-weight: bold;
+      text-shadow: 0 0 20px currentColor;
+    }
+    
+    .team-votes.home { color: #4a90d9; }
+    .team-votes.away { color: #ff8c00; }
+    
+    .team-percent {
+      font-size: 18px;
+      color: #aaa;
+      font-weight: 600;
+    }
+    
+    .vs {
+      font-size: 32px;
+      color: #888;
+      font-weight: bold;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+    
+    .progress-bar {
+      height: 16px;
+      background: #ff8c00;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 15px;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4a90d9 0%, #5aa3e9 100%);
+      transition: width 0.8s ease;
+      box-shadow: 0 0 15px rgba(74, 144, 217, 0.6);
+    }
+    
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      color: #aaa;
+      font-weight: 500;
+    }
+    
+    .participants {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .participant-list {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 15px;
+    }
+    
+    .participant-list.home {
+      border-left: 3px solid #4a90d9;
+    }
+    
+    .participant-list.away {
+      border-left: 3px solid #ff8c00;
+    }
+    
+    .participant-header {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .participant-header.home { color: #4a90d9; }
+    .participant-header.away { color: #ff8c00; }
+    
+    .participant-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+    }
+    
+    .participant-item:last-child {
+      border-bottom: none;
+    }
+    
+    .participant-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .source-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .source-badge.web { background: rgba(74, 144, 217, 0.3); color: #4a90d9; }
+    .source-badge.bilibili { background: rgba(251, 114, 153, 0.3); color: #fb7299; }
+    
+    .participant-time {
+      color: #666;
+      font-size: 12px;
+    }
+    
+    .bilibili-section {
+      background: rgba(251, 114, 153, 0.1);
+      border-radius: 12px;
+      padding: 15px;
+      margin-top: 20px;
+      border: 1px solid rgba(251, 114, 153, 0.3);
+    }
+    
+    .bilibili-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      color: #fb7299;
+      font-weight: bold;
+    }
+    
+    .bilibili-input-row {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .bilibili-input {
+      flex: 1;
+      padding: 10px 15px;
+      border: 1px solid rgba(251, 114, 153, 0.3);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 14px;
+    }
+    
+    .bilibili-input:focus {
+      outline: none;
+      border-color: #fb7299;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-bilibili {
+      background: linear-gradient(135deg, #fb7299 0%, #ff6b9d 100%);
+      color: #fff;
+    }
+    
+    .btn-bilibili:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(251, 114, 153, 0.4);
+    }
+    
+    .btn-stop {
+      background: #666;
+      color: #fff;
+    }
+    
+    .bilibili-status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    
+    .bilibili-status.connected {
+      background: rgba(76, 175, 80, 0.2);
+      color: #81c784;
+    }
+    
+    .bilibili-status.disconnected {
+      background: rgba(244, 67, 54, 0.2);
+      color: #e57373;
+    }
+    
+    .danmaku-feed {
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    
+    .danmaku-item {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .danmaku-user {
+      color: #fb7299;
+    }
+    
+    .danmaku-text {
+      color: #fff;
+    }
+    
+    .prediction-toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(76, 175, 80, 0.9);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+      z-index: 1000;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes fadeOut {
+      to { opacity: 0; }
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #888;
+    }
+    
+    .empty {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+      font-size: 13px;
+    }
+    
+    .refresh-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: rotate(180deg);
+    }
+    
+    .refresh-btn.refreshing {
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .auto-refresh-indicator {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      background: rgba(76, 175, 80, 0.2);
+      color: #81c784;
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔮 竞猜结果</h1>
+    <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()" title="手动刷新">🔄</button>
+  </div>
+  
+  <div class="auto-refresh-indicator">
+    ⚡ 自动刷新: 每5秒
+  </div>
+  
+  <div id="content">
+    <div class="loading">等待加载比赛数据...</div>
+  </div>
+  
+  <div class="bilibili-section">
+    <div class="bilibili-header">
+      📺 B站弹幕竞猜
+    </div>
+    <div class="bilibili-input-row">
+      <input type="text" class="bilibili-input" id="bilibiliRoomId" placeholder="输入B站直播间房间号">
+      <button class="btn btn-bilibili" id="startBtn" onclick="toggleBilibili()">开始监听</button>
+    </div>
+    <div id="bilibiliStatus" class="bilibili-status disconnected" style="display: none;">
+      未连接
+    </div>
+    <div class="danmaku-feed" id="danmakuFeed" style="display: none;">
+    </div>
+  </div>
+  
+  <script>
+    console.log('=== 竞猜结果页面初始化 ===')
+    console.log('electronAPI可用:', !!window.electronAPI)
+    console.log('onLoadMatch可用:', !!(window.electronAPI && window.electronAPI.onLoadMatch))
+    
+    let matchId = null
+    let matchData = null
+    let predictionData = null
+    let bilibiliConnected = false
+    let autoRefreshInterval = null
+    
+    // 监听来自主进程的消息
+    window.electronAPI.onRoomData && window.electronAPI.onRoomData((data) => {
+      console.log('收到房间数据:', data)
+    })
+    
+    // 监听加载比赛事件
+    if (window.electronAPI && window.electronAPI.onLoadMatch) {
+      console.log('注册load-match监听器')
+      window.electronAPI.onLoadMatch((id) => {
+        console.log('✅ 收到load-match事件，matchId:', id)
+        matchId = id
+        loadData()
+        startAutoRefresh()
+      })
+    } else {
+      console.error('❌ electronAPI.onLoadMatch不可用！')
+    }
+    
+    // 监听B站弹幕
+    window.electronAPI.onBilibiliDanmaku && window.electronAPI.onBilibiliDanmaku((data) => {
+      addDanmaku(data)
+    })
+    
+    // 监听竞猜事件
+    window.electronAPI.onBilibiliPrediction && window.electronAPI.onBilibiliPrediction((data) => {
+      showPredictionToast(data)
+      loadData() // 立即刷新数据
+    })
+    
+    function startAutoRefresh() {
+      // 清除旧的定时器
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval)
+      }
+      // 每5秒自动刷新
+      autoRefreshInterval = setInterval(() => {
+        if (matchId) {
+          loadData()
+        }
+      }, 5000)
+    }
+    
+    async function loadData() {
+      if (!matchId) {
+        document.getElementById('content').innerHTML = '<div class="loading">请从主页面选择一场比赛</div>'
+        return
+      }
+      
+      try {
+        console.log('开始加载竞猜数据:', matchId)
+        const result = await window.electronAPI.getMatchPredictions(matchId)
+        console.log('竞猜数据返回:', result)
+        
+        if (result.success) {
+          predictionData = result.data
+          renderData()
+        } else {
+          console.error('加载失败:', result.error)
+          document.getElementById('content').innerHTML = `<div class="loading">加载失败: ${result.error || '未知错误'}</div>`
+        }
+      } catch (e) {
+        console.error('加载异常:', e)
+        document.getElementById('content').innerHTML = `<div class="loading">加载失败: ${e.message}</div>`
+      }
+    }
+    
+    function renderData() {
+      if (!predictionData || !predictionData.stats) {
+        document.getElementById('content').innerHTML = '<div class="loading">暂无数据</div>'
+        return
+      }
+      
+      const stats = predictionData.stats
+      const homePercent = stats.totalPredictions > 0 ? stats.homeTeamPercentage : 50
+      
+      const html = `
+        <div class="match-info">
+          <div class="teams-row">
+            <div class="team">
+              <div class="team-logo">${stats.homeTeamName ? stats.homeTeamName[0] : 'A'}</div>
+              <div class="team-name">${stats.homeTeamName || '主队'}</div>
+              <div class="team-votes home">${stats.homeTeamPredictions}</div>
+              <div class="team-percent">${stats.homeTeamPercentage.toFixed(1)}%</div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="team">
+              <div class="team-logo">${stats.awayTeamName ? stats.awayTeamName[0] : 'B'}</div>
+              <div class="team-name">${stats.awayTeamName || '客队'}</div>
+              <div class="team-votes away">${stats.awayTeamPredictions}</div>
+              <div class="team-percent">${stats.awayTeamPercentage.toFixed(1)}%</div>
+            </div>
+          </div>
+          
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${homePercent}%"></div>
+          </div>
+          
+          <div class="stats-row">
+            <span>🌐 网页: ${stats.webPredictions}</span>
+            <span>总计: ${stats.totalPredictions} 人</span>
+            <span>📺 B站: ${stats.bilibiliPredictions}</span>
+          </div>
+        </div>
+        
+        <div class="participants">
+          <div class="participant-list home">
+            <div class="participant-header home">
+              🏠 ${stats.homeTeamName || '主队'} 支持者
+            </div>
+            ${renderParticipants(predictionData.homeTeamParticipants)}
+          </div>
+          <div class="participant-list away">
+            <div class="participant-header away">
+              ✈️ ${stats.awayTeamName || '客队'} 支持者
+            </div>
+            ${renderParticipants(predictionData.awayTeamParticipants)}
+          </div>
+        </div>
+      `
+      
+      document.getElementById('content').innerHTML = html
+    }
+    
+    function renderParticipants(participants) {
+      if (!participants || !participants.length) {
+        return '<div class="empty">暂无支持者</div>'
+      }
+      
+      return participants.map(p => `
+        <div class="participant-item">
+          <div class="participant-name">
+            <span class="source-badge ${p.source === 'Web' ? 'web' : 'bilibili'}">
+              ${p.source === 'Web' ? '🌐' : '📺'}
+            </span>
+            ${p.name}
+          </div>
+          <div class="participant-time">${formatTime(p.createdAt)}</div>
+        </div>
+      `).join('')
+    }
+    
+    function formatTime(dt) {
+      if (!dt) return ''
+      const d = new Date(dt)
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+    
+    async function toggleBilibili() {
+      const roomIdInput = document.getElementById('bilibiliRoomId')
+      const startBtn = document.getElementById('startBtn')
+      const statusDiv = document.getElementById('bilibiliStatus')
+      const feedDiv = document.getElementById('danmakuFeed')
+      
+      if (bilibiliConnected) {
+        // 停止
+        await window.electronAPI.stopBilibiliDanmaku()
+        bilibiliConnected = false
+        startBtn.textContent = '开始监听'
+        startBtn.classList.remove('btn-stop')
+        startBtn.classList.add('btn-bilibili')
+        statusDiv.className = 'bilibili-status disconnected'
+        statusDiv.textContent = '已断开'
+        statusDiv.style.display = 'block'
+        feedDiv.style.display = 'none'
+      } else {
+        // 开始
+        const roomId = roomIdInput.value.trim()
+        if (!roomId) {
+          alert('请输入B站直播间房间号')
+          return
+        }
+        
+        startBtn.disabled = true
+        startBtn.textContent = '连接中...'
+        
+        try {
+          const result = await window.electronAPI.startBilibiliDanmaku(roomId, matchId)
+          if (result.success) {
+            bilibiliConnected = true
+            startBtn.textContent = '停止监听'
+            startBtn.classList.remove('btn-bilibili')
+            startBtn.classList.add('btn-stop')
+            statusDiv.className = 'bilibili-status connected'
+            statusDiv.textContent = `已连接到直播间 ${result.roomId}`
+            statusDiv.style.display = 'block'
+            feedDiv.style.display = 'block'
+            feedDiv.innerHTML = ''
+          } else {
+            alert('连接失败: ' + result.error)
+            startBtn.textContent = '开始监听'
+          }
+        } catch (e) {
+          alert('连接失败: ' + e.message)
+          startBtn.textContent = '开始监听'
+        }
+        
+        startBtn.disabled = false
+      }
+    }
+    
+    function addDanmaku(data) {
+      const feedDiv = document.getElementById('danmakuFeed')
+      const item = document.createElement('div')
+      item.className = 'danmaku-item'
+      item.innerHTML = `<span class="danmaku-user">${data.username}:</span> <span class="danmaku-text">${data.text}</span>`
+      feedDiv.insertBefore(item, feedDiv.firstChild)
+      
+      // 限制显示数量
+      while (feedDiv.children.length > 50) {
+        feedDiv.removeChild(feedDiv.lastChild)
+      }
+    }
+    
+    function showPredictionToast(data) {
+      const toast = document.createElement('div')
+      toast.className = 'prediction-toast'
+      toast.textContent = `✅ ${data.username} 竞猜 ${data.teamName} 获胜`
+      document.body.appendChild(toast)
+      
+      setTimeout(() => {
+        toast.remove()
+      }, 3000)
+    }
+    
+    function manualRefresh() {
+      const btn = document.getElementById('refreshBtn')
+      btn.classList.add('refreshing')
+      loadData()
+      setTimeout(() => {
+        btn.classList.remove('refreshing')
+      }, 1000)
+    }
+  </script>
+</body>
+</html>

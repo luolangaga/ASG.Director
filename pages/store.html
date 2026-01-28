@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASG布局包商店</title>
+
+  <link rel="stylesheet" href="./css/store.css">
+</head>
+
+<body>
+  <header class="header">
+    <h1>🎨 ASG布局包商店</h1>
+    <div class="header-actions">
+      <button class="btn btn-outline" onclick="checkUpdates()">🔄 检查更新</button>
+      <button class="btn btn-primary" onclick="showUploadModal()">📤 上传布局包</button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <aside class="sidebar">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索布局包..." onkeyup="handleSearch(event)">
+      </div>
+
+      <h3>分类</h3>
+      <div class="nav-item active" data-view="browse" onclick="switchView('browse')">
+        🏪 浏览商店
+      </div>
+      <div class="nav-item" data-view="installed" onclick="switchView('installed')">
+        📦 已安装
+      </div>
+      <div class="nav-item" data-view="my-packs" onclick="switchView('my-packs')">
+        👤 我的上传
+      </div>
+
+      <div class="filter-group" style="margin-top: 20px;">
+        <label>排序方式</label>
+        <select id="sortBy" onchange="loadPacks()">
+          <option value="downloads">最多下载</option>
+          <option value="rating">最高评分</option>
+          <option value="newest">最新发布</option>
+          <option value="updated">最近更新</option>
+        </select>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="content-header">
+        <h2 id="contentTitle">浏览商店</h2>
+        <span class="pack-count" id="packCount"></span>
+      </div>
+
+      <div id="packsList" class="packs-grid">
+        <!-- 动态生成 -->
+      </div>
+
+      <div id="pagination" class="pagination">
+        <!-- 动态生成 -->
+      </div>
+    </main>
+  </div>
+
+  <!-- 详情弹窗 -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+      <div class="modal-preview" id="modalPreview">
+        <span>📦</span>
+      </div>
+      <div class="modal-content">
+        <h2 class="modal-title" id="modalTitle">-</h2>
+        <div class="modal-meta">
+          <div class="item"><span>📌</span> 版本 <span id="modalVersion">-</span></div>
+          <div class="item"><span>👤</span> <span id="modalAuthor">-</span></div>
+          <div class="item"><span>📥</span> <span id="modalDownloads">0</span> 次下载</div>
+          <div class="item"><span>⭐</span> <span id="modalRating">-</span></div>
+        </div>
+        <p class="modal-description" id="modalDescription">-</p>
+        <div class="pack-tags" id="modalTags"></div>
+        <div style="margin: 20px 0;">
+          <label style="color: #888; font-size: 12px; margin-bottom: 10px; display: block;">为这个布局包评分</label>
+          <div class="rating-stars" id="ratingStars">
+            <span class="star" data-rating="1">⭐</span>
+            <span class="star" data-rating="2">⭐</span>
+            <span class="star" data-rating="3">⭐</span>
+            <span class="star" data-rating="4">⭐</span>
+            <span class="star" data-rating="5">⭐</span>
+          </div>
+        </div>
+        <div id="storeDownloadProgress" style="display: none; margin-bottom: 20px;">
+          <div
+            style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #ffd700;">
+            <span>正在下载布局包...</span>
+            <span id="storeProgressText">0%</span>
+          </div>
+          <div class="progress-track"
+            style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+            <div id="storeProgressFill"
+              style="height: 100%; background: linear-gradient(90deg, #ffd700, #ff8c00); width: 0%; transition: width 0.2s;">
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="downloadBtn" onclick="downloadPack()">📥 下载安装</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 上传弹窗 -->
+  <div class="modal-overlay" id="uploadModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+      <div class="upload-form">
+        <h2 style="color: #ffd700; margin-bottom: 20px;">📤 上传布局包</h2>
+        <p style="color: #888; font-size: 13px; margin-bottom: 20px;">
+          将你的当前布局打包上传到商店，与其他用户分享。
+        </p>
+
+        <div class="form-group">
+          <label>选择要上传的布局 *</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;">
+            <label
+              style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
+              <input type="checkbox" id="uploadFrontendA" checked> 前台 (A队)
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
+              <input type="checkbox" id="uploadFrontendB"> 前台 (B队)
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
+              <input type="checkbox" id="uploadScoreboardA"> 比分板 (A队)
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
+              <input type="checkbox" id="uploadScoreboardB"> 比分板 (B队)
+            </label>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>布局包名称 *</label>
+            <input type="text" id="uploadName" placeholder="例如：简约深色主题">
+          </div>
+          <div class="form-group">
+            <label>版本号 *</label>
+            <input type="text" id="uploadVersion" placeholder="例如：1.0.0" value="1.0.0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>作者名称 *</label>
+          <input type="text" id="uploadAuthor" placeholder="你的名字或昵称">
+        </div>
+
+        <div class="form-group">
+          <label>简介描述</label>
+          <textarea id="uploadDescription" placeholder="描述一下这个布局包的特点..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>标签（逗号分隔）</label>
+          <input type="text" id="uploadTags" placeholder="例如：简约,深色,比赛">
+        </div>
+
+        <div class="form-group">
+          <label>预览图片</label>
+          <div class="preview-select">
+            <div class="preview-thumb" id="uploadPreviewThumb">📷</div>
+            <button class="btn btn-outline" onclick="selectPreviewImage()">选择图片</button>
+            <input type="hidden" id="uploadPreviewPath">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="uploadPublic" checked> 公开发布（其他人可以看到和下载）
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="uploadAutoIncrementVersion"> 🔄 同ID包自动版本递增（将覆盖上方版本号）
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>PackageId（留空自动生成，填写已有ID可更新旧版本）</label>
+          <input type="text" id="uploadPackageId" placeholder="例如：abc123def456">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn btn-secondary" onclick="closeUploadModal()" style="flex: 1;">取消</button>
+          <button class="btn btn-primary" onclick="uploadPack()" style="flex: 1;">📤 上传</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="./js/store-logic.js"></script>
+</body>
+
+</html>

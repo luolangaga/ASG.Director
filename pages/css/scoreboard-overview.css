@@ -1,0 +1,475 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    background: transparent;
+    font-family: 'Microsoft YaHei', 'Arial', sans-serif;
+    color: #fff;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+}
+
+body.has-background {
+    background: transparent;
+}
+
+/* 拖动条 */
+.drag-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 28px;
+    -webkit-app-region: drag;
+    background: rgba(255, 215, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+    z-index: 10000;
+    cursor: move;
+}
+
+body.edit-mode .drag-bar {
+    background: rgba(255, 215, 0, 0.3);
+}
+
+/* 编辑提示 */
+.edit-hint {
+    position: fixed;
+    top: 35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 215, 0, 0.9);
+    color: #1a1a2e;
+    padding: 8px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    z-index: 10001;
+    display: none;
+    font-size: 14px;
+}
+
+body.edit-mode .edit-hint {
+    display: block;
+}
+
+/* 背景图 */
+.background-image {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -1;
+    display: none;
+}
+
+/* 主容器 */
+.scoreboard-container {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    min-height: 100vh;
+    padding-top: 28px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+body.has-background .scoreboard-container {
+    background: transparent;
+}
+
+/* 列 */
+.column {
+    display: flex;
+    flex-direction: column;
+}
+
+.team-column {
+    min-width: 150px;
+    flex-shrink: 0;
+}
+
+.total-column {
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+/* 游戏容器 */
+.games-container {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+/* 游戏列 */
+.game-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+    border-left: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* 表头单元格 */
+.header-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 5px;
+    min-height: 60px;
+    background: rgba(30, 30, 50, 0.9);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.header-cell .cell-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    display: none;
+}
+
+.header-cell .cell-bg[src]:not([src=""]) {
+    display: block;
+}
+
+.header-text {
+    position: relative;
+    z-index: 1;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 2px;
+}
+
+/* 子表头 */
+.sub-header {
+    display: flex;
+    justify-content: space-around;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 4px;
+    z-index: 1;
+    width: 100%;
+}
+
+.sub-header span {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* 队伍行 */
+.team-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px 10px;
+    flex: 1;
+    min-height: 50px;
+}
+
+.team-row .cell-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    display: none;
+}
+
+.team-row .cell-bg[src]:not([src=""]) {
+    display: block;
+}
+
+.team-a {
+    background: linear-gradient(90deg, #c62828 0%, #e53935 100%);
+}
+
+.team-b {
+    background: linear-gradient(90deg, #b8860b 0%, #daa520 100%);
+}
+
+.team-logo {
+    position: relative;
+    z-index: 1;
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    margin-right: 10px;
+    display: none;
+}
+
+.team-logo[src]:not([src=""]) {
+    display: block;
+}
+
+.team-name {
+    position: relative;
+    z-index: 1;
+    font-size: 20px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* 比分单元格 */
+.score-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 50px;
+    padding: 10px;
+}
+
+.score-cell .cell-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    display: none;
+}
+
+.score-cell .cell-bg[src]:not([src=""]) {
+    display: block;
+}
+
+.score-a {
+    background: rgba(198, 40, 40, 0.7);
+}
+
+.score-b {
+    background: rgba(184, 134, 11, 0.7);
+}
+
+/* 比分数值容器 */
+.score-values {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+}
+
+.half-score {
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    flex: 1;
+}
+
+.half-divider {
+    border-left: 1px dashed rgba(255, 255, 255, 0.4);
+    height: 30px;
+    align-self: center;
+}
+
+/* TOTAL区域 */
+.total-a {
+    background: rgba(198, 40, 40, 0.7);
+}
+
+.total-b {
+    background: rgba(184, 134, 11, 0.7);
+}
+
+.total-score {
+    position: relative;
+    z-index: 1;
+    font-size: 28px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* 模态框 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: #1a1a2e;
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    border-radius: 12px;
+    width: 500px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.modal-header h3 {
+    color: #ffd700;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: #ffd700;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 15px 20px;
+    border-top: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+/* 设置区块 */
+.settings-section {
+    margin-bottom: 20px;
+}
+
+.settings-section h4 {
+    color: #64b5f6;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.settings-row label {
+    min-width: 120px;
+    color: #ccc;
+    font-size: 13px;
+}
+
+.settings-row input[type="number"],
+.settings-row input[type="color"],
+.settings-row select {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+}
+
+.settings-row input[type="number"] {
+    width: 80px;
+}
+
+.settings-row input[type="color"] {
+    width: 50px;
+    height: 30px;
+    padding: 2px;
+}
+
+.settings-row select {
+    min-width: 150px;
+}
+
+/* 按钮 */
+.btn-select {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #4caf50 0%, #43a047 100%);
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.btn-select:hover {
+    background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+}
+
+.btn-clear {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.btn-clear:hover {
+    background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+}
+
+.btn-primary {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+    border: none;
+    border-radius: 6px;
+    color: #1a1a2e;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #ffdf00 0%, #ffa500 100%);
+}
+
+/* 编辑模式边框 */
+body.edit-mode .team-column,
+body.edit-mode .game-column,
+body.edit-mode .total-column {
+    outline: 1px dashed rgba(255, 215, 0, 0.5);
+}
+
+body.edit-mode .header-cell,
+body.edit-mode .team-row,
+body.edit-mode .score-cell {
+    outline: 1px dotted rgba(100, 181, 246, 0.5);
+}
+
+body.edit-mode .header-cell:hover,
+body.edit-mode .team-row:hover,
+body.edit-mode .score-cell:hover {
+    outline: 2px solid #ffd700;
+    cursor: pointer;
+}

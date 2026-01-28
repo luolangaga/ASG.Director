@@ -1,0 +1,428 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  background: transparent;
+}
+
+body {
+  font-family: 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #fff;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+body.has-background {
+  background: transparent;
+}
+
+body.transparent-bg {
+  background: transparent !important;
+}
+
+body.transparent-bg .drag-bar {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+body.transparent-bg .draggable {
+  background: transparent !important;
+}
+
+body.transparent-bg .bo-item {
+  background: transparent !important;
+}
+
+.drag-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 28px;
+  -webkit-app-region: drag;
+  background: rgba(255, 215, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+  z-index: 10000;
+  cursor: move;
+}
+
+body.edit-mode .drag-bar {
+  background: rgba(255, 215, 0, 0.3);
+}
+
+#backgroundImage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  display: none;
+}
+
+.draggable {
+  position: absolute;
+  cursor: move;
+  padding: 0;
+  /* Removing padding to make sizing more accurate to content */
+  background: transparent;
+  /* Removed dark background */
+  /* border-radius: 8px; Removed radius */
+  border: 2px solid transparent;
+  /* Border only for selection/hover */
+  user-select: none;
+}
+
+body.edit-mode .draggable {
+  border-width: 1px;
+  border-color: rgba(255, 215, 0, 0.5);
+  background: transparent;
+  border-radius: 0;
+}
+
+body.edit-mode .layout-hidden {
+  opacity: 0.25 !important;
+  filter: grayscale(1);
+}
+
+body.edit-mode .draggable:hover {
+  border-color: #ffd700;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.draggable.dragging {
+  opacity: 0.8;
+  z-index: 9999;
+}
+
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing !important;
+}
+
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 215, 0, 0.7);
+  border: 1px solid #ffd700;
+  display: none;
+  z-index: 10;
+  border-radius: 0;
+}
+
+body.edit-mode .resize-handle {
+  display: block;
+}
+
+.resize-handle.nw {
+  top: -5px;
+  left: -5px;
+  cursor: nw-resize;
+}
+
+.resize-handle.n {
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: n-resize;
+}
+
+.resize-handle.ne {
+  top: -5px;
+  right: -5px;
+  cursor: ne-resize;
+}
+
+.resize-handle.e {
+  top: 50%;
+  right: -5px;
+  transform: translateY(-50%);
+  cursor: e-resize;
+}
+
+.resize-handle.se {
+  bottom: -5px;
+  right: -5px;
+  cursor: se-resize;
+}
+
+.resize-handle.s {
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: s-resize;
+}
+
+.resize-handle.sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: sw-resize;
+}
+
+.resize-handle.w {
+  top: 50%;
+  left: -5px;
+  transform: translateY(-50%);
+  cursor: w-resize;
+}
+
+#bigScore {
+  font-size: 72px;
+  font-weight: bold;
+  font-family: 'Arial Black', sans-serif;
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+  text-align: center;
+  line-height: 1;
+}
+
+#bigScore.team-a {
+  color: #64b5f6;
+}
+
+#bigScore.team-b {
+  color: #ef5350;
+}
+
+#teamName {
+  font-size: 28px;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 10px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+#teamName.team-a {
+  color: #64b5f6;
+}
+
+#teamName.team-b {
+  color: #ef5350;
+}
+
+#teamLogo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.8));
+}
+
+#record {
+  font-size: 24px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  text-align: center;
+  margin-top: 10px;
+  color: #ffd700;
+}
+
+.bo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bo-item {
+  background: transparent;
+  border-radius: 8px;
+  padding: 12px;
+  border: 2px solid rgba(255, 215, 0, 0.3);
+}
+
+.bo-header {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffd700;
+  margin-bottom: 8px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.bo-half {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 16px;
+}
+
+.bo-half-label {
+  color: #aaa;
+  min-width: 80px;
+}
+
+.bo-half-score {
+  font-size: 20px;
+  font-weight: bold;
+  font-family: monospace;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.bo-half-score.win {
+  color: #81c784;
+}
+
+.bo-half-score.lose {
+  color: #e57373;
+}
+
+.bo-half-score.draw {
+  color: #ffd700;
+}
+
+.bo-result {
+  text-align: center;
+  margin-top: 8px;
+  padding: 6px;
+  border-radius: 5px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.bo-result.win {
+  background: rgba(129, 199, 132, 0.3);
+  color: #81c784;
+}
+
+.bo-result.lose {
+  background: rgba(229, 115, 115, 0.3);
+  color: #e57373;
+}
+
+.bo-result.draw {
+  background: rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+}
+
+.bo-result.pending {
+  background: rgba(128, 128, 128, 0.2);
+  color: #888;
+}
+
+.edit-hint {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 215, 0, 0.9);
+  color: #1a1a2e;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-weight: bold;
+  z-index: 10001;
+  display: none;
+}
+
+body.edit-mode .edit-hint {
+  display: block;
+}
+
+/* 辅助对齐线 */
+.snap-line {
+  position: fixed;
+  background: #00e5ff;
+  z-index: 99999;
+  pointer-events: none;
+  display: none;
+  box-shadow: 0 0 4px rgba(0, 229, 255, 0.8);
+}
+
+.snap-line-v {
+  width: 1px;
+  height: 100%;
+  top: 0;
+}
+
+.snap-line-h {
+  height: 1px;
+  width: 100%;
+  border-top: 1px dashed #00ffff;
+}
+
+/* 字体选择器弹窗 */
+#fontSelectorModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 11000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#fontSelectorModal.show {
+  display: flex;
+}
+
+#fontSelectorModal .modal-content {
+  background: #1a1a2e;
+  border: 1px solid #ffd700;
+  width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.font-selector-item {
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.2s;
+}
+
+.font-selector-item:hover {
+  background: rgba(255, 215, 0, 0.2);
+}
+
+.font-selector-item:last-child {
+  border-bottom: none;
+}
+
+/* 坐标显示 */
+#coordDisplay {
+  position: fixed;
+  top: 80px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #ffd700;
+  color: #ffd700;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 10002;
+  display: none;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+body.edit-mode #coordDisplay.show {
+  display: block;
+}
+
+/* 自定义组件样式 */
+.custom-component {
+  background: transparent;
+}
+
+.custom-component-content {
+  color: #fff;
+}
+
+body.edit-mode .custom-component {
+  background: rgba(13, 71, 161, 0.1);
+  border: 1px dashed rgba(13, 71, 161, 0.5);
+}

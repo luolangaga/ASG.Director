@@ -1,0 +1,336 @@
+* {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      border: none !important;
+      outline: none !important;
+    }
+
+    html,
+    body {
+      background: transparent;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      color: #fff;
+      /* 默认不透明：除非启用 transparent-bg */
+      background: #0b0f1a;
+    }
+
+    /* 编辑模式下显示背景便于调试 */
+    body.edit-mode {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+    }
+
+    /* 透明背景模式：强制全透明，并隐藏背景图（优先级高于 edit-mode） */
+    body.transparent-bg {
+      background: transparent !important;
+    }
+
+    body.transparent-bg.edit-mode {
+      background: transparent !important;
+    }
+
+    body.transparent-bg #backgroundImage {
+      display: none !important;
+    }
+
+    /* 整个窗口都可拖动 */
+    .drag-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      -webkit-app-region: drag;
+      pointer-events: auto;
+    }
+
+    body.edit-mode .drag-bar {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    #backgroundImage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      display: none;
+    }
+
+    .edit-hint {
+      position: fixed;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 215, 0, 0.9);
+      color: #1a1a2e;
+      padding: 10px 16px;
+      font-weight: bold;
+      z-index: 10001;
+      display: none;
+      white-space: nowrap;
+    }
+
+    body.edit-mode .edit-hint {
+      display: block;
+    }
+
+    /* 编辑模式下整个窗口不可拖动，控件可独立拖动 */
+    body.edit-mode .drag-bar {
+      -webkit-app-region: no-drag;
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    /* 根布局容器：非编辑模式不吃鼠标事件（OBS叠加更干净） */
+    .layout-root {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    body.edit-mode .layout-root {
+      pointer-events: auto;
+    }
+
+    /* 复用 BP 前台的 draggable + resize 交互风格（但默认完全透明） */
+    .draggable-container {
+      position: absolute;
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: auto;
+    }
+
+    body.edit-mode .draggable-container {
+      outline: 2px dashed rgba(255, 215, 0, 0.55) !important;
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .draggable-container.dragging,
+    .draggable-container.resizing {
+      outline-color: rgba(255, 215, 0, 0.9) !important;
+    }
+
+    .control-label {
+      position: absolute;
+      top: -24px;
+      left: 0;
+      font-size: 12px;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: none;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    body.edit-mode .control-label {
+      display: inline-block;
+    }
+
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: rgba(255, 215, 0, 0.95);
+      border-radius: 2px;
+      display: none;
+      z-index: 100;
+    }
+
+    body.edit-mode .resize-handle {
+      display: block;
+    }
+
+    .resize-handle.nw {
+      top: -5px;
+      left: -5px;
+      cursor: nw-resize;
+    }
+
+    .resize-handle.ne {
+      top: -5px;
+      right: -5px;
+      cursor: ne-resize;
+    }
+
+    .resize-handle.sw {
+      bottom: -5px;
+      left: -5px;
+      cursor: sw-resize;
+    }
+
+    .resize-handle.se {
+      bottom: -5px;
+      right: -5px;
+      cursor: se-resize;
+    }
+
+    .widget-content {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 立绘 */
+    .character-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* 名字/角色名（可缩放容器尺寸来间接控制排版） */
+    .name-box {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+      color: #fff;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+      background: transparent;
+    }
+
+    .player-name {
+      font-weight: 900;
+      font-size: 1.5em;
+      line-height: 1.1;
+    }
+
+    .character-name {
+      font-weight: 700;
+      font-size: 1em;
+      line-height: 1.1;
+      opacity: 0.95;
+    }
+
+    /* 天赋和技能图标容器 */
+    .abilities-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+    }
+
+    .ability-icon {
+      height: 100%;
+      width: auto;
+      object-fit: contain;
+    }
+
+    /* 监管者技能特殊样式 */
+    .hunter-skills {
+      width: 100%;
+      height: 100%;
+    }
+
+    .skill-icon {
+      height: 100%;
+      width: auto;
+    }
+
+    /* 确保所有图片无边框 */
+    img {
+      border: none !important;
+      outline: none !important;
+    }
+
+    /* 空状态 - 完全隐藏（未选角色时不显示任何东西） */
+    .empty-character {
+      display: none;
+    }
+
+    body.edit-mode .empty-character {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      justify-content: center;
+      align-items: center;
+      color: rgba(255, 255, 255, 0.85);
+      font-weight: 900;
+      font-size: 100%;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+    }
+
+    /* 编辑隐藏：编辑模式下仍可见但半透明 */
+    body.edit-mode .layout-hidden {
+      opacity: 0.25;
+      filter: grayscale(1);
+    }
+
+    .team-logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .score-text {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 100%;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+    }
+
+    /* 字体选择器弹窗 */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      z-index: 100000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #1a1a2e;
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 12px;
+      width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .font-selector-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .font-selector-item:hover {
+      background: rgba(255, 215, 0, 0.2);
+    }
+

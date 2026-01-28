@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地图展示</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.3s ease;
+      -webkit-app-region: drag;
+      cursor: move;
+      /* 添加半透明边框提示窗口存在 */
+      border: 3px dashed rgba(255, 215, 0, 0.5);
+      box-shadow: inset 0 0 20px rgba(255, 215, 0, 0.2), 0 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    /* 空内容时保持窗口透明，便于 OBS 持续捕获 */
+    body.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    /* 当有内容显示时，增强边框 */
+    body:not(.hidden) {
+      border-color: rgba(255, 215, 0, 0.8);
+      box-shadow: inset 0 0 30px rgba(255, 215, 0, 0.3), 0 0 50px rgba(0, 0, 0, 0.7);
+    }
+    
+    .container {
+      text-align: center;
+      padding: 40px;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .action-badge {
+      display: inline-block;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .action-badge.ban {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    }
+    
+    .action-badge.pick {
+      background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+    }
+    
+    .map-name {
+      font-size: 56px;
+      font-weight: bold;
+      color: #ffd700;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+      margin-bottom: 15px;
+      animation: glow 2s ease-in-out infinite;
+    }
+    
+    @keyframes glow {
+      0%, 100% {
+        text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+      }
+      50% {
+        text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+      }
+    }
+    
+    .team-info {
+      font-size: 24px;
+      color: #ecf0f1;
+      margin-top: 10px;
+    }
+    
+    .team-badge {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      margin-left: 10px;
+    }
+    
+    .countdown {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+  </style>
+</head>
+<body class="hidden">
+  <div class="container">
+    <div class="action-badge" id="actionBadge">BAN</div>
+    <div class="map-name" id="mapName">地图名称</div>
+    <div class="team-info">
+      <span id="teamLabel">队伍</span>
+      <span class="team-badge" id="teamName">TeamA</span>
+    </div>
+  </div>
+  <div class="countdown" id="countdown">3秒后关闭</div>
+
+  <script>
+    // 接收父窗口传递的地图数据
+    window.addEventListener('DOMContentLoaded', () => {
+      // 从URL参数获取数据
+      const params = new URLSearchParams(window.location.search)
+      const action = params.get('action') || 'ban'
+      const mapName = params.get('map') || '未知地图'
+      const team = params.get('team') || 'TeamA'
+      
+      // 更新显示
+      const actionBadge = document.getElementById('actionBadge')
+      const mapNameEl = document.getElementById('mapName')
+      const teamNameEl = document.getElementById('teamName')
+      const teamLabel = document.getElementById('teamLabel')
+      const bodyEl = document.body
+      
+      actionBadge.textContent = action === 'ban' ? '禁用地图' : '选择地图'
+      actionBadge.className = 'action-badge ' + action
+      
+      mapNameEl.textContent = mapName
+      teamNameEl.textContent = team === 'teamA' ? '主场队伍' : '客场队伍'
+      teamLabel.textContent = action === 'ban' ? '禁用方' : '选择方'
+      
+      // 倒计时
+      let remaining = 3
+      const countdownEl = document.getElementById('countdown')
+
+      // 展示内容
+      bodyEl.classList.remove('hidden')
+      
+      const timer = setInterval(() => {
+        remaining--
+        if (remaining > 0) {
+          countdownEl.textContent = `${remaining}秒后关闭`
+        } else {
+          clearInterval(timer)
+          // 隐藏内容但不关闭窗口，保持 OBS 捕获源
+          bodyEl.classList.add('hidden')
+        }
+      }, 1000)
+    })
+  </script>
+</body>
+</html>

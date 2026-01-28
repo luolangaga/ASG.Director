@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASG导播 - 前台</title>
+  <link rel="stylesheet" href="./css/frontend.css">
+</head>
+
+<body style="opacity: 0; transition: opacity 0.5s ease;">
+  <!-- 纯色背景层 -->
+  <div id="solidBackground"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2e; z-index: -1;"></div>
+
+  <!-- 背景图片层 -->
+  <div id="background"></div>
+
+  <!-- 顶部拖拽条（用于移动窗口） -->
+  <div class="drag-bar" id="dragBar"></div>
+
+  <!-- 编辑工具栏 -->
+  <div id="editToolbar">
+    <button class="btn-help" onclick="FrontendOnboarding.forceStart()"
+      style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.3);">❓ 教程</button>
+    <button class="btn-bg" onclick="selectBackground()">更换背景</button>
+    <!-- 导出/导入已移除，请在主页操作 -->
+    <!-- <button class="btn-export" onclick="exportLayoutPack()">导出布局包</button> -->
+    <!-- <button class="btn-import" onclick="importLayoutPack()">导入布局包</button> -->
+    <button class="btn-settings" onclick="openLayoutSettings()">布局设置</button>
+    <!-- 保存已改为自动保存 -->
+    <!-- <button class="btn-save" onclick="saveLayout()">保存</button> -->
+    <button class="btn-cancel" onclick="exitEditMode()">退出编辑</button>
+  </div>
+
+  <!-- 编辑提示 -->
+  <div id="editHint">按 F2 进入/退出编辑模式 | 拖拽移动 | 拖拽角落调整大小 | 双击控件修改字体/颜色 | Shift+点击隐藏控件</div>
+
+  <div id="layoutSettingsPanel">
+    <div class="settings-modal">
+      <div class="settings-title">Ban 布局设置</div>
+      <div class="settings-section">
+        <h4>全局禁选（求生者）</h4>
+        <div class="settings-grid">
+          <div class="settings-item"><label>每行最多</label><input id="gsMaxPerRow" type="number" min="1" max="12"></div>
+          <div class="settings-item"><label>项间距</label><input id="gsItemGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>行间距</label><input id="gsRowGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>尺寸</label><input id="gsItemSize" type="number" min="32" max="128"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h4>全局禁选（监管者）</h4>
+        <div class="settings-grid">
+          <div class="settings-item"><label>每行最多</label><input id="ghMaxPerRow" type="number" min="1" max="12"></div>
+          <div class="settings-item"><label>项间距</label><input id="ghItemGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>行间距</label><input id="ghRowGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>尺寸</label><input id="ghItemSize" type="number" min="32" max="128"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h4>阶段禁选（求生者）</h4>
+        <div class="settings-grid">
+          <div class="settings-item"><label>每行最多</label><input id="lsMaxPerRow" type="number" min="1" max="12"></div>
+          <div class="settings-item"><label>项间距</label><input id="lsItemGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>行间距</label><input id="lsRowGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>尺寸</label><input id="lsItemSize" type="number" min="32" max="128"></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h4>阶段禁选（监管者）</h4>
+        <div class="settings-grid">
+          <div class="settings-item"><label>每行最多</label><input id="lhMaxPerRow" type="number" min="1" max="12"></div>
+          <div class="settings-item"><label>项间距</label><input id="lhItemGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>行间距</label><input id="lhRowGap" type="number" min="0" max="64"></div>
+          <div class="settings-item"><label>尺寸</label><input id="lhItemSize" type="number" min="32" max="128"></div>
+        </div>
+      </div>
+      <div class="settings-actions">
+        <button class="btn-cancel" onclick="closeLayoutSettings()">取消</button>
+        <button class="btn-save" onclick="saveLayoutSettings()">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 字体与颜色选择器弹窗（整合） -->
+  <div id="fontSelectorModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>字体与样式设置</h3>
+        <button class="close-btn" onclick="closeFontSelector()">×</button>
+      </div>
+      <div id="fontSelectorList"></div>
+
+      <!-- 字体大小设置 -->
+      <div class="font-color-section">
+        <h4>字体大小 (px)</h4>
+        <div class="color-picker-container" style="gap: 10px; align-items: center;">
+          <input type="number" id="fontSizeInput" min="8" max="200" step="1"
+            style="width: 80px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff;">
+          <input type="range" id="fontSizeRange" min="8" max="200" step="1" style="flex: 1;">
+        </div>
+      </div>
+
+      <!-- 颜色选择部分 -->
+      <div class="font-color-section">
+        <h4>文字颜色</h4>
+        <div class="color-picker-container">
+          <input type="color" id="textColorPicker" value="#ffffff" />
+          <div class="color-presets-inline">
+            <div class="color-preset-inline" style="background: #ffffff;" data-color="#ffffff"></div>
+            <div class="color-preset-inline" style="background: #ffd700;" data-color="#ffd700"></div>
+            <div class="color-preset-inline" style="background: #ff4444;" data-color="#ff4444"></div>
+            <div class="color-preset-inline" style="background: #64ffda;" data-color="#64ffda"></div>
+            <div class="color-preset-inline" style="background: #64b5f6;" data-color="#64b5f6"></div>
+            <div class="color-preset-inline" style="background: #9c27b0;" data-color="#9c27b0"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 进度条颜色设置 (仅进度条显示) -->
+      <div id="progressBarSettings"
+        style="display: none; border-top: 1px solid #444; margin-top: 15px; padding-top: 15px;">
+        <div class="font-color-section">
+          <h4>进度条颜色</h4>
+          <div class="color-picker-container">
+            <input type="color" id="progressColorPicker" value="#4caf50" />
+          </div>
+        </div>
+        <div class="font-color-section">
+          <h4>底色 (轨道颜色)</h4>
+          <div class="color-picker-container">
+            <input type="color" id="trackColorPicker" value="#ffffff" />
+            <span style="font-size: 12px; color: #888;">(支持透明度需在代码调整，此处仅RGB)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 弹窗提示 -->
+  <div id="popupOverlay" class="popup-overlay">
+    <div id="popupContent" class="popup-content">
+      <div class="popup-header">
+        <span id="popupIcon" class="popup-icon"></span>
+        <span id="popupTitle" class="popup-title"></span>
+      </div>
+      <div class="popup-body">
+        <div id="popupText" class="popup-text"></div>
+        <div id="popupTeam" class="popup-team"></div>
+      </div>
+      <div id="popupCountdown" class="popup-countdown"></div>
+    </div>
+  </div>
+
+  <!-- 求生者1 -->
+  <div class="draggable-container character-box" id="survivor1" data-type="survivor" data-index="0">
+    <div class="control-label">求生者1</div>
+    <div class="placeholder">?</div>
+    <div class="name"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 求生者2 -->
+  <div class="draggable-container character-box" id="survivor2" data-type="survivor" data-index="1">
+    <div class="control-label">求生者2</div>
+    <div class="placeholder">?</div>
+    <div class="name"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 求生者3 -->
+  <div class="draggable-container character-box" id="survivor3" data-type="survivor" data-index="2">
+    <div class="control-label">求生者3</div>
+    <div class="placeholder">?</div>
+    <div class="name"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 求生者4 -->
+  <div class="draggable-container character-box" id="survivor4" data-type="survivor" data-index="3">
+    <div class="control-label">求生者4</div>
+    <div class="placeholder">?</div>
+    <div class="name"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 监管者 -->
+  <div class="draggable-container hunter-box" id="hunter" data-type="hunter">
+    <div class="control-label">监管者</div>
+    <div class="placeholder">?</div>
+    <div class="name"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 求生者Ban位 -->
+  <div class="draggable-container" id="survivorBans" data-type="ban">
+    <div class="control-label">全局求生者禁用</div>
+    <div class="ban-container" id="survivorBanList"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 监管者Ban位 -->
+  <div class="draggable-container" id="hunterBans" data-type="ban">
+    <div class="control-label">全局监管者禁用</div>
+    <div class="ban-container" id="hunterBanList"></div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 地图信息 -->
+  <div class="draggable-container map-info" id="mapInfo" data-type="info" data-editable-color="true">
+    <div class="control-label">地图信息</div>
+    <span id="mapName">等待选择地图</span>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 地图图片展示 -->
+  <div class="draggable-container map-image" id="mapImage" data-type="map-image">
+    <div class="control-label">地图图片</div>
+    <img id="mapImageImg" alt="地图" draggable="false">
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 阶段信息 -->
+  <div class="draggable-container phase-info" id="phaseInfo" data-type="info" data-editable-color="true">
+    <div class="control-label">阶段信息</div>
+    <span id="phaseName">等待开始</span>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 计时器 -->
+  <div class="draggable-container timer" id="timerBox" data-type="timer" data-editable-color="true">
+    <div class="control-label">倒计时</div>
+    <span id="timerDisplay">0:00</span>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 计时器进度条 -->
+  <div class="draggable-container timer-progress-bar" id="timerProgressBar" data-type="progress-bar"
+    data-editable-color="true" style="left: 1080px; top: 90px; width: 160px; height: 10px;">
+    <div class="control-label">倒计时进度条</div>
+    <div class="progress-track">
+      <div class="progress-fill" id="timerProgressFill"></div>
+    </div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+
+  <!-- A队logo (仅图片) -->
+  <div class="draggable-container team-logo team-a" id="teamALogo" data-type="logo" style="left: 40px; top: 20px;">
+    <div class="control-label">战队A Logo</div>
+    <img id="teamALogoImg" src="" alt="A队">
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- A队队名 (仅文字) -->
+  <div class="draggable-container team-name-text" id="teamAName" data-type="info" data-editable-color="true"
+    style="left: 40px; top: 165px;">
+    <div class="control-label">战队A 队名</div>
+    <div class="team-name" id="teamANameText">A队</div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- B队logo (仅图片) -->
+  <div class="draggable-container team-logo team-b" id="teamBLogo" data-type="logo" style="left: 1100px; top: 20px;">
+    <div class="control-label">战队B Logo</div>
+    <img id="teamBLogoImg" src="" alt="B队">
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- B队队名 (仅文字) -->
+  <div class="draggable-container team-name-text" id="teamBName" data-type="info" data-editable-color="true"
+    style="left: 1100px; top: 165px;">
+    <div class="control-label">战队B 队名</div>
+    <div class="team-name" id="teamBNameText">B队</div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 全局禁选求生者 -->
+  <div class="draggable-container" id="globalBanSurvivors" data-type="global-ban"
+    style="left: 40px; top: 760px; width: 400px; height: 70px;">
+    <div class="control-label">全局禁选求生者</div>
+    <div style="display: flex; align-items: flex-start; gap: 10px; height: 100%;">
+      <div class="global-ban-container" id="globalBanSurvivorList"></div>
+    </div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 全局禁选监管者 -->
+  <div class="draggable-container" id="globalBanHunters" data-type="global-ban"
+    style="left: 820px; top: 720px; width: 340px; height: 70px;">
+    <div class="control-label">全局禁选监管者</div>
+    <div style="display: flex; align-items: flex-start; gap: 10px; height: 100%;">
+      <div class="global-ban-container" id="globalBanHunterList"></div>
+    </div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+  </div>
+
+  <!-- 坐标显示 -->
+  <div id="coordDisplay"></div>
+
+
+
+  <div id="snapLineV" class="snap-line snap-line-v"></div>
+  <div id="snapLineH" class="snap-line snap-line-h"></div>
+
+  <!-- Scripts -->
+  <script src="./js/signalr.min.js"></script>
+  <script src="./js/animation-system.js"></script>
+  <script src="./js/frontend-main.js"></script>
+  <script src="./js/frontend-3d-inject.js"></script>
+  <script src="./js/frontend-onboarding.js"></script>
+</body>
+
+</html>

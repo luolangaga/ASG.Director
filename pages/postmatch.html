@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASG导播 - 赛后数据</title>
+  
+  <link rel="stylesheet" href="./css/postmatch.css">
+</head>
+
+<body>
+  <div class="drag-bar"></div>
+  <div class="edit-hint">编辑模式：拖拽/缩放组件 | F3 选择背景 | F2 退出</div>
+  <img id="backgroundImage" alt="背景" />
+
+  <!-- 标题区域 -->
+  <div id="titleContainer" class="draggable" style="left: 30px; top: 50px; width: 860px;">
+    <div class="title" id="titleText">赛后数据</div>
+    <div class="subtitle" id="subTitleText">MATCH STATS</div>
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <!-- 队伍条 -->
+  <div id="teamBarContainer" class="draggable" style="left: 30px; top: 140px; width: 1220px;">
+    <div class="team-bar">
+      <div class="team-card team-a">
+        <img id="teamALogo" class="team-logo" alt="A队logo" />
+        <div>
+          <div class="team-name" id="teamAName">A队</div>
+          <div class="team-meta" id="teamAMeta">W 0 &nbsp; D 0</div>
+        </div>
+        <div class="team-score" id="teamAScore">0</div>
+      </div>
+
+      <div class="center-card">
+        <div>
+          <div class="label" id="gameLabel">GAME 1</div>
+          <div class="map" id="mapName">地图</div>
+        </div>
+        <div class="label" id="centerNote">赛后数据</div>
+      </div>
+
+      <div class="team-card team-b">
+        <div class="team-score" id="teamBScore" style="justify-self: start;">0</div>
+        <div style="text-align: right;">
+          <div class="team-name" id="teamBName">B队</div>
+          <div class="team-meta" id="teamBMeta">W 0 &nbsp; D 0</div>
+        </div>
+        <img id="teamBLogo" class="team-logo" alt="B队logo" />
+      </div>
+    </div>
+
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <!-- 主体区域：求生者表 + 监管者卡 -->
+  <div id="statsContainer" class="draggable" style="left: 30px; top: 260px; width: 1220px;">
+    <div class="layout-grid">
+      <div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width: 220px;">ID</th>
+              <th>破译进度</th>
+              <th>砸板命中次数</th>
+              <th>救人次数</th>
+              <th>治疗次数</th>
+              <th>牵制监管者/秒</th>
+            </tr>
+          </thead>
+          <tbody id="survivorTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="hunter-card">
+        <div class="hunter-header">
+          <div style="flex: 1;">
+            <div class="hunter-name" id="hunterName">监管者</div>
+            <div class="hunter-role" id="hunterRole">角色</div>
+          </div>
+        </div>
+        <div class="hunter-stats">
+          <div class="kv">
+            <div class="k">剩余密码机数量</div>
+            <div class="v" id="hunterRemainingCiphers">0</div>
+          </div>
+          <div class="kv">
+            <div class="k">破坏板子数</div>
+            <div class="v" id="hunterPalletDestroy">0</div>
+          </div>
+          <div class="kv">
+            <div class="k">命中求生者次数</div>
+            <div class="v" id="hunterHit">0</div>
+          </div>
+          <div class="kv">
+            <div class="k">恐惧震慑次数</div>
+            <div class="v" id="hunterTerrorShock">0</div>
+          </div>
+          <div class="kv">
+            <div class="k">击倒次数</div>
+            <div class="v" id="hunterDown">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="resize-handle nw" data-dir="nw"></div>
+    <div class="resize-handle n" data-dir="n"></div>
+    <div class="resize-handle ne" data-dir="ne"></div>
+    <div class="resize-handle e" data-dir="e"></div>
+    <div class="resize-handle se" data-dir="se"></div>
+    <div class="resize-handle s" data-dir="s"></div>
+    <div class="resize-handle sw" data-dir="sw"></div>
+    <div class="resize-handle w" data-dir="w"></div>
+  </div>
+
+  <div id="snapLineV" class="snap-line snap-line-v"></div>
+  <div id="snapLineH" class="snap-line snap-line-h"></div>
+  <div id="coordDisplay">X: 0 | Y: 0</div>
+
+  <!-- 字体选择器弹窗 -->
+  <div id="fontSelectorModal">
+    <div class="modal-content">
+      <div
+        style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #ffd700;padding-bottom:8px;">
+        <h3 style="margin:0;color:#ffd700;">选择字体</h3>
+        <button onclick="closeFontSelector()"
+          style="background:transparent;border:none;color:#fff;cursor:pointer;font-size:20px;">×</button>
+      </div>
+      <div id="fontSelectorList"></div>
+    </div>
+  </div>
+
+  <script src="./js/postmatch-logic.js"></script>
+
+</body>
+
+</html>

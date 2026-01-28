@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ASG导播 - 总览比分板</title>
+    <link rel="stylesheet" href="./css/scoreboard-overview.css">
+</head>
+
+<body>
+    <div class="drag-bar"></div>
+    <div class="edit-hint">编辑模式 - F3 选择背景 | F4 设置贴图 | F5 设置字体 | F2 退出</div>
+
+    <!-- 主容器 -->
+    <div id="scoreboardContainer" class="scoreboard-container">
+        <!-- TEAM区域 -->
+        <div class="column team-column">
+            <div class="header-cell team-header">
+                <img id="teamHeaderBg" class="cell-bg" src="" alt="">
+                <span class="header-text">TEAM</span>
+            </div>
+            <div class="team-row team-a">
+                <img id="teamABg" class="cell-bg" src="" alt="">
+                <img id="teamALogo" class="team-logo" src="" alt="">
+                <span id="teamAName" class="team-name">A队</span>
+            </div>
+            <div class="team-row team-b">
+                <img id="teamBBg" class="cell-bg" src="" alt="">
+                <img id="teamBLogo" class="team-logo" src="" alt="">
+                <span id="teamBName" class="team-name">B队</span>
+            </div>
+        </div>
+
+        <!-- 游戏列容器（动态生成） -->
+        <div id="gamesContainer" class="games-container">
+            <!-- 动态生成 -->
+        </div>
+
+        <!-- TOTAL区域 -->
+        <div class="column total-column">
+            <div class="header-cell total-header">
+                <img id="totalHeaderBg" class="cell-bg" src="" alt="">
+                <span class="header-text">TOTAL</span>
+            </div>
+            <div class="team-row total-a">
+                <img id="totalABg" class="cell-bg" src="" alt="">
+                <span id="totalAScore" class="total-score">0</span>
+            </div>
+            <div class="team-row total-b">
+                <img id="totalBBg" class="cell-bg" src="" alt="">
+                <span id="totalBScore" class="total-score">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settingsModal" class="modal" onclick="if(event.target===this) closeSettingsModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>贴图设置</h3>
+                <button class="modal-close" onclick="closeSettingsModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>表头区域</h4>
+                    <div class="settings-row">
+                        <label>TEAM区域背景:</label>
+                        <button class="btn-select" onclick="selectTexture('teamHeaderBg')">选择贴图</button>
+                        <button class="btn-clear" onclick="clearTexture('teamHeaderBg')">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>GAME表头背景:</label>
+                        <button class="btn-select" onclick="selectGameHeaderTexture()">选择贴图</button>
+                        <button class="btn-clear" onclick="clearGameHeaderTexture()">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>TOTAL区域背景:</label>
+                        <button class="btn-select" onclick="selectTexture('totalHeaderBg')">选择贴图</button>
+                        <button class="btn-clear" onclick="clearTexture('totalHeaderBg')">清除</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>队伍区域</h4>
+                    <div class="settings-row">
+                        <label>A队TEAM背景:</label>
+                        <button class="btn-select" onclick="selectTexture('teamABg')">选择贴图</button>
+                        <button class="btn-clear" onclick="clearTexture('teamABg')">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>A队GAME背景:</label>
+                        <button class="btn-select" onclick="selectGameATexture()">选择贴图</button>
+                        <button class="btn-clear" onclick="clearGameATexture()">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>A队Total背景:</label>
+                        <button class="btn-select" onclick="selectTexture('totalABg')">选择贴图</button>
+                        <button class="btn-clear" onclick="clearTexture('totalABg')">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>B队TEAM背景:</label>
+                        <button class="btn-select" onclick="selectTexture('teamBBg')">选择贴图</button>
+                        <button class="btn-clear" onclick="clearTexture('teamBBg')">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>B队GAME背景:</label>
+                        <button class="btn-select" onclick="selectGameBTexture()">选择贴图</button>
+                        <button class="btn-clear" onclick="clearGameBTexture()">清除</button>
+                    </div>
+                    <div class="settings-row">
+                        <label>B队Total背景:</label>
+                        <button class="btn-select" onclick="selectTexture('totalBBg')">选择贴图</button>
+                        <button class="btn-clear" onclick="clearTexture('totalBBg')">清除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 字体设置弹窗 -->
+    <div id="fontModal" class="modal" onclick="if(event.target===this) closeFontModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>字体设置</h3>
+                <button class="modal-close" onclick="closeFontModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>表头字体</h4>
+                    <div class="settings-row">
+                        <label>字体:</label>
+                        <select id="headerFont" onchange="applyFontSettings()">
+                            <option value="">系统默认</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>大小(px):</label>
+                        <input type="number" id="headerFontSize" value="24" min="8" max="72"
+                            onchange="applyFontSettings()">
+                    </div>
+                    <div class="settings-row">
+                        <label>颜色:</label>
+                        <input type="color" id="headerFontColor" value="#ffffff" onchange="applyFontSettings()">
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>队伍名字体</h4>
+                    <div class="settings-row">
+                        <label>字体:</label>
+                        <select id="teamNameFont" onchange="applyFontSettings()">
+                            <option value="">系统默认</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>大小(px):</label>
+                        <input type="number" id="teamNameFontSize" value="20" min="8" max="72"
+                            onchange="applyFontSettings()">
+                    </div>
+                    <div class="settings-row">
+                        <label>颜色:</label>
+                        <input type="color" id="teamNameFontColor" value="#ffffff" onchange="applyFontSettings()">
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>比分字体</h4>
+                    <div class="settings-row">
+                        <label>字体:</label>
+                        <select id="scoreFont" onchange="applyFontSettings()">
+                            <option value="">系统默认</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>大小(px):</label>
+                        <input type="number" id="scoreFontSize" value="18" min="8" max="72"
+                            onchange="applyFontSettings()">
+                    </div>
+                    <div class="settings-row">
+                        <label>颜色:</label>
+                        <input type="color" id="scoreFontColor" value="#ffffff" onchange="applyFontSettings()">
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>TOTAL字体</h4>
+                    <div class="settings-row">
+                        <label>字体:</label>
+                        <select id="totalFont" onchange="applyFontSettings()">
+                            <option value="">系统默认</option>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <label>大小(px):</label>
+                        <input type="number" id="totalFontSize" value="28" min="8" max="72"
+                            onchange="applyFontSettings()">
+                    </div>
+                    <div class="settings-row">
+                        <label>颜色:</label>
+                        <input type="color" id="totalFontColor" value="#ffffff" onchange="applyFontSettings()">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-primary" onclick="closeFontModal()">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <img id="backgroundImage" class="background-image" src="" alt="">
+
+    <script src="./js/signalr.min.js"></script>
+    <script src="./js/scoreboard-overview-logic.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,1368 @@
+Attached HTML and CSS Context
+
+<span class="v-btn__content" data-no-activator="">登录</span>
+
+
+/* Matched Rule from regular */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Matched Rule from regular */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Matched Rule from regular */
+.v-btn__content, .v-btn__prepend, .v-btn__append {
+  align-items: center;
+  display: flex;
+  transition: transform, opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  display: flex;
+  transition-behavior: normal, normal;
+  transition-duration: 0s, 0.2s;
+  transition-timing-function: ease, cubic-bezier(0.4, 0, 0.2, 1);
+  transition-delay: 0s, 0s;
+  transition-property: transform, opacity;
+}
+
+/* Matched Rule from regular */
+.v-btn__content {
+  grid-area: content;
+  justify-content: center;
+  white-space: nowrap;
+  grid-row-start: content;
+  grid-column-start: content;
+  grid-row-end: content;
+  grid-column-end: content;
+  justify-content: center;
+  white-space-collapse: collapse;
+  text-wrap-mode: nowrap;
+}
+
+/* Inherited from ancestor level 1 (user-agent) */
+a:-webkit-any-link {
+  color: -webkit-link;
+  text-decoration-line: underline;
+  text-decoration-thickness: initial;
+  text-decoration-style: initial;
+  text-decoration-color: initial;
+  cursor: pointer;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+a {
+  text-decoration: none;
+  text-decoration-line: none;
+  text-decoration-thickness: initial;
+  text-decoration-style: initial;
+  text-decoration-color: initial;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+a {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+a {
+  background-color: transparent;
+  background-color: transparent;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.v-btn {
+  align-items: center;
+  border-radius: 4px;
+  display: inline-grid;
+  grid-template-areas: "prepend content append";
+  grid-template-columns: max-content auto max-content;
+  font-weight: 500;
+  justify-content: center;
+  letter-spacing: 0.0892857143em;
+  line-height: normal;
+  max-width: 100%;
+  outline: none;
+  position: relative;
+  text-decoration: none;
+  text-indent: 0.0892857143em;
+  text-transform: uppercase;
+  transition-property: box-shadow, transform, opacity, background;
+  transition-duration: 0.28s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  vertical-align: middle;
+  flex-shrink: 0;
+  align-items: center;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+  display: inline-grid;
+  grid-template-areas: "prepend content append";
+  grid-template-columns: max-content auto max-content;
+  font-weight: 500;
+  justify-content: center;
+  letter-spacing: 0.0892857em;
+  line-height: normal;
+  max-width: 100%;
+  outline-color: initial;
+  outline-style: none;
+  outline-width: initial;
+  position: relative;
+  text-decoration-line: none;
+  text-decoration-thickness: initial;
+  text-decoration-style: initial;
+  text-decoration-color: initial;
+  text-indent: 0.0892857em;
+  text-transform: uppercase;
+  transition-property: box-shadow, transform, opacity, background;
+  transition-duration: 0.28s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.v-btn--size-default {
+  --v-btn-size: 0.875rem;
+  --v-btn-height: 36px;
+  font-size: var(--v-btn-size);
+  min-width: 64px;
+  padding: 0 16px;
+  --v-btn-size: 0.875rem;
+  --v-btn-height: 36px;
+  font-size: var(--v-btn-size);
+  min-width: 64px;
+  padding-top: 0px;
+  padding-right: 16px;
+  padding-bottom: 0px;
+  padding-left: 16px;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.v-btn {
+  border-color: rgba(var(--v-border-color), var(--v-border-opacity));
+  border-style: solid;
+  border-width: 0;
+  border-top-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
+  border-left-style: solid;
+  border-top-width: 0px;
+  border-right-width: 0px;
+  border-bottom-width: 0px;
+  border-left-width: 0px;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.v-btn--variant-plain, .v-btn--variant-outlined, .v-btn--variant-text, .v-btn--variant-tonal {
+  background: transparent;
+  color: inherit;
+  background-image: initial;
+  background-position-x: initial;
+  background-position-y: initial;
+  background-size: initial;
+  background-repeat: initial;
+  background-attachment: initial;
+  background-origin: initial;
+  background-clip: initial;
+  background-color: transparent;
+  color: inherit;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.elevation-0 {
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12)) !important;
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12)) !important;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.rounded-pill {
+  border-radius: 9999px !important;
+  border-top-left-radius: 9999px !important;
+  border-top-right-radius: 9999px !important;
+  border-bottom-right-radius: 9999px !important;
+  border-bottom-left-radius: 9999px !important;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.text-none {
+  text-transform: none !important;
+  text-transform: none !important;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.font-weight-medium {
+  font-weight: 500 !important;
+  font-weight: 500 !important;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.v-theme--md3Light {
+  color-scheme: normal;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+  color-scheme: normal;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+}
+
+/* Inherited from ancestor level 1 (regular) */
+.v-btn.v-btn--density-default {
+  height: calc(var(--v-btn-height) + 0px);
+  height: calc(var(--v-btn-height) + 0px);
+}
+
+/* Inherited from ancestor level 2 (user-agent) */
+div {
+  display: block;
+}
+
+/* Inherited from ancestor level 2 (user-agent) */
+address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section, search, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output, [dir="ltr" i], [dir="rtl" i], [dir="auto" i] {
+  unicode-bidi: isolate;
+}
+
+/* Inherited from ancestor level 2 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 2 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 2 (regular) */
+.gap-1 {
+  gap: 4px;
+  row-gap: 4px;
+  column-gap: 4px;
+}
+
+/* Inherited from ancestor level 2 (regular) */
+.d-none {
+  display: none !important;
+  display: none !important;
+}
+
+/* Inherited from ancestor level 2 (regular) */
+.align-center {
+  align-items: center !important;
+  align-items: center !important;
+}
+
+/* Inherited from ancestor level 2 (regular) */
+.d-sm-flex {
+  display: flex !important;
+  display: flex !important;
+}
+
+/* Inherited from ancestor level 3 (user-agent) */
+div {
+  display: block;
+}
+
+/* Inherited from ancestor level 3 (user-agent) */
+address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section, search, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output, [dir="ltr" i], [dir="rtl" i], [dir="auto" i] {
+  unicode-bidi: isolate;
+}
+
+/* Inherited from ancestor level 3 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 3 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 3 (regular) */
+.v-toolbar__content, .v-toolbar__extension {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  position: relative;
+  transition: inherit;
+  width: 100%;
+  align-items: center;
+  display: flex;
+  flex-grow: 0;
+  flex-shrink: 0;
+  flex-basis: auto;
+  position: relative;
+  transition-property: inherit;
+  transition-duration: inherit;
+  transition-timing-function: inherit;
+  transition-delay: inherit;
+  transition-behavior: inherit;
+  width: 100%;
+}
+
+/* Inherited from ancestor level 3 (regular) */
+.v-toolbar__content {
+  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+/* Inherited from ancestor level 4 (user-agent) */
+article, aside, footer, header, hgroup, main, nav, search, section {
+  display: block;
+}
+
+/* Inherited from ancestor level 4 (user-agent) */
+address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section, search, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output, [dir="ltr" i], [dir="rtl" i], [dir="auto" i] {
+  unicode-bidi: isolate;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.glass-effect {
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar {
+  align-items: flex-start;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: space-between;
+  max-width: 100%;
+  position: relative;
+  transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: height, width, transform, max-width, left, right, top, bottom, box-shadow;
+  width: 100%;
+  align-items: flex-start;
+  display: flex;
+  flex-grow: 0;
+  flex-shrink: 0;
+  flex-basis: auto;
+  flex-direction: column;
+  justify-content: space-between;
+  max-width: 100%;
+  position: relative;
+  transition-behavior: normal;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-delay: 0s;
+  transition-property: height, width, transform, max-width, left, right, top, bottom, box-shadow;
+  width: 100%;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar {
+  border-color: rgba(var(--v-border-color), var(--v-border-opacity));
+  border-style: solid;
+  border-width: 0;
+  border-top-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
+  border-left-style: solid;
+  border-top-width: 0px;
+  border-right-width: 0px;
+  border-bottom-width: 0px;
+  border-left-width: 0px;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar--border {
+  border-width: thin;
+  box-shadow: none;
+  border-top-width: thin;
+  border-right-width: thin;
+  border-bottom-width: thin;
+  border-left-width: thin;
+  box-shadow: none;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar {
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12));
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12));
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar {
+  border-radius: 0;
+  border-top-left-radius: 0px;
+  border-top-right-radius: 0px;
+  border-bottom-right-radius: 0px;
+  border-bottom-left-radius: 0px;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar {
+  background: rgb(var(--v-theme-surface-light));
+  color: rgba(var(--v-theme-on-surface-light), var(--v-high-emphasis-opacity));
+  color: rgba(var(--v-theme-on-surface-light), var(--v-high-emphasis-opacity));
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-toolbar--flat {
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12));
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12));
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-app-bar {
+  display: flex;
+  display: flex;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-locale--is-ltr {
+  direction: ltr;
+  direction: ltr;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.elevation-0 {
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12)) !important;
+  box-shadow: 0px 0px 0px 0px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 0px 0px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 0px 0px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12)) !important;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.border-b {
+  border-block-end-width: thin !important;
+  border-block-end-style: solid !important;
+  border-block-end-color: rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+  border-block-end-width: thin !important;
+  border-block-end-style: solid !important;
+  border-block-end-color: rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-theme--md3Light {
+  color-scheme: normal;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+  color-scheme: normal;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.bg-background {
+  --v-theme-overlay-multiplier: var(--v-theme-background-overlay-multiplier);
+  background-color: rgb(var(--v-theme-background)) !important;
+  color: rgb(var(--v-theme-on-background)) !important;
+  --v-theme-overlay-multiplier: var(--v-theme-background-overlay-multiplier);
+  background-color: rgb(var(--v-theme-background)) !important;
+  color: rgb(var(--v-theme-on-background)) !important;
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-app-bar.v-toolbar {
+  background: rgb(var(--v-theme-surface));
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+}
+
+/* Inherited from ancestor level 4 (regular) */
+.v-app-bar:not(.v-toolbar--absolute) {
+  padding-inline-end: var(--v-scrollbar-offset);
+  padding-inline-end: var(--v-scrollbar-offset);
+}
+
+/* Inherited from ancestor level 5 (user-agent) */
+div {
+  display: block;
+}
+
+/* Inherited from ancestor level 5 (user-agent) */
+address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section, search, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output, [dir="ltr" i], [dir="rtl" i], [dir="auto" i] {
+  unicode-bidi: isolate;
+}
+
+/* Inherited from ancestor level 5 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 5 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 5 (regular) */
+.v-application__wrap {
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  max-width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: auto;
+  max-width: 100%;
+  min-height: 100dvh;
+  position: relative;
+}
+
+/* Inherited from ancestor level 6 (user-agent) */
+div {
+  display: block;
+}
+
+/* Inherited from ancestor level 6 (user-agent) */
+address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section, search, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output, [dir="ltr" i], [dir="rtl" i], [dir="auto" i] {
+  unicode-bidi: isolate;
+}
+
+/* Inherited from ancestor level 6 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 6 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 6 (regular) */
+.v-application {
+  display: flex;
+  background: rgb(var(--v-theme-background));
+  color: rgba(var(--v-theme-on-background), var(--v-high-emphasis-opacity));
+  display: flex;
+  color: rgba(var(--v-theme-on-background), var(--v-high-emphasis-opacity));
+}
+
+/* Inherited from ancestor level 6 (regular) */
+.v-locale--is-ltr {
+  direction: ltr;
+  direction: ltr;
+}
+
+/* Inherited from ancestor level 6 (regular) */
+.v-theme--md3Light {
+  color-scheme: normal;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+  color-scheme: normal;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+}
+
+/* Inherited from ancestor level 7 (user-agent) */
+div {
+  display: block;
+}
+
+/* Inherited from ancestor level 7 (user-agent) */
+address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section, search, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output, [dir="ltr" i], [dir="rtl" i], [dir="auto" i] {
+  unicode-bidi: isolate;
+}
+
+/* Inherited from ancestor level 7 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 7 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 7 (regular) */
+#app {
+  min-height: 100vh;
+  min-height: 100vh;
+}
+
+/* Inherited from ancestor level 8 (user-agent) */
+body {
+  display: block;
+  margin-top: 8px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  margin-left: 8px;
+}
+
+/* Inherited from ancestor level 8 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 8 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 8 (regular) */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* Inherited from ancestor level 8 (regular) */
+body {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Inherited from ancestor level 9 (user-agent) */
+html {
+  display: block;
+}
+
+/* Inherited from ancestor level 9 (user-agent) */
+:root {
+  view-transition-name: root;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+*, ::before, ::after {
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+  background-repeat: no-repeat;
+  box-sizing: inherit;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+* {
+  padding: 0;
+  margin: 0;
+  padding-top: 0px;
+  padding-right: 0px;
+  padding-bottom: 0px;
+  padding-left: 0px;
+  margin-top: 0px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-left: 0px;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+html {
+  scroll-behavior: smooth;
+  scroll-behavior: smooth;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+html {
+  box-sizing: border-box;
+  overflow-y: scroll;
+  -webkit-text-size-adjust: 100%;
+  word-break: normal;
+  -moz-tab-size: 4;
+  tab-size: 4;
+  box-sizing: border-box;
+  overflow-y: scroll;
+  text-size-adjust: 100%;
+  word-break: normal;
+  tab-size: 4;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+html {
+  font-family: "Roboto", sans-serif;
+  line-height: 1.5;
+  font-size: 1rem;
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  font-family: Roboto, sans-serif;
+  line-height: 1.5;
+  font-size: 1rem;
+  overflow-x: hidden;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+/* Inherited from ancestor level 9 (regular) */
+:root {
+  font-family: 'Roboto Flex', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: "Roboto Flex", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  font-synthesis-weight: none;
+  font-synthesis-style: none;
+  font-synthesis-small-caps: none;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+:root {
+  color: #213547;
+  color: rgb(33, 53, 71);
+}
+
+/* Inherited from ancestor level 9 (regular) */
+:root {
+  --v-theme-overlay-multiplier: 1;
+  --v-scrollbar-offset: 0px;
+  --v-theme-overlay-multiplier: 1;
+  --v-scrollbar-offset: 0px;
+}
+
+/* Inherited from ancestor level 9 (regular) */
+:root {
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+  --v-theme-background: 243,244,246;
+  --v-theme-background-overlay-multiplier: 1;
+  --v-theme-surface: 255,255,255;
+  --v-theme-surface-overlay-multiplier: 1;
+  --v-theme-surface-bright: 255,255,255;
+  --v-theme-surface-bright-overlay-multiplier: 1;
+  --v-theme-surface-light: 238,238,238;
+  --v-theme-surface-light-overlay-multiplier: 1;
+  --v-theme-surface-variant: 66,66,66;
+  --v-theme-surface-variant-overlay-multiplier: 2;
+  --v-theme-on-surface-variant: 238,238,238;
+  --v-theme-primary: 59,130,246;
+  --v-theme-primary-overlay-multiplier: 1;
+  --v-theme-primary-darken-1: 31,85,146;
+  --v-theme-primary-darken-1-overlay-multiplier: 2;
+  --v-theme-secondary: 100,116,139;
+  --v-theme-secondary-overlay-multiplier: 2;
+  --v-theme-secondary-darken-1: 1,135,134;
+  --v-theme-secondary-darken-1-overlay-multiplier: 1;
+  --v-theme-error: 239,68,68;
+  --v-theme-error-overlay-multiplier: 1;
+  --v-theme-info: 59,130,246;
+  --v-theme-info-overlay-multiplier: 1;
+  --v-theme-success: 16,185,129;
+  --v-theme-success-overlay-multiplier: 1;
+  --v-theme-warning: 245,158,11;
+  --v-theme-warning-overlay-multiplier: 1;
+  --v-theme-tertiary: 20,184,166;
+  --v-theme-tertiary-overlay-multiplier: 1;
+  --v-theme-surfaceVariant: 241,245,249;
+  --v-theme-surfaceVariant-overlay-multiplier: 1;
+  --v-theme-outline: 203,213,225;
+  --v-theme-outline-overlay-multiplier: 1;
+  --v-theme-on-background: 0,0,0;
+  --v-theme-on-surface: 0,0,0;
+  --v-theme-on-surface-bright: 0,0,0;
+  --v-theme-on-surface-light: 0,0,0;
+  --v-theme-on-primary: 255,255,255;
+  --v-theme-on-primary-darken-1: 255,255,255;
+  --v-theme-on-secondary: 255,255,255;
+  --v-theme-on-secondary-darken-1: 255,255,255;
+  --v-theme-on-error: 255,255,255;
+  --v-theme-on-info: 255,255,255;
+  --v-theme-on-success: 255,255,255;
+  --v-theme-on-warning: 0,0,0;
+  --v-theme-on-tertiary: 255,255,255;
+  --v-theme-on-surfaceVariant: 0,0,0;
+  --v-theme-on-outline: 0,0,0;
+  --v-border-color: 0, 0, 0;
+  --v-border-opacity: 0.12;
+  --v-high-emphasis-opacity: 0.87;
+  --v-medium-emphasis-opacity: 0.6;
+  --v-disabled-opacity: 0.38;
+  --v-idle-opacity: 0.04;
+  --v-hover-opacity: 0.04;
+  --v-focus-opacity: 0.12;
+  --v-selected-opacity: 0.08;
+  --v-activated-opacity: 0.12;
+  --v-pressed-opacity: 0.12;
+  --v-dragged-opacity: 0.08;
+  --v-theme-kbd: 238, 238, 238;
+  --v-theme-on-kbd: 0, 0, 0;
+  --v-theme-code: 245, 245, 245;
+  --v-theme-on-code: 0, 0, 0;
+}

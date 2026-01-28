@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASG 组件设计器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+  <link rel="stylesheet" href="./css/component-editor.css">
+</head>
+
+<body>
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <span class="toolbar-title">🎨 组件设计器</span>
+        <button class="btn btn-secondary btn-sm" onclick="createNewComponent()">➕ 新建组件</button>
+        <button class="btn btn-primary btn-sm" onclick="saveAllComponents()">💾 保存全部</button>
+    </div>
+
+    <div class="main-content">
+        <!-- 左侧组件列表 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">我的组件</span>
+                <span id="componentCount" style="color: var(--text-secondary); font-size: 12px;">0 个</span>
+            </div>
+            <div class="component-list" id="componentList">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">📦</div>
+                    <div class="empty-state-title">暂无组件</div>
+                    <div class="empty-state-desc">点击上方"新建组件"创建您的第一个自定义组件</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间编辑区 -->
+        <div class="editor-area" id="editorArea" style="display: none;">
+            <div class="editor-tabs">
+                <button class="editor-tab active" data-tab="preview" onclick="switchEditorTab('preview')">👁️
+                    预览</button>
+                <button class="editor-tab" data-tab="code" onclick="switchEditorTab('code')">📝 代码</button>
+            </div>
+
+            <div class="editor-content">
+                <!-- 预览面板 -->
+                <div class="editor-panel active" id="previewPanel">
+                    <div class="preview-container">
+                        <div class="preview-header">
+                            <span class="preview-title">实时预览</span>
+                            <div class="preview-controls">
+                                <button class="btn btn-ghost btn-sm" onclick="refreshPreview()">🔄 刷新</button>
+                            </div>
+                        </div>
+                        <div class="preview-box">
+                            <div class="preview-content" id="previewContent">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">👀</div>
+                                    <div class="empty-state-desc">选择一个组件查看预览</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 代码面板 -->
+                <div class="editor-panel" id="codePanel">
+                    <div class="code-editor-container">
+                        <textarea class="code-editor" id="codeEditor" placeholder="在这里编写 HTML 代码..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 空状态 (没选中组件时显示) -->
+        <div class="editor-area" id="editorPlaceholder">
+            <div class="empty-state" style="flex: 1; display: flex;">
+                <div class="empty-state-icon">✨</div>
+                <div class="empty-state-title">选择或创建组件</div>
+                <div class="empty-state-desc">从左侧列表选择一个组件进行编辑，或点击"新建组件"创建</div>
+            </div>
+        </div>
+
+        <!-- 右侧属性面板 -->
+        <div class="properties-panel" id="propertiesPanel" style="display: none;">
+            <div class="properties-section">
+                <div class="properties-section-title">基本属性</div>
+                <div class="property-group">
+                    <label class="property-label">组件名称</label>
+                    <input type="text" class="property-input" id="propName" placeholder="输入组件名称">
+                </div>
+                <div class="property-group">
+                    <label class="property-label">组件类型</label>
+                    <select class="property-input" id="propType" disabled>
+                        <option value="text">📝 文本</option>
+                        <option value="image">🖼️ 图片</option>
+                        <option value="html">🌐 自定义 HTML</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 文本类型属性 -->
+            <div class="properties-section" id="textProperties">
+                <div class="properties-section-title">文本设置</div>
+                <div class="property-group">
+                    <label class="property-label">文本内容</label>
+                    <textarea class="property-input" id="propTextContent" rows="3" placeholder="输入文本内容"></textarea>
+                </div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">字体大小</label>
+                        <input type="number" class="property-input" id="propFontSize" value="16" min="8" max="200">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">字体粗细</label>
+                        <select class="property-input" id="propFontWeight">
+                            <option value="normal">正常</option>
+                            <option value="bold">粗体</option>
+                            <option value="300">细</option>
+                            <option value="500">中等</option>
+                            <option value="700">加粗</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">文本颜色</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="propTextColor" value="#ffffff">
+                        <input type="text" class="property-input" id="propTextColorText" value="#ffffff" style="flex:1">
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">文本对齐</label>
+                    <select class="property-input" id="propTextAlign">
+                        <option value="left">左对齐</option>
+                        <option value="center">居中</option>
+                        <option value="right">右对齐</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">背景颜色</label>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="propBgColor" value="#000000">
+                        <input type="text" class="property-input" id="propBgColorText" value="transparent"
+                            style="flex:1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图片类型属性 -->
+            <div class="properties-section" id="imageProperties" style="display: none;">
+                <div class="properties-section-title">图片设置</div>
+                <div class="property-group">
+                    <label class="property-label">图片来源</label>
+                    <div class="image-picker">
+                        <div class="image-preview" id="imagePreview">
+                            <span class="image-preview-placeholder">暂无图片</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="selectImage()" style="flex: 1;">📁
+                                选择图片</button>
+                            <button class="btn btn-ghost btn-sm" onclick="clearImage()">清除</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">或输入图片 URL</label>
+                    <input type="text" class="property-input" id="propImageUrl" placeholder="https://...">
+                </div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">宽度</label>
+                        <input type="text" class="property-input" id="propImageWidth" placeholder="auto" value="auto">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">高度</label>
+                        <input type="text" class="property-input" id="propImageHeight" placeholder="auto" value="auto">
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">填充方式</label>
+                    <select class="property-input" id="propObjectFit">
+                        <option value="contain">包含 (contain)</option>
+                        <option value="cover">覆盖 (cover)</option>
+                        <option value="fill">拉伸 (fill)</option>
+                        <option value="none">原始 (none)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- HTML 类型属性 -->
+            <div class="properties-section" id="htmlProperties" style="display: none;">
+                <div class="properties-section-title">HTML 设置</div>
+                <div class="property-group">
+                    <label class="property-label">自定义样式 (CSS)</label>
+                    <textarea class="property-input" id="propCustomCss" rows="4"
+                        placeholder=".my-class { color: red; }"></textarea>
+                </div>
+            </div>
+
+            <!-- 尺寸与位置 -->
+            <div class="properties-section">
+                <div class="properties-section-title">默认尺寸</div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">宽度</label>
+                        <input type="text" class="property-input" id="propWidth" placeholder="auto" value="200">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">高度</label>
+                        <input type="text" class="property-input" id="propHeight" placeholder="auto" value="50">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导出到页面 -->
+            <div class="export-section">
+                <div class="export-title">导出到页面</div>
+                <div class="target-pages" id="targetPages">
+                    <label class="target-page-item">
+                        <input type="checkbox" value="frontend" checked>
+                        <span class="target-page-name">📺 BP 前台</span>
+                    </label>
+                    <label class="target-page-item">
+                        <input type="checkbox" value="scoreboard">
+                        <span class="target-page-name">🏆 比分板</span>
+                    </label>
+                    <label class="target-page-item">
+                        <input type="checkbox" value="postmatch">
+                        <span class="target-page-name">📊 赛后数据</span>
+                    </label>
+                    <label class="target-page-item">
+                        <input type="checkbox" value="characterDisplay">
+                        <span class="target-page-name">👤 角色展示</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="properties-section" style="border-bottom: none;">
+                <button class="btn btn-primary" style="width: 100%; margin-bottom: 8px;"
+                    onclick="saveCurrentComponent()">💾 保存组件</button>
+                <button class="btn btn-danger" style="width: 100%;" onclick="deleteCurrentComponent()">🗑️ 删除组件</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建组件模态框 -->
+    <div class="modal-overlay" id="newComponentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">新建组件</span>
+                <button class="modal-close" onclick="closeNewComponentModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="property-group" style="margin-bottom: 20px;">
+                    <label class="property-label">组件名称</label>
+                    <input type="text" class="property-input" id="newComponentName" placeholder="例如：队伍标题、赛事Logo">
+                </div>
+
+                <label class="property-label" style="margin-bottom: 12px; display: block;">选择组件类型</label>
+                <div class="type-selector">
+                    <div class="type-option selected" data-type="text">
+                        <span class="type-option-icon">📝</span>
+                        <span class="type-option-name">文本</span>
+                    </div>
+                    <div class="type-option" data-type="image">
+                        <span class="type-option-icon">🖼️</span>
+                        <span class="type-option-name">图片</span>
+                    </div>
+                    <div class="type-option" data-type="html">
+                        <span class="type-option-icon">🌐</span>
+                        <span class="type-option-name">自定义 HTML</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeNewComponentModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmNewComponent()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="./js/component-editor-logic.js"></script>
+</body>
+
+</html>

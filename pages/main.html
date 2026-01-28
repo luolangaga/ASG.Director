@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>ASG导播端</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./css/main.css">
+</head>
+
+<body>
+  <div class="app-sidebar">
+    <div class="sidebar-header">
+      <div class="app-logo">ASG Director</div>
+      <span id="versionBadge" class="status-badge" onclick="checkUpdate()" style="cursor:pointer">v1.0.0</span>
+    </div>
+
+    <div class="sidebar-nav">
+      <button class="nav-item active" id="nav-home" onclick="switchView('home')">
+        <span class="nav-icon">📋</span> 本地 BP
+      </button>
+      <button class="nav-item" id="nav-online" onclick="switchView('online')">
+        <span class="nav-icon">🌐</span> 联网 BP
+      </button>
+      <button class="nav-item" id="nav-settings" onclick="switchView('settings')">
+        <span class="nav-icon">🎨</span> MMD,字体和组件包
+      </button>
+      <button class="nav-item" id="nav-tools" onclick="switchView('tools')">
+        <span class="nav-icon">🛠️</span> 插件和布局包
+      </button>
+
+      <div style="height:1px; background:var(--border-color); margin: 8px 16px;"></div>
+      <div style="padding:0 16px; font-size:12px; color:var(--text-secondary); margin-bottom:4px;">插件</div>
+
+      <div id="pluginMenubar" style="display:flex; flex-direction:column; gap:4px;"></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-pill" onclick="currentUser ? logout() : showLoginModal()">
+        <div id="userInfo" style="flex:1; display:flex; align-items:center; gap:8px;">
+          <span id="userStatus">未登录</span>
+        </div>
+        <span id="loginBtn" style="font-size:12px;">登录</span>
+        <span id="logoutBtn" style="font-size:12px; display:none;">退出</span>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button class="btn-ghost" id="updateBtn" onclick="checkUpdate()" title="检查更新"
+          style="flex:1; justify-content:center;"><span class="update-text">更新</span></button>
+        <button class="btn-ghost" id="themeToggleBtn" onclick="toggleTheme()"
+          style="flex:1; justify-content:center;"><span id="themeIcon">🌙</span></button>
+        <button class="btn-ghost" id="helpBtn" onclick="ASGOnboarding.forceStart()" title="新手引导"
+          style="flex:1; justify-content:center;">❓</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-main">
+    <div class="view-container">
+      <div id="mainContainer">
+
+        <!-- View: Home -->
+        <div id="view-home" class="view-section active">
+          <div class="section-header">
+            <h1 class="section-title">本地 BP</h1>
+            <p class="section-desc">快速开始一场专业的赛事导播</p>
+          </div>
+
+          <div class="grid-2">
+            <div class="feature-card hero-card">
+              <div class="hero-content">
+                <h3 style="font-size: 32px; margin-bottom: 12px;">本地 BP 模式</h3>
+                <p style="font-size: 16px; margin-bottom: 24px;">单机导播，快速启动，无需联网连接。</p>
+                <button class="btn btn-primary btn-lg" id="localBpBtn">立即开始</button>
+              </div>
+              <div style="font-size:100px; opacity:0.8;">📋</div>
+            </div>
+
+
+
+
+
+            <div class="feature-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3>赛程（Idvevent对接功能）</h3>
+                <button class="btn btn-secondary" id="refreshScheduleBtn" onclick="loadIdveventSchedules()">
+                  🔄 刷新
+                </button>
+              </div>
+
+              <div class="control-group" style="margin-bottom:16px;">
+                <label class="control-label">赛事ID (可选，留空获取所有)</label>
+                <input type="text" id="idveventEventId" class="form-input"
+                  placeholder="例如: 550e8400-e29b-41d4-a716-446655440000">
+              </div>
+
+              <div id="idveventScheduleList" style="max-height:400px; overflow-y:auto;">
+                <div style="text-align:center; padding:20px; color:var(--text-secondary);">
+                  点击"刷新"按钮加载赛程
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feature-card" id="teamManagerCard" style="margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h3>队伍管理器</h3>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span id="teamManagerCount" style="font-size:12px; color:var(--text-secondary);">未导入</span>
+                <button class="btn btn-ghost" id="teamManagerClearBtn" style="font-size:12px;">清空</button>
+              </div>
+            </div>
+
+            <div class="control-group" style="margin-bottom:16px;">
+              <label class="control-label">导入赛事队伍 CSV</label>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input type="file" id="teamCsvInput" class="form-input" accept=".csv">
+                <button class="btn btn-secondary" id="importTeamCsvBtn">导入</button>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:16px;">
+              <div>
+                <label class="control-label">A队</label>
+                <select id="teamManagerTeamA" class="form-select"></select>
+                <div id="teamManagerPreviewA" style="margin-top:8px; font-size:12px; color:var(--text-secondary);"></div>
+              </div>
+              <div>
+                <label class="control-label">B队</label>
+                <select id="teamManagerTeamB" class="form-select"></select>
+                <div id="teamManagerPreviewB" style="margin-top:8px; font-size:12px; color:var(--text-secondary);"></div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn-primary" id="applyTeamsToLocalBpBtn">应用到本地BP</button>
+            </div>
+          </div>
+
+          <div id="pluginCardsSection"
+            style="margin-top:40px; display:none; border-top: 1px solid var(--border-color); padding-top: 30px;">
+            <div class="section-header" style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
+              <h2 class="section-title" style="font-size:20px; margin:0;">🧩 插件</h2>
+              <span class="section-desc">来自已安装的插件</span>
+            </div>
+            <div id="pluginCardsGrid" class="grid-2"></div>
+          </div>
+        </div>
+
+        <!-- View: Online -->
+        <div id="view-online" class="view-section">
+          <div class="section-header">
+            <h1 class="section-title">联网 BP</h1>
+            <p class="section-desc">创建房间，分发链接，开始比赛。</p>
+          </div>
+
+          <div class="grid-2">
+            <div class="feature-card" id="onlineRoomCard">
+              <h3>创建新房间</h3>
+              <div class="control-group">
+                <label class="control-label">服务器</label>
+                <input type="text" id="serverUrl" class="form-input" value="https://api.idvevent.cn">
+              </div>
+              <div class="grid-2" style="margin-bottom:16px;">
+                <div>
+                  <label class="control-label">赛制</label>
+                  <select id="boType" class="form-select">
+                    <option value="3">BO3</option>
+                    <option value="5">BO5</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="control-label">赛事ID</label>
+                  <input type="text" id="eventId" class="form-input" placeholder="可选">
+                </div>
+              </div>
+              <div class="control-group">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                  <input type="checkbox" id="globalBan" checked> <span style="font-size:14px;">启用全局禁选</span>
+                </label>
+              </div>
+              <button class="btn btn-primary" id="createBtn" style="width:100%">🚀 创建房间</button>
+
+              <div id="linksContainer"
+                style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border-color);">
+                <div class="control-group">
+                  <label class="control-label">A队链接</label>
+                  <div style="display:flex; gap:8px;">
+                    <input type="text" id="teamALink" class="form-input" readonly>
+                    <button class="btn btn-secondary" onclick="copyLink('teamALink')">复制</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">B队链接</label>
+                  <div style="display:flex; gap:8px;">
+                    <input type="text" id="teamBLink" class="form-input" readonly>
+                    <button class="btn btn-secondary" onclick="copyLink('teamBLink')">复制</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">观众链接</label>
+                  <div style="display:flex; gap:8px;">
+                    <input type="text" id="spectatorLink" class="form-input" readonly>
+                    <button class="btn btn-secondary" onclick="copyLink('spectatorLink')">复制</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3>历史房间</h3>
+                <button class="btn btn-ghost" onclick="clearRoomHistory()" style="font-size:12px;">清空</button>
+              </div>
+              <div id="roomHistorySection">
+                <div id="roomHistoryList"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- View: Settings -->
+        <div id="view-settings" class="view-section">
+          <div class="section-header">
+            <h1 class="section-title">表现设置</h1>
+            <p class="section-desc">配置 3D 模型渲染、前台分辨率与全局样式。</p>
+          </div>
+
+          <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchSettingTab('3d', event)">3D 模型</button>
+            <button class="tab-btn" onclick="switchSettingTab('render', event)">渲染分辨率</button>
+            <button class="tab-btn" onclick="switchSettingTab('assets', event)">字体与资源</button>
+          </div>
+
+          <div id="setting-tab-3d">
+            <div class="feature-card" id="model3dSettingsCard">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <label
+                  style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:16px; font-weight:bold;">
+                  <input type="checkbox" id="enable3dModels" class="switch-input"> 启用 3D 模型
+                </label>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <button class="btn btn-sm btn-secondary" onclick="ASGOnboarding.startMMDTutorial()">📖 配置教程</button>
+                  <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" id="model3dAutoApply"> 实时应用修改
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-grid">
+                <div class="control-group">
+                  <label class="control-label">求生者模型目录</label>
+                  <div style="display:flex; gap:8px;">
+                    <input id="survivorModelDir" class="form-input" placeholder="Path...">
+                    <button class="btn btn-secondary" onclick="pickFolderFor('survivorModelDir')">...</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">监管者模型目录</label>
+                  <div style="display:flex; gap:8px;">
+                    <input id="hunterModelDir" class="form-input" placeholder="Path...">
+                    <button class="btn btn-secondary" onclick="pickFolderFor('hunterModelDir')">...</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">求生者动作目录</label>
+                  <div style="display:flex; gap:8px;">
+                    <input id="survivorMotionDir" class="form-input" placeholder="Path...">
+                    <button class="btn btn-secondary" onclick="pickFolderFor('survivorMotionDir')">...</button>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">监管者动作目录</label>
+                  <div style="display:flex; gap:8px;">
+                    <input id="hunterMotionDir" class="form-input" placeholder="Path...">
+                    <button class="btn btn-secondary" onclick="pickFolderFor('hunterMotionDir')">...</button>
+                  </div>
+                </div>
+
+                <div class="control-group"><label class="control-label">抗锯齿</label><select id="render3dAntialias"
+                    class="form-select">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select></div>
+                <div class="control-group"><label class="control-label">像素比</label><select id="render3dPixelRatio"
+                    class="form-select">
+                    <option value="1">1x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                  </select></div>
+                <div class="control-group"><label class="control-label">目标 FPS</label><input type="number"
+                    id="model3dTargetFPS" class="form-input" value="30"></div>
+                <div class="control-group"><label class="control-label">阴影质量</label><select id="render3dShadowQuality"
+                    class="form-select">
+                    <option value="1024">中</option>
+                    <option value="2048">高</option>
+                  </select></div>
+                <div class="control-group"><label class="control-label">Toon 风格</label>
+                  <div style="display:flex; align-items:center; gap:10px;"><input type="checkbox"
+                      id="render3dEnableToon"> <span>启用 Toon</span></div>
+                </div>
+                <div class="control-group"><label class="control-label">描边</label>
+                  <div style="display:flex; align-items:center; gap:10px;"><input type="checkbox"
+                      id="render3dEnableOutline"> <span>启用描边</span></div>
+                </div>
+              </div>
+
+              <div style="display:none">
+                <input id="defaultMotionVmd"><input id="render3dEnableShadows"><input id="render3dToonGradient">
+                <input id="render3dOutlineThickness"><input id="render3dOutlineColor"><input id="render3dOutlineAlpha">
+                <input id="render3dAmbientColor"><input id="render3dAmbientIntensity">
+                <input id="render3dDirectionalColor"><input id="render3dDirectionalIntensity">
+                <input id="render3dLightPosX"><input id="render3dLightPosY"><input id="render3dLightPosZ">
+              </div>
+
+              <div style="margin-top:20px; display:flex; gap:10px;">
+                <button class="btn btn-secondary" onclick="loadModel3dSettings()">刷新设置</button>
+                <button class="btn btn-primary" onclick="applyModel3dSettings(true)">保存并应用</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="setting-tab-render" style="display:none;">
+            <div class="feature-card">
+              <h3>OBS 前台输出</h3>
+              <div class="control-group">
+                <label class="control-label">输出分辨率</label>
+                <select id="frontendResolutionPreset" class="form-select" onchange="onFrontendResPresetChange()">
+                  <option value="1920x1080">1080p</option>
+                  <option value="2560x1440">1440p</option>
+                  <option value="3840x2160">4K</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </div>
+              <div class="grid-2">
+                <input type="number" id="frontendResWidth" class="form-input" placeholder="W">
+                <input type="number" id="frontendResHeight" class="form-input" placeholder="H">
+              </div>
+              <p id="frontendResHint" style="font-size:12px; color:var(--text-secondary); margin:10px 0;">...</p>
+              <button class="btn btn-primary" onclick="applyFrontendResolution()">应用分辨率</button>
+
+              <div style="margin-top:30px; border-top:1px solid var(--border-color); padding-top:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <h4>透明背景模式</h4>
+                    <p style="font-size:12px; color:var(--text-secondary);">OBS 推流时背景透明</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="transparentBackgroundToggle" onchange="toggleTransparentBackground()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="setting-tab-assets" style="display:none;">
+            <div class="feature-card">
+              <h3>资源管理</h3>
+              <div class="grid-2">
+                <button class="btn btn-secondary" onclick="openCharacterManager()">🎭 角色图片管理</button>
+                <button class="btn btn-secondary" onclick="openFontSettings()">🔤 全局字体设置</button>
+                <button class="btn btn-primary" onclick="openComponentEditor()">🎨 自定义组件设计器</button>
+                <button class="btn btn-primary" onclick="openAnimationEditor()">🎬 动画编辑器</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- View: Tools/Store -->
+        <div id="view-tools" class="view-section">
+          <div class="section-header">
+            <h1 class="section-title">工具与商店</h1>
+          </div>
+
+          <div class="grid-3">
+            <div class="feature-card" id="storeCard">
+              <h3>布局商店</h3>
+              <p>下载精美的官方/社区布局包。</p>
+              <p id="packCount" style="color:#FFD700; font-weight:bold;">10+</p>
+              <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="openStore()">打开布局商店</button>
+            </div>
+
+            <div class="feature-card">
+              <h3>插件中心</h3>
+              <p>扩展导播端功能。</p>
+              <button class="btn btn-secondary" style="width:100%; margin-top:10px;"
+                onclick="openPluginStore()">插件商店</button>
+              <button class="btn btn-ghost" style="width:100%; margin-top:5px;"
+                onclick="openPluginManager()">管理已安装</button>
+            </div>
+
+            <div class="feature-card">
+              <h3>布局管理</h3>
+              <p>导入或导出您的 BP 布局包，或重置为默认值。</p>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
+                <button class="btn btn-secondary" onclick="importBpPack()">📥 导入</button>
+                <button class="btn btn-secondary" onclick="exportBpPack()">📤 导出</button>
+                <button class="btn btn-ghost" onclick="resetLayout()"
+                  style="width:100%; border: 1px solid rgba(255,255,255,0.1); margin-top:10px;">🔄 重置为默认</button>
+              </div>
+            </div>
+          </div>
+
+
+        </div>
+
+      </div>
+
+      <div id="pluginPagesContainer"></div>
+
+    </div>
+  </div>
+
+  <div id="statusToast" class="status-toast"></div>
+
+  <div class="modal" id="loginModal">
+    <div class="modal-content">
+      <h3 style="margin-bottom:20px; text-align:center;">登录账号</h3>
+      <input type="email" id="loginEmail" class="form-input" placeholder="Email" style="margin-bottom:10px;">
+      <input type="password" id="loginPassword" class="form-input" placeholder="Password" style="margin-bottom:10px;">
+      <div id="loginError" style="color:red; font-size:12px; margin-bottom:10px; display:none;"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-secondary" onclick="hideLoginModal()" style="flex:1">取消</button>
+        <button class="btn btn-primary" id="doLoginBtn" onclick="doLogin()" style="flex:1">登录</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/main-logic.js"></script>
+  <script src="./js/signalr.min.js"></script>
+  <script src="./js/onboarding.js"></script>
+  <script>
+    let connection = null
+    let roomData = null
+    let currentUser = null
+    let myEvents = []
+    let selectedEventId = null
+    let eventMatches = []
+    let roomHistory = [] // 房间历史记录
+    let currentRoomId = null // 当前活动的房间ID
+
+    const serverUrlInput = document.getElementById('serverUrl')
+    const eventIdInput = document.getElementById('eventId')
+    const boTypeSelect = document.getElementById('boType')
+    const globalBanCheckbox = document.getElementById('globalBan')
+    const createBtn = document.getElementById('createBtn')
+    const linksContainer = document.getElementById('linksContainer')
+    const statusToast = document.getElementById('statusToast')
+
+    // 加载房间历史记录
+    function loadRoomHistory() {
+      const saved = localStorage.getItem('asg_room_history')
+      if (saved) {
+        try {
+          roomHistory = JSON.parse(saved)
+          renderRoomHistory()
+        } catch (e) {
+          console.error('加载房间历史失败:', e)
+          roomHistory = []
+        }
+      }
+    }
+
+    // 保存房间历史记录
+    function saveRoomHistory() {
+      localStorage.setItem('asg_room_history', JSON.stringify(roomHistory))
+      renderRoomHistory()
+    }
+
+    // 添加房间到历史记录
+    function addRoomToHistory(roomData, links = {}) {
+      const existingIndex = roomHistory.findIndex(r => r.roomId === roomData.roomId)
+
+      const historyItem = {
+        roomId: roomData.roomId,
+        serverUrl: roomData.serverUrl,
+        eventId: roomData.eventId || '',
+        boType: roomData.boType,
+        globalBanEnabled: roomData.globalBanEnabled,
+        createdAt: new Date().toISOString(),
+        teamAName: roomData.teamAName || 'A队',
+        teamBName: roomData.teamBName || 'B队',
+        teamALink: links.teamALink || '',
+        teamBLink: links.teamBLink || '',
+        spectatorLink: links.spectatorLink || ''
+      }
+
+      if (existingIndex > -1) {
+        roomHistory[existingIndex] = historyItem
+      } else {
+        roomHistory.unshift(historyItem)
+        if (roomHistory.length > 5) {
+          roomHistory = roomHistory.slice(0, 5)
+        }
+      }
+
+      currentRoomId = roomData.roomId
+      saveRoomHistory()
+    }
+
+    // 渲染房间历史列表
+    function renderRoomHistory() {
+      const section = document.getElementById('roomHistorySection')
+      const list = document.getElementById('roomHistoryList')
+
+      if (roomHistory.length === 0) {
+        section.style.display = 'none'
+        return
+      }
+
+      section.style.display = 'block'
+
+      list.innerHTML = roomHistory.map(room => {
+        const isActive = room.roomId === currentRoomId
+        const date = new Date(room.createdAt).toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+
+        const hasLinks = room.teamALink || room.teamBLink || room.spectatorLink
+
+        return `
+          <div class="room-history-item ${isActive ? 'active' : ''}" data-room-id="${room.roomId}">
+            <div class="room-history-info">
+              <div class="room-history-id">🎮 房间 ${room.roomId}</div>
+              <div class="room-history-meta">
+                ${room.teamAName} vs ${room.teamBName} • BO${room.boType} • ${date}
+              </div>
+              ${hasLinks ? `
+                <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap;">
+                  ${room.teamALink ? `<button class="room-history-btn" style="background: rgba(100, 181, 246, 0.2); color: #64b5f6; font-size: 10px;" onclick="copyRoomLink('${room.teamALink}', 'A队')">📋 A队</button>` : ''}
+                  ${room.teamBLink ? `<button class="room-history-btn" style="background: rgba(239, 83, 80, 0.2); color: #ef5350; font-size: 10px;" onclick="copyRoomLink('${room.teamBLink}', 'B队')">📋 B队</button>` : ''}
+                  ${room.spectatorLink ? `<button class="room-history-btn" style="background: rgba(255, 215, 0, 0.2); color: #ffd700; font-size: 10px;" onclick="copyRoomLink('${room.spectatorLink}', '观众')">📋 观众</button>` : ''}
+                </div>
+              ` : ''}
+            </div>
+            <div class="room-history-actions">
+              ${!isActive ? `<button class="room-history-btn use" onclick="useRoomFromHistory('${room.roomId}')">使用</button>` : '<span style="color: #81c784; font-size: 11px;">✓ 当前</span>'}
+              <button class="room-history-btn delete" onclick="deleteRoomFromHistory('${room.roomId}')">×</button>
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    // 使用历史房间
+    async function useRoomFromHistory(roomId) {
+      const room = roomHistory.find(r => r.roomId === roomId)
+      if (!room) return
+
+      // 先关闭现有的窗口
+      try {
+        await window.electronAPI.closeBpWindows()
+        showStatus('正在切换房间...', 'info')
+      } catch (e) {
+        console.warn('关闭窗口时出错:', e)
+      }
+
+      document.getElementById('serverUrl').value = room.serverUrl
+      document.getElementById('eventId').value = room.eventId
+      document.getElementById('boType').value = room.boType
+      document.getElementById('globalBan').checked = room.globalBanEnabled
+
+      try {
+        const conn = await connectToServer()
+        if (!conn) return
+
+        try {
+          await conn.invoke('JoinRoom', roomId, '', 'spectator')
+
+          currentRoomId = roomId
+          const roomData = {
+            roomId: roomId,
+            serverUrl: room.serverUrl,
+            eventId: room.eventId,
+            boType: room.boType,
+            globalBanEnabled: room.globalBanEnabled,
+            teamAName: room.teamAName,
+            teamBName: room.teamBName
+          }
+
+          await window.electronAPI.openBpWindows(roomData)
+          showStatus('已重新连接到房间', 'success')
+          renderRoomHistory()
+
+        } catch (e) {
+          showStatus('房间已失效，请创建新房间', 'warning')
+        }
+
+        await conn.stop()
+      } catch (e) {
+        showStatus('连接失败: ' + e.message, 'error')
+      }
+    }
+
+    // 删除历史房间
+    function deleteRoomFromHistory(roomId) {
+      if (!confirm('确定要删除这条记录吗？')) return
+
+      roomHistory = roomHistory.filter(r => r.roomId !== roomId)
+      if (currentRoomId === roomId) {
+        currentRoomId = null
+      }
+      saveRoomHistory()
+      showStatus('已删除', 'info')
+    }
+
+    // 清空历史记录
+    function clearRoomHistory() {
+      if (!confirm('确定要清空所有历史记录吗？')) return
+
+      roomHistory = []
+      currentRoomId = null
+      saveRoomHistory()
+      showStatus('已清空', 'info')
+    }
+
+    // 初始化时检查登录状态
+    async function checkAuthStatus() {
+      try {
+        const result = await window.electronAPI.getAuthStatus()
+        if (result.isLoggedIn && result.user) {
+          currentUser = result.user
+          updateUserUI()
+          loadMyEvents()
+        }
+      } catch (e) {
+        console.error('检查登录状态失败:', e)
+      }
+    }
+
+    function updateUserUI() {
+      const userInfo = document.getElementById('userInfo')
+      const loginBtn = document.getElementById('loginBtn')
+      const logoutBtn = document.getElementById('logoutBtn')
+
+      if (currentUser) {
+        const displayName = currentUser.fullName || currentUser.email || '用户'
+        userInfo.innerHTML = `
+          <div class="user-avatar">${displayName[0].toUpperCase()}</div>
+          <span style="color: #ddd;">${displayName}</span>
+        `
+        loginBtn.style.display = 'none'
+        logoutBtn.style.display = 'inline-block'
+      } else {
+        userInfo.innerHTML = '<span id="userStatus" style="color: #888;">未登录</span>'
+        loginBtn.style.display = 'inline-block'
+        logoutBtn.style.display = 'none'
+      }
+    }
+
+    function showLoginModal(message) {
+      if (message) {
+        const errorDiv = document.getElementById('loginError')
+        errorDiv.textContent = message
+        errorDiv.style.display = 'block'
+      }
+      document.getElementById('loginModal').classList.add('show')
+      document.getElementById('loginEmail').focus()
+    }
+
+    function hideLoginModal() {
+      document.getElementById('loginModal').classList.remove('show')
+      document.getElementById('loginEmail').value = ''
+      document.getElementById('loginPassword').value = ''
+      document.getElementById('loginError').style.display = 'none'
+    }
+
+    async function doLogin() {
+      const email = document.getElementById('loginEmail').value.trim()
+      const password = document.getElementById('loginPassword').value
+      const errorDiv = document.getElementById('loginError')
+      const loginBtn = document.getElementById('doLoginBtn')
+
+      if (!email || !password) {
+        errorDiv.textContent = '请输入邮箱和密码'
+        errorDiv.style.display = 'block'
+        return
+      }
+
+      loginBtn.disabled = true
+      loginBtn.textContent = '登录中...'
+
+      // 先让 UI 完整渲染一帧，避免“点击登录后界面卡住/不刷新”的观感
+      await new Promise(requestAnimationFrame)
+
+      try {
+        const result = await window.electronAPI.login(email, password)
+        if (result.success) {
+          currentUser = result.user
+          hideLoginModal()
+          updateUserUI()
+          loadMyEvents()
+          showStatus('登录成功', 'success')
+        } else {
+          errorDiv.textContent = result.error || '登录失败'
+          errorDiv.style.display = 'block'
+        }
+      } catch (e) {
+        errorDiv.textContent = e.message || '登录失败'
+        errorDiv.style.display = 'block'
+      }
+
+      loginBtn.disabled = false
+      loginBtn.textContent = '登录'
+    }
+
+    async function logout() {
+      try {
+        await window.electronAPI.logout()
+        currentUser = null
+        myEvents = []
+        updateUserUI()
+        renderPredictionSection()
+        showStatus('已退出登录', 'info')
+      } catch (e) {
+        console.error('退出登录失败:', e)
+      }
+    }
+
+    async function loadMyEvents() {
+      if (!currentUser) return
+
+      try {
+        const result = await window.electronAPI.getMyEvents()
+        if (result.success) {
+          myEvents = result.data || []
+          renderPredictionSection()
+        }
+      } catch (e) {
+        console.error('加载赛事失败:', e)
+      }
+    }
+
+    // Theme toggle: persist to localStorage and notify other windows
+    function getSystemTheme() {
+      try {
+        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'
+      } catch {
+        return 'light'
+      }
+    }
+
+    function updateThemeToggleUI(theme) {
+      const icon = document.getElementById('themeIcon')
+      const text = document.getElementById('themeText')
+      if (!icon || !text) return
+      if (theme === 'dark') { icon.textContent = '🌙'; text.textContent = '深色' }
+      else { icon.textContent = '☀️'; text.textContent = '浅色' }
+    }
+
+    function applyTheme(theme, persist = true) {
+      try {
+        const t = theme === 'dark' ? 'dark' : 'light'
+        document.documentElement.setAttribute('data-theme', t)
+        updateThemeToggleUI(t)
+
+        if (persist) localStorage.setItem('asg_theme', t)
+
+        // notify other windows via main-process broadcast
+        if (window.electronAPI && window.electronAPI.sendToFrontend) {
+          window.electronAPI.sendToFrontend({ type: 'theme-changed', theme: t })
+        }
+      } catch (e) {
+        console.warn('applyTheme error', e)
+      }
+    }
+
+    function toggleTheme() {
+      const saved = localStorage.getItem('asg_theme')
+      const current = (saved === 'dark' || saved === 'light') ? saved : getSystemTheme()
+      const next = current === 'dark' ? 'light' : 'dark'
+      applyTheme(next, true)
+    }
+
+    // Apply persisted theme at startup (no saved => follow system, but update button text)
+    ; (function () {
+      const saved = localStorage.getItem('asg_theme')
+      if (saved === 'dark' || saved === 'light') {
+        applyTheme(saved, false)
+      } else {
+        // follow system: don't set attribute, just reflect current mode on button
+        document.documentElement.removeAttribute('data-theme')
+        updateThemeToggleUI(getSystemTheme())
+      }
+    })()
+
+    function renderPredictionSection() {
+      const content = document.getElementById('predictionContent')
+
+      if (!currentUser) {
+        content.innerHTML = '<p style="color: #888; font-size: 13px; text-align: center; padding: 20px 0;">请先登录账号以使用竞猜功能</p>'
+        return
+      }
+
+      if (!myEvents.length) {
+        content.innerHTML = '<p style="color: #888; font-size: 13px; text-align: center; padding: 20px 0;">您暂无管理的赛事</p>'
+        return
+      }
+
+      let html = `
+        <select class="event-select" id="eventSelect" onchange="onEventSelect(this.value)">
+          <option value="">选择赛事</option>
+          ${myEvents.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+        </select>
+        <div id="matchList"></div>
+      `
+
+      content.innerHTML = html
+    }
+
+    async function onEventSelect(eventId) {
+      selectedEventId = eventId
+      const matchList = document.getElementById('matchList')
+
+      if (!eventId) {
+        matchList.innerHTML = ''
+        return
+      }
+
+      matchList.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center; padding: 10px;">加载中...</p>'
+
+      try {
+        const result = await window.electronAPI.getEventMatches(eventId)
+        console.log('赛程数据:', result)
+        if (result.success) {
+          eventMatches = Array.isArray(result.data) ? result.data : []
+          console.log('解析后的赛程:', eventMatches)
+          renderMatchList()
+        } else {
+          matchList.innerHTML = `<p style="color: #e57373; font-size: 12px;">加载失败: ${result.error || '未知错误'}</p>`
+        }
+      } catch (e) {
+        console.error('加载赛程异常:', e)
+        matchList.innerHTML = `<p style="color: #e57373; font-size: 12px;">加载失败: ${e.message}</p>`
+      }
+    }
+
+    function renderMatchList() {
+      const matchList = document.getElementById('matchList')
+
+      if (!eventMatches.length) {
+        matchList.innerHTML = '<p style="color: #888; font-size: 12px; text-align: center; padding: 10px;">暂无赛程</p>'
+        return
+      }
+
+      let html = eventMatches.map(m => `
+        <div class="match-item" onclick="openPredictionWindow('${m.id}')">
+          <div class="match-teams">${m.homeTeamName || '主队'} vs ${m.awayTeamName || '客队'}</div>
+          <div class="match-time">${new Date(m.matchTime).toLocaleString()}</div>
+        </div>
+      `).join('')
+
+      matchList.innerHTML = html
+    }
+
+    async function openPredictionWindow(matchId) {
+      try {
+        await window.electronAPI.openPredictionWindow(matchId)
+      } catch (e) {
+        console.error('打开竞猜窗口失败:', e)
+      }
+    }
+
+    function showStatus(message, type) {
+      statusToast.textContent = message
+      statusToast.className = `status-toast ${type}`
+      statusToast.classList.add('show')
+      setTimeout(() => {
+        statusToast.classList.remove('show')
+      }, 3000)
+    }
+
+    function copyLink(inputId) {
+      const input = document.getElementById(inputId)
+      input.select()
+      document.execCommand('copy')
+      showStatus('链接已复制到剪贴板', 'success')
+    }
+
+    function copyRoomLink(link, teamName) {
+      const textarea = document.createElement('textarea')
+      textarea.value = link
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      showStatus(`${teamName}链接已复制`, 'success')
+    }
+
+    // 删除快捷操作相关函数
+    async function openStore() {
+      try {
+        await window.electronAPI.openStore()
+      } catch (e) {
+        showStatus('打开商店失败: ' + e.message, 'error')
+      }
+    }
+
+    async function openPluginStore() {
+      try {
+        await window.electronAPI.openPluginStore()
+      } catch (e) {
+        showStatus('打开插件商店失败: ' + e.message, 'error')
+      }
+    }
+
+    async function openPluginManager() {
+      try {
+        const opener = window.electronAPI?.openPluginManager || window.plugins?.openPluginManager
+        if (typeof opener !== 'function') {
+          const keys = window.electronAPI ? Object.keys(window.electronAPI).slice(0, 8).join(', ') : 'none'
+          showStatus('无法打开插件管理：预加载 API 未注入/不完整（electronAPI keys: ' + keys + '）', 'error')
+          return
+        }
+
+        const result = await opener()
+        if (result && result.success === false) {
+          showStatus('打开插件管理失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('打开插件管理失败: ' + (e?.message || '未知错误'), 'error')
+      }
+    }
+
+    async function openCharacterManager() {
+      try {
+        if (typeof window.electronAPI?.openCharacterManager !== 'function') {
+          showStatus('无法打开角色管理：API 未注入', 'error')
+          return
+        }
+
+        const result = await window.electronAPI.openCharacterManager()
+        if (result && result.success === false) {
+          showStatus('打开角色管理失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('打开角色管理失败: ' + (e?.message || '未知错误'), 'error')
+      }
+    }
+
+    async function openComponentEditor() {
+      try {
+        if (typeof window.electronAPI?.openComponentEditor !== 'function') {
+          showStatus('无法打开组件设计器：API 未注入', 'error')
+          return
+        }
+
+        const result = await window.electronAPI.openComponentEditor()
+        if (result && result.success === false) {
+          showStatus('打开组件设计器失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('打开组件设计器失败: ' + (e?.message || '未知错误'), 'error')
+      }
+    }
+
+
+
+    // 导入布局包
+    async function importBpPack() {
+      try {
+        showStatus('正在导入布局包...', 'info')
+        const result = await window.electronAPI.importBpPack()
+        if (result.success) {
+          showStatus('✅ 布局包导入成功！前台窗口已自动更新', 'success')
+        } else if (!result.canceled) {
+          showStatus('导入失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('导入失败: ' + e.message, 'error')
+      }
+    }
+
+    // 导出布局包
+    async function exportBpPack() {
+      try {
+        showStatus('正在导出布局包...', 'info')
+        const result = await window.electronAPI.exportBpPack()
+        if (result.success) {
+          showStatus('✅ 布局包导出成功！', 'success')
+        } else if (!result.canceled) {
+          showStatus('导出失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('导出失败: ' + e.message, 'error')
+      }
+    }
+
+    // 重置布局
+    async function resetLayout() {
+      if (!confirm('确定要恢复默认布局吗？这将清除所有自定义设置。')) return
+
+      try {
+        showStatus('正在重置布局...', 'info')
+        const result = await window.electronAPI.resetLayout()
+        if (result.success) {
+          showStatus('✅ 布局已重置为默认！前台窗口已自动更新', 'success')
+        } else {
+          showStatus('重置失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('重置失败: ' + e.message, 'error')
+      }
+    }
+
+    // 打开帮助
+    function openHelp() {
+      const helpContent = `
+        【ASG导播端使用指南】
+        
+        1️⃣ 创建房间
+        - 点击"创建房间"按钮
+        - 复制A队/B队链接发给选手
+        - 选手打开链接即可进行BP
+        
+        2️⃣ 导播操作
+        - 房间创建后会自动打开前台和后台窗口
+        - 前台窗口用于OBS捕获展示
+        - 后台窗口用于控制BP流程
+        
+        3️⃣ 布局定制
+        - 在前台窗口拖拽元素调整位置
+        - 布局会自动保存，无需手动点击保存
+        - 使用"导出布局"保存为文件分享
+        - 在商店下载精美布局包
+        - 使用"导入布局"应用布局包
+        
+        4️⃣ 快捷操作
+        - 前台窗口支持拖拽调整元素位置
+        - 双击元素可编辑属性
+        - 拖拽/调整大小后会自动保存
+        - 更换背景后会自动保存
+        
+        ✨ 自动保存功能
+        - 拖拽元素后 0.5 秒自动保存
+        - 调整大小后 0.5 秒自动保存
+        - 更换背景后立即自动保存
+        - 窗口加载时自动保存当前布局
+        
+        如需更多帮助，请联系管理员或查看在线文档。
+      `
+      alert(helpContent)
+    }
+
+    // ==================== 前台渲染分辨率设置 ====================
+    function parsePresetResolution(value) {
+      if (!value || value === 'custom') return null
+      const m = String(value).match(/^(\d+)x(\d+)$/)
+      if (!m) return null
+      return { width: parseInt(m[1], 10), height: parseInt(m[2], 10) }
+    }
+
+    function setFrontendResInputs(width, height) {
+      const w = document.getElementById('frontendResWidth')
+      const h = document.getElementById('frontendResHeight')
+      w.value = width
+      h.value = height
+    }
+
+    function onFrontendResPresetChange() {
+      const preset = document.getElementById('frontendResolutionPreset').value
+      const r = parsePresetResolution(preset)
+      if (r) {
+        setFrontendResInputs(r.width, r.height)
+      }
+    }
+
+    async function loadFrontendResolution() {
+      try {
+        const result = await window.electronAPI.getFrontendRenderResolution()
+        if (!result || !result.success) return
+
+        const saved = result.saved
+        if (saved && saved.width && saved.height) {
+          setFrontendResInputs(saved.width, saved.height)
+          const presetValue = `${saved.width}x${saved.height}`
+          const presetSelect = document.getElementById('frontendResolutionPreset')
+          const hasPreset = Array.from(presetSelect.options).some(o => o.value === presetValue)
+          presetSelect.value = hasPreset ? presetValue : 'custom'
+        }
+
+        const hint = document.getElementById('frontendResHint')
+        if (result.current) {
+          hint.textContent = `当前前台窗口：${result.current.width}×${result.current.height}。点击“应用分辨率”可立即调整并保存。`
+        }
+      } catch (e) {
+        console.warn('加载前台渲染分辨率失败:', e)
+      }
+    }
+
+    async function applyFrontendResolution() {
+      const w = parseInt(document.getElementById('frontendResWidth').value, 10)
+      const h = parseInt(document.getElementById('frontendResHeight').value, 10)
+      if (!Number.isFinite(w) || !Number.isFinite(h)) {
+        showStatus('请输入合法的宽高', 'error')
+        return
+      }
+
+      try {
+        const result = await window.electronAPI.setFrontendRenderResolution({ width: w, height: h })
+        if (result && result.success) {
+          showStatus(`✅ 前台渲染分辨率已设置为 ${w}×${h}`, 'success')
+          const hint = document.getElementById('frontendResHint')
+          if (result.current) {
+            hint.textContent = `当前前台窗口：${result.current.width}×${result.current.height}（已应用并保存）`
+          }
+        } else {
+          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+      }
+    }
+
+    // ==================== 透明背景设置 ====================
+    async function loadTransparentBackgroundSetting() {
+      try {
+        const result = await window.electronAPI.getTransparentBackground()
+        if (result && result.success) {
+          const toggle = document.getElementById('transparentBackgroundToggle')
+          if (toggle) {
+            toggle.checked = !!result.transparentBackground
+          }
+        }
+      } catch (e) {
+        console.warn('加载透明背景设置失败:', e)
+      }
+    }
+
+    async function toggleTransparentBackground() {
+      const toggle = document.getElementById('transparentBackgroundToggle')
+      const enabled = toggle ? toggle.checked : false
+
+      try {
+        const result = await window.electronAPI.setTransparentBackground(enabled)
+        if (result && result.success) {
+          showStatus(enabled ? '✅ 已启用透明背景模式，前台窗口将自动刷新' : '✅ 已禁用透明背景模式，前台窗口将自动刷新', 'success')
+        } else {
+          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
+          // 恢复原状态
+          if (toggle) toggle.checked = !enabled
+        }
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+        // 恢复原状态
+        if (toggle) toggle.checked = !enabled
+      }
+    }
+
+    function onTransparentBackgroundRowClick(e) {
+      const toggle = document.getElementById('transparentBackgroundToggle')
+      if (!toggle) return
+
+      // 点击到开关本体时，让 onchange 自己处理
+      const target = e?.target
+      if (target === toggle) return
+      if (target && typeof target.closest === 'function' && target.closest('.switch')) return
+
+      toggle.checked = !toggle.checked
+      toggleTransparentBackground()
+    }
+
+    async function connectToServer() {
+      const serverUrl = serverUrlInput.value.trim()
+      if (!serverUrl) {
+        showStatus('请输入服务器地址', 'error')
+        return null
+      }
+
+      try {
+        connection = new signalR.HubConnectionBuilder()
+          .withUrl(`${serverUrl}/hubs/bp`)
+          .withAutomaticReconnect()
+          .build()
+
+        await connection.start()
+        showStatus('已连接到服务器', 'success')
+        return connection
+      } catch (error) {
+        showStatus(`连接失败: ${error.message}`, 'error')
+        return null
+      }
+    }
+
+    function getBpBaseUrlFromServerUrl(serverUrl) {
+      const baseUrl = (serverUrl || '').trim().replace(/\/+$/, '')
+
+      // 本地/自托管场景：做端口映射（兼容旧端口）
+      const portMapped = baseUrl
+        .replace(':5068', ':5174')
+        .replace(':5250', ':5173')
+
+      // 生产环境：bp 页面在 bp 子域名，后端 API 在 api 子域名
+      try {
+        const url = new URL(portMapped)
+        if (url.hostname === 'api.idvevent.cn') {
+          url.hostname = 'bp.idvevent.cn'
+        }
+        return url.origin
+      } catch {
+        return portMapped
+      }
+    }
+
+    async function createRoom() {
+      createBtn.disabled = true
+      createBtn.innerHTML = '<span>⏳</span> 创建中...'
+      showStatus('正在创建房间...', 'info')
+
+      // 先关闭旧窗口
+      try {
+        await window.electronAPI.closeBpWindows()
+      } catch (e) {
+        console.warn('关闭旧窗口时出错:', e)
+      }
+
+      try {
+        const conn = await connectToServer()
+        if (!conn) {
+          createBtn.disabled = false
+          createBtn.innerHTML = '<span>🚀</span> 创建房间'
+          return
+        }
+
+        const eventId = eventIdInput.value.trim() || null
+        const boType = parseInt(boTypeSelect.value)
+        const globalBanEnabled = globalBanCheckbox.checked
+
+        const result = await conn.invoke('CreateRoom', eventId, boType, globalBanEnabled)
+
+        roomData = {
+          ...result,
+          serverUrl: serverUrlInput.value.trim()
+        }
+
+        // 构建完整链接
+        const bpBaseUrl = getBpBaseUrlFromServerUrl(serverUrlInput.value)
+
+        document.getElementById('teamALink').value = `${bpBaseUrl}/room/${result.roomId}?token=${result.teamAToken}&team=teamA`
+        document.getElementById('teamBLink').value = `${bpBaseUrl}/room/${result.roomId}?token=${result.teamBToken}&team=teamB`
+        document.getElementById('spectatorLink').value = `${bpBaseUrl}/spectator/${result.roomId}`
+
+        const teamALink = document.getElementById('teamALink').value
+        const teamBLink = document.getElementById('teamBLink').value
+        const spectatorLink = document.getElementById('spectatorLink').value
+
+        linksContainer.classList.add('show')
+        showStatus('房间创建成功！正在打开前台和后台...', 'success')
+
+        // 添加到历史记录（包含链接）
+        addRoomToHistory(roomData, {
+          teamALink,
+          teamBLink,
+          spectatorLink
+        })
+
+        // 打开前台和后台窗口
+        await window.electronAPI.createRoom(roomData)
+
+        // 重置按钮状态，允许继续创建
+        createBtn.disabled = false
+        createBtn.innerHTML = '<span>🚀</span> 创建房间'
+
+      } catch (error) {
+        showStatus(`创建失败: ${error.message}`, 'error')
+        createBtn.disabled = false
+        createBtn.innerHTML = '<span>🚀</span> 创建房间'
+      }
+    }
+
+    createBtn.addEventListener('click', createRoom)
+
+    // 本地BP模式
+    const localBpBtn = document.getElementById('localBpBtn')
+    localBpBtn.addEventListener('click', async () => {
+      try {
+        const result = await window.electronAPI.invoke('open-local-bp')
+        if (result.success) {
+          showStatus('本地BP窗口已打开', 'success')
+        } else {
+          showStatus(`打开失败: ${result.error}`, 'error')
+        }
+      } catch (error) {
+        showStatus(`打开失败: ${error.message}`, 'error')
+      }
+    })
+
+    const TEAM_MANAGER_KEY = 'asg_team_manager_teams'
+    const TEAM_MANAGER_SELECTION_KEY = 'asg_team_manager_selection'
+    let teamManagerTeams = []
+
+    const teamCsvInput = document.getElementById('teamCsvInput')
+    const importTeamCsvBtn = document.getElementById('importTeamCsvBtn')
+    const teamManagerClearBtn = document.getElementById('teamManagerClearBtn')
+    const teamManagerCount = document.getElementById('teamManagerCount')
+    const teamManagerTeamA = document.getElementById('teamManagerTeamA')
+    const teamManagerTeamB = document.getElementById('teamManagerTeamB')
+    const teamManagerPreviewA = document.getElementById('teamManagerPreviewA')
+    const teamManagerPreviewB = document.getElementById('teamManagerPreviewB')
+    const applyTeamsToLocalBpBtn = document.getElementById('applyTeamsToLocalBpBtn')
+
+    function loadTeamManagerData() {
+      try {
+        const raw = localStorage.getItem(TEAM_MANAGER_KEY)
+        teamManagerTeams = raw ? JSON.parse(raw) : []
+      } catch (e) {
+        teamManagerTeams = []
+      }
+    }
+
+    function saveTeamManagerData() {
+      localStorage.setItem(TEAM_MANAGER_KEY, JSON.stringify(teamManagerTeams))
+    }
+
+    function loadTeamManagerSelection() {
+      try {
+        const raw = localStorage.getItem(TEAM_MANAGER_SELECTION_KEY)
+        return raw ? JSON.parse(raw) : {}
+      } catch {
+        return {}
+      }
+    }
+
+    function saveTeamManagerSelection(sel) {
+      localStorage.setItem(TEAM_MANAGER_SELECTION_KEY, JSON.stringify(sel || {}))
+    }
+
+    function parseCsvRows(text) {
+      const rows = []
+      let row = []
+      let field = ''
+      let inQuotes = false
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i]
+        const next = text[i + 1]
+        if (ch === '"') {
+          if (inQuotes && next === '"') {
+            field += '"'
+            i++
+          } else {
+            inQuotes = !inQuotes
+          }
+          continue
+        }
+        if (!inQuotes && (ch === '\n' || ch === '\r')) {
+          if (ch === '\r' && next === '\n') i++
+          row.push(field)
+          rows.push(row)
+          row = []
+          field = ''
+          continue
+        }
+        if (!inQuotes && ch === ',') {
+          row.push(field)
+          field = ''
+          continue
+        }
+        field += ch
+      }
+      if (field.length > 0 || row.length > 0) {
+        row.push(field)
+        rows.push(row)
+      }
+      return rows.map(r => r.map(v => (v || '').trim())).filter(r => r.some(v => v !== ''))
+    }
+
+    function normalizeHeader(h) {
+      return (h || '').replace('\uFEFF', '').trim().toLowerCase()
+    }
+
+    function parseTeamsFromCsv(text) {
+      const rows = parseCsvRows(text)
+      if (rows.length <= 1) return []
+      const header = rows[0].map(normalizeHeader)
+      const idx = {
+        teamName: header.findIndex(h => h === 'teamname'),
+        teamId: header.findIndex(h => h === 'teamid'),
+        qq: header.findIndex(h => h === 'qqnumber'),
+        playerName: header.findIndex(h => h === 'playername'),
+        gameId: header.findIndex(h => h === 'gameid'),
+        gameRank: header.findIndex(h => h === 'gamerank'),
+        playerDesc: header.findIndex(h => h === 'playerdescription')
+      }
+      const map = new Map()
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i]
+        const teamName = idx.teamName >= 0 ? row[idx.teamName] : ''
+        const teamId = idx.teamId >= 0 ? row[idx.teamId] : ''
+        if (!teamName && !teamId) continue
+        const key = teamId || teamName
+        if (!map.has(key)) {
+          map.set(key, {
+            id: teamId,
+            name: teamName || teamId,
+            qq: idx.qq >= 0 ? row[idx.qq] : '',
+            players: []
+          })
+        }
+        const team = map.get(key)
+        const playerName = idx.playerName >= 0 ? row[idx.playerName] : ''
+        const gameId = idx.gameId >= 0 ? row[idx.gameId] : ''
+        const gameRank = idx.gameRank >= 0 ? row[idx.gameRank] : ''
+        const playerDescription = idx.playerDesc >= 0 ? row[idx.playerDesc] : ''
+        if (playerName || gameId) {
+          const exists = team.players.some(p => (p.name || '') === playerName && (p.gameId || '') === gameId)
+          if (!exists) {
+            team.players.push({ name: playerName, gameId, gameRank, description: playerDescription })
+          }
+        }
+      }
+      return Array.from(map.values()).sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'))
+    }
+
+    function renderTeamManager() {
+      if (teamManagerCount) {
+        teamManagerCount.textContent = teamManagerTeams.length ? `已导入 ${teamManagerTeams.length} 支队伍` : '未导入'
+      }
+      const selection = loadTeamManagerSelection()
+      const buildOptions = (selectEl, selectedId) => {
+        if (!selectEl) return
+        const options = ['<option value="">请选择</option>'].concat(teamManagerTeams.map(t => {
+          const val = t.id || t.name
+          const label = t.name + (t.id ? ` (${t.id.slice(0, 6)}...)` : '')
+          return `<option value="${val}">${label}</option>`
+        }))
+        selectEl.innerHTML = options.join('')
+        if (selectedId) selectEl.value = selectedId
+      }
+      buildOptions(teamManagerTeamA, selection.teamA || '')
+      buildOptions(teamManagerTeamB, selection.teamB || '')
+      updateTeamPreview()
+    }
+
+    function findTeamById(val) {
+      if (!val) return null
+      return teamManagerTeams.find(t => (t.id || t.name) === val) || null
+    }
+
+    function renderPreview(el, team) {
+      if (!el) return
+      if (!team) {
+        el.textContent = ''
+        return
+      }
+      const players = team.players || []
+      const list = players.map(p => p.name || p.gameId).filter(Boolean)
+      el.textContent = list.length ? `阵容：${list.join('、')}` : '未识别选手'
+    }
+
+    function updateTeamPreview() {
+      const teamA = findTeamById(teamManagerTeamA?.value)
+      const teamB = findTeamById(teamManagerTeamB?.value)
+      renderPreview(teamManagerPreviewA, teamA)
+      renderPreview(teamManagerPreviewB, teamB)
+      saveTeamManagerSelection({ teamA: teamManagerTeamA?.value || '', teamB: teamManagerTeamB?.value || '' })
+    }
+
+    async function importTeamCsv() {
+      const file = teamCsvInput?.files?.[0]
+      if (!file) {
+        showStatus('请选择CSV文件', 'warning')
+        return
+      }
+      try {
+        const text = await file.text()
+        const teams = parseTeamsFromCsv(text)
+        if (!teams.length) {
+          showStatus('CSV未解析到队伍数据', 'warning')
+          return
+        }
+        teamManagerTeams = teams
+        saveTeamManagerData()
+        renderTeamManager()
+        showStatus(`已导入 ${teams.length} 支队伍`, 'success')
+      } catch (e) {
+        showStatus('导入失败: ' + (e?.message || e), 'error')
+      }
+    }
+
+    function applyTeamsToLocalBp() {
+      const teamA = findTeamById(teamManagerTeamA?.value)
+      const teamB = findTeamById(teamManagerTeamB?.value)
+      if (!teamA && !teamB) {
+        showStatus('请选择至少一支队伍', 'warning')
+        return
+      }
+      let matchBase = {}
+      try {
+        matchBase = JSON.parse(localStorage.getItem('localBp_matchBase') || '{}')
+      } catch { }
+      if (!matchBase.teamA) matchBase.teamA = { name: '', roster: [] }
+      if (!matchBase.teamB) matchBase.teamB = { name: '', roster: [] }
+      if (teamA) {
+        matchBase.teamA.name = teamA.name || matchBase.teamA.name
+        const rosterA = (teamA.players || []).map(p => p.name || p.gameId).filter(Boolean)
+        if (rosterA.length) matchBase.teamA.roster = rosterA
+      }
+      if (teamB) {
+        matchBase.teamB.name = teamB.name || matchBase.teamB.name
+        const rosterB = (teamB.players || []).map(p => p.name || p.gameId).filter(Boolean)
+        if (rosterB.length) matchBase.teamB.roster = rosterB
+      }
+      localStorage.setItem('localBp_matchBase', JSON.stringify(matchBase))
+      window.dispatchEvent(new Event('storage'))
+      window.dispatchEvent(new CustomEvent('local-bp-update'))
+      showStatus('已应用到本地BP', 'success')
+    }
+
+    function clearTeamManager() {
+      teamManagerTeams = []
+      saveTeamManagerData()
+      renderTeamManager()
+    }
+
+    importTeamCsvBtn?.addEventListener('click', importTeamCsv)
+    teamManagerClearBtn?.addEventListener('click', clearTeamManager)
+    teamManagerTeamA?.addEventListener('change', updateTeamPreview)
+    teamManagerTeamB?.addEventListener('change', updateTeamPreview)
+    applyTeamsToLocalBpBtn?.addEventListener('click', applyTeamsToLocalBp)
+
+    loadTeamManagerData()
+    renderTeamManager()
+
+    // 前台 3D 模型设置快捷入口
+    const openModelSettingsBtn = document.getElementById('openModelSettingsBtn')
+    openModelSettingsBtn?.addEventListener('click', async () => {
+      try {
+        const card = document.getElementById('model3dSettingsCard')
+        if (card && card.classList.contains('collapsed')) {
+          setModel3dCardCollapsed(false)
+        }
+        card?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        showStatus('已定位到“前台 3D模型设置”', 'info')
+      } catch (error) {
+        showStatus(`打开失败: ${error.message}`, 'error')
+      }
+    })
+
+    // ==================== 3D 模型设置（主页） ====================
+    let __model3dApplyTimer = null
+    const MODEL3D_CARD_STATE_KEY = 'homepageModel3dCardCollapsed'
+
+    function getDefaultModel3dConfig() {
+      return {
+        enabled: false,
+        targetFPS: 30,
+        survivorModelDir: null,
+        hunterModelDir: null,
+        survivorMotionDir: null,
+        hunterMotionDir: null,
+        defaultMotionVmd: null,
+
+        // 渲染质量
+        antialias: true,
+        pixelRatio: 1,
+        enableShadows: false,
+        shadowQuality: 1024,
+
+        // 风格化渲染
+        enableOutline: true,
+        outlineThickness: 0.003,
+        outlineColor: '#000000',
+        outlineAlpha: 1.0,
+        enableToon: false,
+        toonGradient: 5,
+
+        // 光照
+        ambientColor: '#ffffff',
+        ambientIntensity: 0.5,
+        directionalColor: '#ffffff',
+        directionalIntensity: 0.7,
+        lightPosX: 10,
+        lightPosY: 20,
+        lightPosZ: 10,
+
+        // 3D 视口（前台保存的高级设置）
+        viewports: {}
+      }
+    }
+
+    function bindModel3dAutoApply() {
+      const auto = document.getElementById('model3dAutoApply')
+      const ids = [
+        'enable3dModels',
+        'model3dTargetFPS',
+        'survivorModelDir',
+        'hunterModelDir',
+        'survivorMotionDir',
+        'hunterMotionDir',
+        'defaultMotionVmd',
+        'render3dAntialias',
+        'render3dPixelRatio',
+        'render3dEnableShadows',
+        'render3dShadowQuality',
+        'render3dEnableOutline',
+        'render3dOutlineThickness',
+        'render3dOutlineColor',
+        'render3dOutlineAlpha',
+        'render3dEnableToon',
+        'render3dToonGradient',
+        'render3dAmbientColor',
+        'render3dAmbientIntensity',
+        'render3dDirectionalColor',
+        'render3dDirectionalIntensity',
+        'render3dLightPosX',
+        'render3dLightPosY',
+        'render3dLightPosZ'
+      ]
+
+      const handler = () => {
+        if (!auto?.checked) return
+        if (__model3dApplyTimer) clearTimeout(__model3dApplyTimer)
+        __model3dApplyTimer = setTimeout(() => applyModel3dSettings(false), 450)
+      }
+
+      for (const id of ids) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        el.addEventListener('change', handler)
+        el.addEventListener('input', handler)
+      }
+    }
+
+    async function pickFolderFor(inputId) {
+      try {
+        const res = await window.electronAPI.selectFolder()
+        if (res && res.success && res.path) {
+          const el = document.getElementById(inputId)
+          if (el) el.value = res.path
+          const auto = document.getElementById('model3dAutoApply')
+          if (auto?.checked) applyModel3dSettings(false)
+        }
+      } catch (e) {
+        showStatus('选择文件夹失败: ' + (e?.message || e), 'error')
+      }
+    }
+
+    async function pickVmdFor(inputId) {
+      try {
+        const res = await window.electronAPI.selectFileWithFilter({
+          filters: [{ name: 'VMD 动作文件', extensions: ['vmd'] }, { name: '所有文件', extensions: ['*'] }]
+        })
+        if (res && res.success && res.path) {
+          const el = document.getElementById(inputId)
+          if (el) el.value = res.path
+          const auto = document.getElementById('model3dAutoApply')
+          if (auto?.checked) applyModel3dSettings(false)
+        }
+      } catch (e) {
+        showStatus('选择文件失败: ' + (e?.message || e), 'error')
+      }
+    }
+
+    function __setVal(id, v) {
+      const el = document.getElementById(id)
+      if (!el) return
+      if (el.type === 'checkbox') {
+        el.checked = !!v
+        return
+      }
+      el.value = (v ?? '')
+    }
+
+    async function loadModel3dSettings() {
+      try {
+        const result = await window.electronAPI.loadLayout()
+        const layout = (result && result.success && result.layout) ? result.layout : {}
+        const def = getDefaultModel3dConfig()
+        const m0 = (layout && layout.model3d && typeof layout.model3d === 'object') ? layout.model3d : {}
+        const m = { ...def, ...m0, viewports: (m0 && m0.viewports) ? m0.viewports : {} }
+
+        __setVal('enable3dModels', !!m.enabled)
+        __setVal('model3dTargetFPS', Number(m.targetFPS || 30))
+        __setVal('survivorModelDir', m.survivorModelDir || '')
+        __setVal('hunterModelDir', m.hunterModelDir || '')
+        __setVal('survivorMotionDir', m.survivorMotionDir || '')
+        __setVal('hunterMotionDir', m.hunterMotionDir || '')
+        __setVal('defaultMotionVmd', m.defaultMotionVmd || '')
+
+        __setVal('render3dAntialias', String(m.antialias !== false))
+        __setVal('render3dPixelRatio', String(Number(m.pixelRatio ?? 1)))
+        __setVal('render3dEnableShadows', !!m.enableShadows)
+        __setVal('render3dShadowQuality', String(Number(m.shadowQuality || 1024)))
+
+        __setVal('render3dEnableOutline', m.enableOutline !== false)
+        __setVal('render3dOutlineThickness', String(Number(m.outlineThickness || 0.003)))
+        __setVal('render3dOutlineColor', m.outlineColor || '#000000')
+        __setVal('render3dOutlineAlpha', String(Number(m.outlineAlpha ?? 1.0)))
+        __setVal('render3dEnableToon', !!m.enableToon)
+        __setVal('render3dToonGradient', String(Number(m.toonGradient || 5)))
+
+        __setVal('render3dAmbientColor', m.ambientColor || '#ffffff')
+        __setVal('render3dAmbientIntensity', String(Number(m.ambientIntensity ?? 0.5)))
+        __setVal('render3dDirectionalColor', m.directionalColor || '#ffffff')
+        __setVal('render3dDirectionalIntensity', String(Number(m.directionalIntensity ?? 0.7)))
+        __setVal('render3dLightPosX', String(Number(m.lightPosX ?? 10)))
+        __setVal('render3dLightPosY', String(Number(m.lightPosY ?? 20)))
+        __setVal('render3dLightPosZ', String(Number(m.lightPosZ ?? 10)))
+
+        showStatus('已读取 3D 模型配置', 'success')
+      } catch (e) {
+        console.error('读取 3D 模型配置失败:', e)
+        showStatus('读取失败: ' + (e?.message || e), 'error')
+      }
+    }
+
+    async function applyModel3dSettings(showToast) {
+      try {
+        const result = await window.electronAPI.loadLayout()
+        const layout = (result && result.success && result.layout) ? result.layout : {}
+        const def = getDefaultModel3dConfig()
+        const prev = (layout && layout.model3d && typeof layout.model3d === 'object') ? layout.model3d : {}
+
+        const m = {
+          enabled: !!document.getElementById('enable3dModels')?.checked,
+          targetFPS: Number(document.getElementById('model3dTargetFPS')?.value) || def.targetFPS,
+          survivorModelDir: document.getElementById('survivorModelDir')?.value || null,
+          hunterModelDir: document.getElementById('hunterModelDir')?.value || null,
+          survivorMotionDir: document.getElementById('survivorMotionDir')?.value || null,
+          hunterMotionDir: document.getElementById('hunterMotionDir')?.value || null,
+          defaultMotionVmd: document.getElementById('defaultMotionVmd')?.value || null,
+
+          antialias: document.getElementById('render3dAntialias')?.value === 'true',
+          pixelRatio: Number(document.getElementById('render3dPixelRatio')?.value) || def.pixelRatio,
+          enableShadows: !!document.getElementById('render3dEnableShadows')?.checked,
+          shadowQuality: Number(document.getElementById('render3dShadowQuality')?.value) || def.shadowQuality,
+
+          enableOutline: document.getElementById('render3dEnableOutline')?.checked !== false,
+          outlineThickness: Number(document.getElementById('render3dOutlineThickness')?.value) || def.outlineThickness,
+          outlineColor: document.getElementById('render3dOutlineColor')?.value || def.outlineColor,
+          outlineAlpha: Number(document.getElementById('render3dOutlineAlpha')?.value ?? def.outlineAlpha),
+          enableToon: !!document.getElementById('render3dEnableToon')?.checked,
+          toonGradient: Number(document.getElementById('render3dToonGradient')?.value) || def.toonGradient,
+
+          ambientColor: document.getElementById('render3dAmbientColor')?.value || def.ambientColor,
+          ambientIntensity: Number(document.getElementById('render3dAmbientIntensity')?.value ?? def.ambientIntensity),
+          directionalColor: document.getElementById('render3dDirectionalColor')?.value || def.directionalColor,
+          directionalIntensity: Number(document.getElementById('render3dDirectionalIntensity')?.value ?? def.directionalIntensity),
+          lightPosX: Number(document.getElementById('render3dLightPosX')?.value ?? def.lightPosX),
+          lightPosY: Number(document.getElementById('render3dLightPosY')?.value ?? def.lightPosY),
+          lightPosZ: Number(document.getElementById('render3dLightPosZ')?.value ?? def.lightPosZ),
+
+          viewports: prev.viewports ? prev.viewports : {}
+        }
+
+        layout.model3d = m
+
+        const saveRes = await window.electronAPI.saveLayout(layout)
+        if (!saveRes || !saveRes.success) {
+          throw new Error(saveRes?.error || '保存失败')
+        }
+
+        // 让前台刷新布局（立即生效）
+        try {
+          if (window.electronAPI && window.electronAPI.sendToFrontend) {
+            window.electronAPI.sendToFrontend({ type: 'layout-updated' })
+          }
+        } catch { }
+
+        if (showToast) showStatus('✅ 3D 模型设置已保存并同步到前台', 'success')
+      } catch (e) {
+        console.error('保存 3D 模型配置失败:', e)
+        showStatus('保存失败: ' + (e?.message || e), 'error')
+      }
+    }
+
+    function setModel3dCardCollapsed(collapsed, options = {}) {
+      const card = document.getElementById('model3dSettingsCard')
+      if (!card) return
+      card.classList.toggle('collapsed', collapsed)
+      const toggle = document.getElementById('model3dToggleBtn')
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', String(!collapsed))
+        const label = toggle.querySelector('.toggle-label')
+        const icon = toggle.querySelector('.toggle-icon')
+        if (label) label.textContent = collapsed ? '展开' : '收起'
+        if (icon) icon.textContent = collapsed ? '▸' : '▾'
+      }
+      if (options.persist !== false && typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem(MODEL3D_CARD_STATE_KEY, collapsed ? '1' : '0')
+        } catch { }
+      }
+    }
+
+    function toggleModel3dCard() {
+      const card = document.getElementById('model3dSettingsCard')
+      if (!card) return
+      setModel3dCardCollapsed(!card.classList.contains('collapsed'))
+    }
+
+    function initModel3dCardToggle() {
+      const toggle = document.getElementById('model3dToggleBtn')
+      if (!toggle) return
+      toggle.addEventListener('click', toggleModel3dCard)
+    }
+
+    function restoreModel3dCardState() {
+      if (typeof localStorage === 'undefined') return
+      const stored = localStorage.getItem(MODEL3D_CARD_STATE_KEY)
+      // 默认折叠：仅当用户曾经手动展开（存了 0）才展开
+      const collapsed = stored == null ? true : stored === '1'
+      setModel3dCardCollapsed(collapsed, { persist: false })
+    }
+
+    // ==================== 更新检查功能 ====================
+    let isCheckingUpdate = false
+    let hasAvailableUpdate = false
+
+    // 初始化版本显示
+    async function initVersionDisplay() {
+      try {
+        const version = await window.electronAPI.getAppVersion()
+        const versionBadge = document.getElementById('versionBadge')
+        if (versionBadge) {
+          versionBadge.textContent = `v${version}`
+          versionBadge.title = '点击检查更新'
+        }
+      } catch (e) {
+        console.error('获取版本失败:', e)
+      }
+    }
+
+    // 检查更新
+    async function checkUpdate() {
+      if (isCheckingUpdate) return
+
+      const updateBtn = document.getElementById('updateBtn')
+      const versionBadge = document.getElementById('versionBadge')
+
+      isCheckingUpdate = true
+      updateBtn.classList.add('checking')
+      updateBtn.querySelector('.update-text').textContent = '检查中...'
+
+      try {
+        await window.electronAPI.manualCheckUpdate()
+        showStatus('已检查更新', 'info')
+      } catch (e) {
+        console.error('检查更新失败:', e)
+        showStatus('检查更新失败: ' + e.message, 'error')
+      } finally {
+        isCheckingUpdate = false
+        updateBtn.classList.remove('checking')
+        updateBtn.querySelector('.update-text').textContent = '检查更新'
+      }
+    }
+
+    // 静默检查更新（启动时）
+    async function silentCheckUpdate() {
+      try {
+        const result = await window.electronAPI.checkForUpdate()
+        if (result.success && result.data && result.data.hasUpdate) {
+          hasAvailableUpdate = true
+          const updateBtn = document.getElementById('updateBtn')
+          const versionBadge = document.getElementById('versionBadge')
+
+          updateBtn.classList.add('has-update')
+          updateBtn.querySelector('.update-text').textContent = '有新版本'
+          versionBadge.classList.add('has-update')
+          versionBadge.title = `发现新版本 ${result.data.latestVersion}，点击更新`
+        }
+      } catch (e) {
+        console.error('静默检查更新失败:', e)
+      }
+    }
+
+    // 页面加载时检查登录状态和房间历史
+    if (window.electronAPI && window.electronAPI.on) {
+      window.electronAPI.on('auth-expired', (data) => {
+        try {
+          currentUser = null
+          myEvents = []
+          updateUserUI()
+          renderPredictionSection()
+          if (data && data.reason === 'logout') {
+            // 正常手动退出，不弹窗
+            return
+          }
+          showStatus('登录已过期，请重新登录', 'warning')
+          showLoginModal('您的登录已过期，请重新登录以继续使用竞猜与同步功能。')
+        } catch (e) {
+          console.warn('auth-expired handler error', e)
+        }
+      })
+    }
+
+    checkAuthStatus()
+    loadRoomHistory()
+    initVersionDisplay()
+    loadFrontendResolution()
+    loadTransparentBackgroundSetting()
+
+    // 加载插件组件
+    loadPluginComponents()
+    restoreModel3dCardState()
+    initModel3dCardToggle()
+    loadModel3dSettings()
+    bindModel3dAutoApply()
+
+    // 延迟静默检查更新
+    setTimeout(silentCheckUpdate, 3000)
+
+    // ==================== 插件系统集成 ====================
+
+    // 当前显示的页面
+    let currentPage = 'home'
+
+    // 显示指定页面
+    // 显示指定页面
+    function showPage(pageId) {
+      currentPage = pageId
+
+      // deselect standard nav items
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'))
+
+      // Update menu items state
+      document.querySelectorAll('.plugin-menu-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.page === pageId)
+      })
+
+      // 切换页面显示
+      const mainContainer = document.getElementById('mainContainer')
+      const pagesContainer = document.getElementById('pluginPagesContainer')
+
+      if (pageId === 'home') {
+        switchView('home')
+      } else {
+        mainContainer.classList.add('hidden')
+        document.querySelectorAll('.plugin-page-container').forEach(p => {
+          p.classList.toggle('active', p.dataset.pageId === pageId)
+        })
+      }
+    }
+
+    // 插件请求打开某个插件页面（由插件通过 api.ipc.send/broadcast 触发）
+    if (!window._pluginOpenPageListenerAdded && window.electronAPI && typeof window.electronAPI.on === 'function') {
+      window._pluginOpenPageListenerAdded = true
+      window.electronAPI.on('plugin:open-page', async (pageId) => {
+        if (typeof pageId !== 'string' || !pageId) return
+        console.log('[Main] open plugin page:', pageId)
+        try {
+          // 先刷新组件，确保目标页面已渲染到 DOM
+          await loadPluginComponents()
+        } catch {
+          // ignore
+        }
+        // 下一帧再切换，避免与 DOM 更新竞争
+        setTimeout(() => showPage(pageId), 0)
+      })
+    }
+
+    // 加载插件组件（卡片、页面、菜单项）
+    async function loadPluginComponents() {
+      try {
+        if (!window.plugins) {
+          console.log('[Main] 插件 API 未就绪，稍后重试...')
+          setTimeout(loadPluginComponents, 1000)
+          return
+        }
+
+        // 加载插件卡片
+        const cards = await window.plugins.getPluginCards()
+        renderPluginCards(cards)
+
+        // 加载插件菜单项
+        const menuItems = await window.plugins.getPluginMenuItems()
+        renderPluginMenuItems(menuItems)
+
+        // 加载插件页面
+        const pages = await window.plugins.getPluginPages()
+        renderPluginPages(pages)
+
+        console.log(`[Main] 已加载 ${cards.length} 个插件卡片, ${menuItems.length} 个菜单项, ${pages.length} 个页面`)
+
+        // 监听组件变化事件（只监听一次）
+        if (!window._pluginComponentsListenerAdded && window.plugins.onComponentsChanged) {
+          window._pluginComponentsListenerAdded = true
+          window.plugins.onComponentsChanged(() => {
+            console.log('[Main] 插件组件已变化，重新加载...')
+            loadPluginComponents()
+          })
+        }
+      } catch (e) {
+        console.error('[Main] 加载插件组件失败:', e)
+        // 稍后重试
+        setTimeout(loadPluginComponents, 2000)
+      }
+    }
+
+    // 渲染插件卡片
+    function renderPluginCards(cards) {
+      const section = document.getElementById('pluginCardsSection')
+      const grid = document.getElementById('pluginCardsGrid')
+
+      // 执行容器内的脚本（innerHTML 插入的 script 默认不会执行）
+      function runScriptsWithin(root) {
+        if (!root) return
+        const scripts = root.querySelectorAll('script')
+        scripts.forEach(oldScript => {
+          try {
+            const newScript = document.createElement('script')
+            // 复制属性（type/src 等）
+            for (const attr of Array.from(oldScript.attributes || [])) {
+              newScript.setAttribute(attr.name, attr.value)
+            }
+            newScript.text = oldScript.textContent || ''
+            oldScript.parentNode && oldScript.parentNode.replaceChild(newScript, oldScript)
+          } catch (e) {
+            console.warn('[Main] runScriptsWithin failed:', e && e.message ? e.message : e)
+          }
+        })
+      }
+
+      if (!cards || cards.length === 0) {
+        section.style.display = 'none'
+        return
+      }
+
+      section.style.display = 'block'
+      grid.innerHTML = cards.map(card => `
+        <div class="plugin-card" data-card-id="${card.id}">
+          <div class="plugin-card-header">
+            <div class="plugin-card-icon ${card.iconColor || 'blue'}">${card.icon || '🧩'}</div>
+            <div>
+              <div class="plugin-card-title">${card.title}</div>
+              <div class="plugin-card-desc">${card.description || ''}</div>
+            </div>
+          </div>
+          <div class="plugin-card-content">
+            ${card.html || ''}
+          </div>
+          ${card.actions && card.actions.length > 0 ? `
+            <div class="plugin-card-actions">
+              ${card.actions.map(action => `
+                <button class="plugin-card-action" onclick="executeCardAction('${card.id}', '${action.id}')">${action.icon || ''} ${action.label}</button>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `).join('')
+
+      // 让卡片内联脚本生效（用于插件交互 UI）
+      runScriptsWithin(grid)
+    }
+
+    // 渲染插件菜单项
+    function renderPluginMenuItems(menuItems) {
+      const menubar = document.getElementById('pluginMenubar')
+
+      if (!menubar) return
+
+      // 移除旧的插件菜单项和分隔线
+      menubar.querySelectorAll('[data-plugin-menu-item], .plugin-menu-divider').forEach(el => el.remove())
+
+      if (!menuItems || menuItems.length === 0) return
+
+      // 添加分隔线
+      const divider = document.createElement('div')
+      divider.className = 'plugin-menu-divider'
+      menubar.appendChild(divider)
+
+      // 添加菜单项
+      menuItems.forEach(item => {
+        const btn = document.createElement('button')
+        btn.className = 'plugin-menu-item'
+        btn.dataset.page = item.pageId || item.id
+        btn.dataset.pluginMenuItem = 'true'
+        btn.innerHTML = `
+          <span class="plugin-menu-icon">${item.icon || '📄'}</span>
+          <span>${item.label}</span>
+        `
+        btn.onclick = () => {
+          if (item.command) {
+            window.plugins.executeCommand(item.command)
+          } else if (item.pageId) {
+            showPage(item.pageId)
+          }
+        }
+        menubar.appendChild(btn)
+      })
+    }
+
+    // 渲染插件页面
+    function renderPluginPages(pages) {
+      const container = document.getElementById('pluginPagesContainer')
+
+      if (!container) return
+
+      // 清除旧的插件页面
+      container.querySelectorAll('.plugin-page-container').forEach(el => el.remove())
+
+      if (!pages || pages.length === 0) return
+
+      // 执行容器内的脚本（innerHTML 插入的 script 默认不会执行）
+      function runScriptsWithin(root) {
+        if (!root) return
+        const scripts = root.querySelectorAll('script')
+        scripts.forEach(oldScript => {
+          try {
+            const newScript = document.createElement('script')
+            for (const attr of Array.from(oldScript.attributes || [])) {
+              newScript.setAttribute(attr.name, attr.value)
+            }
+            newScript.text = oldScript.textContent || ''
+            oldScript.parentNode && oldScript.parentNode.replaceChild(newScript, oldScript)
+          } catch (e) {
+            console.warn('[Main] runScriptsWithin failed:', e && e.message ? e.message : e)
+          }
+        })
+      }
+
+      pages.forEach(page => {
+        const pageDiv = document.createElement('div')
+        pageDiv.className = 'plugin-page-container'
+        pageDiv.dataset.pageId = page.id
+        pageDiv.innerHTML = `
+          <div style="max-width: 1400px; margin: 0 auto;">
+            <h2 style="margin-bottom: 20px; color: var(--md-on-surface, #fff);">
+              ${page.icon || '📄'} ${page.title}
+            </h2>
+            <div class="plugin-page-content">
+              ${page.html || '<p>页面内容加载中...</p>'}
+            </div>
+          </div>
+        `
+        container.appendChild(pageDiv)
+
+        // 让页面脚本生效（用于插件页面的按钮/交互）
+        runScriptsWithin(pageDiv)
+      })
+    }
+
+    // 执行卡片动作
+    async function executeCardAction(cardId, actionId) {
+      try {
+        const result = await window.plugins.cardAction(cardId, actionId)
+        if (result && result.message) {
+          showStatus(result.message, result.type || 'info')
+        }
+      } catch (e) {
+        showStatus('执行失败: ' + e.message, 'error')
+      }
+    }
+
+    // ========= 字体设置功能 (Font Settings) =========
+    async function openFontSettings() {
+      try {
+        if (window.electronAPI && window.electronAPI.openFontSettings) {
+          await window.electronAPI.openFontSettings()
+        }
+      } catch (e) {
+        console.error('打开字体设置失败:', e)
+        showStatus('打开字体设置失败: ' + e.message, 'error')
+      }
+    }
+
+    async function openComponentEditor() {
+      try {
+        if (window.electronAPI && window.electronAPI.openComponentEditor) {
+          await window.electronAPI.openComponentEditor()
+        }
+      } catch (e) {
+        console.error('打开组件设计器失败:', e)
+        showStatus('打开组件设计器失败: ' + e.message, 'error')
+      }
+    }
+
+    async function openAnimationEditor() {
+      try {
+        if (window.electronAPI && window.electronAPI.openAnimationEditor) {
+          await window.electronAPI.openAnimationEditor()
+        }
+      } catch (e) {
+        console.error('打开动画编辑器失败:', e)
+        showStatus('打开动画编辑器失败: ' + e.message, 'error')
+      }
+    }
+
+    // ========= Idvevent 赛程导入功能 =========
+
+    // 配置
+    const IDVEVENT_CONFIG = {
+      apiBaseUrl: 'https://api.idvevent.cn/api',
+      asgApiBaseUrl: 'https://api.idvevent.cn/api' // 全部使用生产环境
+    }
+
+    // 当前用户的token
+    async function getAuthToken() {
+      try {
+        // 优先从主进程获取Token (单点登录状态)
+        if (window.electronAPI && window.electronAPI.getAuthStatus) {
+          const status = await window.electronAPI.getAuthStatus()
+          if (status && status.token) {
+            return status.token
+          }
+        }
+
+        // 降级: 从localStorage获取 (虽然现在主要依赖主进程)
+        const token = localStorage.getItem('authToken')
+        return token || null
+      } catch (e) {
+        console.error('获取token失败:', e)
+        return null
+      }
+    }
+
+    // 加载Idvevent赛程列表
+    async function loadIdveventSchedules() {
+      const btn = document.getElementById('refreshScheduleBtn')
+      const listContainer = document.getElementById('idveventScheduleList')
+      const eventIdInput = document.getElementById('idveventEventId')
+
+      if (!listContainer) return
+
+      try {
+        // 更新按钮状态
+        if (btn) {
+          btn.disabled = true
+          btn.innerHTML = '⏳ 加载中...'
+        }
+
+        // 显示加载状态
+        listContainer.innerHTML = `
+          <div style="text-align:center; padding:40px; color:var(--text-secondary);">
+            <div style="font-size:32px; margin-bottom:12px;">⏳</div>
+            <div>正在加载赛程...</div>
+          </div>
+        `
+
+        // 构建API URL
+        const eventId = eventIdInput?.value?.trim()
+        // 用户要求: "返回的赛程应该是时间最近的十个赛程"
+        // 尝试添加排序参数 (如果API支持)，同时限制pageSize为10
+        let apiUrl = `${IDVEVENT_CONFIG.apiBaseUrl}/matches?page=1&pageSize=10`
+        if (eventId) {
+          apiUrl += `&eventId=${encodeURIComponent(eventId)}`
+        }
+
+        // 发起请求
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        let matches = await response.json()
+
+        // 确保按时间倒序排列 (最近的在前面)
+        if (Array.isArray(matches)) {
+          matches.sort((a, b) => new Date(b.matchTime) - new Date(a.matchTime))
+        }
+
+
+        // 渲染赛程列表
+        renderIdveventSchedules(matches)
+
+        showStatus(`✅ 成功加载 ${matches.length || 0} 场赛程`, 'success')
+      } catch (e) {
+        console.error('加载赛程失败:', e)
+        listContainer.innerHTML = `
+          <div style="text-align:center; padding:40px; color:#ff6b6b;">
+            <div style="font-size:32px; margin-bottom:12px;">❌</div>
+            <div style="margin-bottom:8px;">加载失败</div>
+            <div style="font-size:12px; color:var(--text-secondary);">${e.message || e}</div>
+          </div>
+        `
+        showStatus('加载赛程失败: ' + (e.message || e), 'error')
+      } finally {
+        // 恢复按钮状态
+        if (btn) {
+          btn.disabled = false
+          btn.innerHTML = '🔄 刷新'
+        }
+      }
+    }
+
+    // 渲染赛程列表
+    function renderIdveventSchedules(matches) {
+      const listContainer = document.getElementById('idveventScheduleList')
+      if (!listContainer) return
+
+      if (!matches || matches.length === 0) {
+        listContainer.innerHTML = `
+          <div style="text-align:center; padding:40px; color:var(--text-secondary);">
+            <div style="font-size:32px; margin-bottom:12px;">📭</div>
+            <div>暂无赛程数据</div>
+          </div>
+        `
+        return
+      }
+
+      listContainer.innerHTML = matches.map(match => {
+        const matchTime = new Date(match.matchTime).toLocaleString('zh-CN')
+        const eventName = match.eventName || '未知赛事'
+        const homeTeam = match.homeTeamName || '队伍A'
+        const awayTeam = match.awayTeamName || '队伍B'
+        const stage = match.stage || ''
+
+        return `
+          <div class="schedule-item" data-match-id="${match.id}">
+            <div class="schedule-item-header">
+              <div class="schedule-item-teams">${homeTeam} vs ${awayTeam}</div>
+              <div class="schedule-item-time">${matchTime}</div>
+            </div>
+            <div class="schedule-item-info">
+              <span>🏆 ${eventName}</span>
+              ${stage ? `<span>📍 ${stage}</span>` : ''}
+            </div>
+            <div class="schedule-item-actions">
+              <button class="btn btn-primary btn-sm" onclick="importMatchToASG('${match.id}')">
+                📥 导入对局信息
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="importTeamLogos('${match.id}')">
+                🖼️ 导入队伍Logo
+              </button>
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    // 导入对局信息到ASG API
+    async function importMatchToASG(matchId) {
+      try {
+        showStatus('⏳ 正在导入对局信息...', 'info')
+
+        // 1. 从idvevent获取对局详情
+        const matchResponse = await fetch(`${IDVEVENT_CONFIG.apiBaseUrl}/matches/${matchId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!matchResponse.ok) {
+          throw new Error('获取对局详情失败')
+        }
+
+        const match = await matchResponse.json()
+
+        // 2. 检查用户是否登录
+        const token = await getAuthToken()
+        if (!token) {
+          showStatus('❌ 请先登录账号', 'error')
+          return
+        }
+
+        // 3. 准备导入数据
+        const createMatchDto = {
+          homeTeamId: match.homeTeamId,
+          awayTeamId: match.awayTeamId,
+          matchTime: match.matchTime,
+          eventId: match.eventId,
+          liveLink: match.liveLink || null,
+          customData: JSON.stringify({
+            source: 'idvevent',
+            originalId: match.id,
+            stage: match.stage
+          }),
+          commentator: match.commentator || null,
+          director: match.director || null,
+          referee: match.referee || null
+        }
+
+        // 4. 导入到ASG API
+        const importResponse = await fetch(`${IDVEVENT_CONFIG.asgApiBaseUrl}/matches`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(createMatchDto)
+        })
+
+        if (!importResponse.ok) {
+          const errorData = await importResponse.json().catch(() => ({}))
+          throw new Error(errorData.message || `导入失败 (HTTP ${importResponse.status})`)
+        }
+
+        const result = await importResponse.json()
+        showStatus(`✅ 成功导入对局: ${match.homeTeamName} vs ${match.awayTeamName}`, 'success')
+
+        console.log('导入成功:', result)
+
+        // ========== 新增: 同步到本地BP (Local BP) ==========
+        try {
+          // 1. 读取现有配置或创建默认
+          let matchBase = {}
+          try {
+            matchBase = JSON.parse(localStorage.getItem('localBp_matchBase') || '{}')
+          } catch { }
+
+          // 确保结构完整
+          if (!matchBase.teamA) matchBase.teamA = { name: '', members: [] }
+          if (!matchBase.teamB) matchBase.teamB = { name: '', members: [] }
+
+          // 2. 更新队名
+          matchBase.teamA.name = match.homeTeamName
+          matchBase.teamB.name = match.awayTeamName
+
+          // 3. 保存回localStorage
+          localStorage.setItem('localBp_matchBase', JSON.stringify(matchBase))
+
+          // 4. 尝试通知UI更新
+          // 如果是在同一个window下
+          if (typeof window.loadMatchBase === 'function') {
+            window.loadMatchBase()
+            if (typeof window.renderMatchBaseForm === 'function') window.renderMatchBaseForm()
+          }
+          // 触发storage事件以通知其他窗口
+          window.dispatchEvent(new Event('storage'))
+
+          // 专门的自定义事件，如果页面在同一窗口但监听不同
+          window.dispatchEvent(new CustomEvent('local-bp-update'))
+
+          showStatus('已同步到本地BP面板', 'success')
+        } catch (e) {
+          console.warn('同步到本地BP失败:', e)
+        }
+        // ===============================================
+
+      } catch (e) {
+        console.error('导入对局失败:', e)
+        showStatus('❌ 导入失败: ' + (e.message || e), 'error')
+      }
+    }
+
+    // 导入队伍Logo
+    async function importTeamLogos(matchId) {
+      try {
+        showStatus('⏳ 正在导入队伍Logo...', 'info')
+
+        // 1. 从idvevent获取对局详情
+        const matchResponse = await fetch(`${IDVEVENT_CONFIG.apiBaseUrl}/matches/${matchId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!matchResponse.ok) {
+          throw new Error('获取对局详情失败')
+        }
+
+        const match = await matchResponse.json()
+
+        // 2. 检查登录状态
+        const token = await getAuthToken()
+        if (!token) {
+          showStatus('❌ 请先登录账号', 'error')
+          return
+        }
+
+        let successCount = 0
+        let failCount = 0
+
+        // 3. 导入主队Logo
+        if (match.homeTeamId) {
+          try {
+            await importSingleTeamLogo(match.homeTeamId, token)
+            successCount++
+          } catch (e) {
+            console.error('导入主队Logo失败:', e)
+            failCount++
+          }
+        }
+
+        // 4. 导入客队Logo
+        if (match.awayTeamId) {
+          try {
+            await importSingleTeamLogo(match.awayTeamId, token)
+            successCount++
+          } catch (e) {
+            console.error('导入客队Logo失败:', e)
+            failCount++
+          }
+        }
+
+        // 5. 显示结果
+        if (successCount > 0 && failCount === 0) {
+          showStatus(`✅ 成功导入 ${successCount} 个队伍Logo`, 'success')
+        } else if (successCount > 0) {
+          showStatus(`⚠️ 部分成功: ${successCount} 个成功, ${failCount} 个失败`, 'warning')
+        } else {
+          showStatus('❌ 导入队伍Logo失败', 'error')
+        }
+
+        // ========== 新增: 同步Logo到本地BP ==========
+        if (successCount > 0) {
+          setTimeout(async () => {
+            try {
+              let matchBase = JSON.parse(localStorage.getItem('localBp_matchBase') || '{}')
+
+              // 重新获取最新的队伍信息以拿到Logo URL
+              // 注意: 这里我们直接使用idvevent的logoUrl, 或者ASG API返回的Url
+              // 由于importSingleTeamLogo没有返回URL, 我们再次查询或简化处理
+              // 为了简化，我们再次查询ASG API获取最新Logo(如果有) 或者直接使用Idvevent的URL
+              // 这里我们为了实时性，直接再次查询Idvevent获取URL存入本地 (本地BP支持远程URL)
+
+              if (match.homeTeamId) {
+                const t = await fetch(`${IDVEVENT_CONFIG.apiBaseUrl}/teams/${match.homeTeamId}`).then(r => r.json()).catch(() => null)
+                if (t && t.logoUrl && matchBase.teamA) matchBase.teamA.logo = t.logoUrl
+              }
+              if (match.awayTeamId) {
+                const t = await fetch(`${IDVEVENT_CONFIG.apiBaseUrl}/teams/${match.awayTeamId}`).then(r => r.json()).catch(() => null)
+                if (t && t.logoUrl && matchBase.teamB) matchBase.teamB.logo = t.logoUrl
+              }
+
+              localStorage.setItem('localBp_matchBase', JSON.stringify(matchBase))
+
+              if (typeof window.loadMatchBase === 'function') {
+                window.loadMatchBase()
+                if (typeof window.renderMatchBaseForm === 'function') window.renderMatchBaseForm()
+              }
+              window.dispatchEvent(new Event('storage'))
+              window.dispatchEvent(new CustomEvent('local-bp-update'))
+
+            } catch (e) { console.warn('同步Logo到本地失败', e) }
+          }, 500)
+        }
+        // ==========================================
+
+      } catch (e) {
+        console.error('导入队伍Logo失败:', e)
+        showStatus('❌ 导入失败: ' + (e.message || e), 'error')
+      }
+    }
+
+    // 导入单个队伍的Logo
+    async function importSingleTeamLogo(teamId, token) {
+      // 1. 获取idvevent的队伍信息
+      const teamResponse = await fetch(`${IDVEVENT_CONFIG.apiBaseUrl}/teams/${teamId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!teamResponse.ok) {
+        throw new Error('获取队伍信息失败')
+      }
+
+      const team = await teamResponse.json()
+
+      // 2. 如果有logoUrl，下载并上传到ASG API
+      if (team.logoUrl) {
+        // 下载Logo
+        const logoResponse = await fetch(team.logoUrl)
+        if (!logoResponse.ok) {
+          throw new Error('下载Logo失败')
+        }
+
+        const logoBlob = await logoResponse.blob()
+
+        // 准备FormData
+        const formData = new FormData()
+        formData.append('logo', logoBlob, 'logo.png')
+
+        // 上传到ASG API
+        const uploadResponse = await fetch(`${IDVEVENT_CONFIG.asgApiBaseUrl}/teams/${teamId}/logo`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('上传Logo失败')
+        }
+      } else {
+        throw new Error('队伍没有Logo')
+      }
+    }
+  </script>
+</body>
+
+</html>

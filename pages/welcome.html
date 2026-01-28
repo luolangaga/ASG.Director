@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>欢迎使用 ASG Director</title>
+    <link rel="stylesheet" href="./css/welcome.css">
+</head>
+
+<body>
+    <div class="welcome-container">
+        <header>
+            <div class="logo">🎨 ASG Director</div>
+            <h1>欢迎使用!</h1>
+            <p class="subtitle">检测到您是首次使用，当前没有任何样式配置。</p>
+            <p class="description">为了获得最佳体验，我们强烈建议您安装一个初始布局包。</p>
+        </header>
+
+        <main>
+            <h3>🔥 精选推荐布局包</h3>
+            <div id="packsGrid" class="packs-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>正在获取推荐布局...</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <button class="btn btn-secondary" onclick="skipWelcome()">暂时跳过 (没有任何样式)</button>
+            <button class="btn btn-primary" onclick="openFullStore()">前往完整商店</button>
+        </footer>
+    </div>
+
+    <!-- 下载进度遮罩 -->
+    <div class="progress-overlay" id="downloadProgressOverlay">
+        <div class="progress-modal">
+            <h3>正在下载布局包...</h3>
+            <div class="progress-track">
+                <div class="progress-fill" id="downloadProgressFill"></div>
+            </div>
+            <div class="progress-text"><span id="downloadProgressText">0</span>%</div>
+        </div>
+    </div>
+
+    <script src="./js/welcome.js"></script>
+</body>
+
+</html>

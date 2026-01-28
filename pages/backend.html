@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>ASG导播 - 后台管理</title>
+
+  <link rel="stylesheet" href="./css/backend.css">
+</head>
+
+<body>
+  <header class="header">
+    <h1>🎬 ASG导播后台</h1>
+    <div class="status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">已连接</span>
+    </div>
+  </header>
+
+  <div class="main-content">
+    <aside class="sidebar">
+      <h3>房间信息</h3>
+      <div class="info-item">
+        <label>房间ID</label>
+        <div class="value" id="roomIdDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>赛程ID</label>
+        <div class="value" id="eventIdDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>赛制</label>
+        <div class="value" id="boTypeDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>当前局数</label>
+        <div class="value" id="roundDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>当前状态</label>
+        <div class="value" id="statusDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>当前地图</label>
+        <div class="value" id="mapDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>主场</label>
+        <div class="value" id="homeTeamDisplay">-</div>
+      </div>
+      <div class="info-item">
+        <label>客场</label>
+        <div class="value" id="awayTeamDisplay">-</div>
+      </div>
+
+      <!-- 比分显示 -->
+      <div class="score-section">
+        <h3>当前比分</h3>
+        <div class="score-display">
+          <div class="team-score-big team-a" id="teamAScoreBig">0</div>
+          <div class="score-vs">:</div>
+          <div class="team-score-big team-b" id="teamBScoreBig">0</div>
+        </div>
+        <div class="info-item">
+          <label>A队战绩</label>
+          <div class="value" id="teamARecord">0胜 0平 0负</div>
+        </div>
+        <div class="info-item">
+          <label>B队战绩</label>
+          <div class="value" id="teamBRecord">0胜 0平 0负</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content-area">
+      <!-- 前台控制 -->
+      <div class="panel">
+        <h2>前台控制</h2>
+        <div class="frontend-controls">
+          <label>
+            <input type="checkbox" id="alwaysOnTop" onchange="toggleAlwaysOnTop()">
+            窗口置顶
+          </label>
+          <button class="btn btn-secondary" onclick="openEditMode()">编辑布局 (F2)</button>
+        </div>
+
+        <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="openComponentEditor()"
+            style="background: linear-gradient(135deg, #e94560 0%, #f39c12 100%); font-weight: bold;">🎨 组件编辑器
+            v2.0</button>
+          <button class="btn btn-primary" onclick="exportBpPack()">📦 导出布局包</button>
+          <button class="btn btn-success" onclick="importBpPack()">📥 导入布局包</button>
+          <button class="btn btn-warning" onclick="resetLayout()">🔄 恢复默认布局</button>
+          <button class="btn btn-secondary" onclick="openLayoutStore()"
+            style="background: linear-gradient(135deg, #9c27b0 0%, #673ab7 100%);">🏪 布局包商店</button>
+          <button class="btn btn-info" onclick="openFontSettings()"
+            style="background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);">🔤 字体设置</button>
+        </div>
+      </div>
+
+      <!-- 字体设置面板 -->
+      <div id="fontSettingsPanel"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
+        <div
+          style="background: #16213e; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; width: 600px; max-width: 90vw; max-height: 80vh; overflow-y: auto; padding: 20px; color: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; color: #ffd700;">🔤 自定义字体设置</h3>
+            <button onclick="closeFontSettings()"
+              style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+          </div>
+
+          <!-- 已安装字体列表 -->
+          <div style="margin-bottom: 20px;">
+            <h4 style="color: #64b5f6; margin-bottom: 10px;">已安装字体</h4>
+            <div id="fontList"
+              style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; min-height: 60px;"></div>
+            <button onclick="selectCustomFont()"
+              style="margin-top: 10px; padding: 8px 16px; background: linear-gradient(135deg, #4caf50 0%, #43a047 100%); border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: bold;">
+              ➕ 添加字体文件 (TTF/OTF/WOFF)
+            </button>
+          </div>
+
+          <!-- 字体配置 -->
+          <div style="margin-bottom: 20px;">
+            <h4 style="color: #64b5f6; margin-bottom: 10px;">字体配置</h4>
+            <div style="font-size: 12px; color: #9aa4b2; margin-bottom: 12px; line-height: 1.6;">
+              说明：这些设置会同时影响 <b>前台(BP)</b> / <b>比分板</b> / <b>赛后数据</b> 三个页面。下面的“新增项”优先级更高；如果不填，会回退到旧版项。
+            </div>
+
+            <div style="margin: 10px 0 8px; font-size: 13px; color: #ffd700; font-weight: bold;">新增：通用文本类别（推荐）</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">标题字体（赛后标题 / BO标题
+                  等）</label>
+                <select id="fontConfigTitle"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">数值字体（计时 / 比分 /
+                  统计值）</label>
+                <select id="fontConfigNumber"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">标签字体（表头 / 小标签 /
+                  编辑模式标签）</label>
+                <select id="fontConfigLabel"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin: 10px 0 8px; font-size: 13px; color: #ffd700; font-weight: bold;">常用：业务元素</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">默认全局字体（整体基础字体）</label>
+                <select id="fontConfigDefault"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">队伍名字体</label>
+                <select id="fontConfigTeamName"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">角色/选手名字体</label>
+                <select id="fontConfigCharacterName"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">阶段信息字体（前台“阶段信息”）</label>
+                <select id="fontConfigPhase"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">地图信息字体</label>
+                <select id="fontConfigMap"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">全局禁选标签字体（🚫
+                  全局禁）</label>
+                <select id="fontConfigGlobalBanLabel"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">插件组件字体（插件内容区）</label>
+                <select id="fontConfigPluginWidget"
+                  style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <option value="">系统默认</option>
+                </select>
+              </div>
+            </div>
+
+            <details style="margin-top: 10px;">
+              <summary style="cursor: pointer; color: #a6adc8; font-size: 12px;">兼容旧版（可留空，仅当你还在用旧项时才需要）</summary>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                <div>
+                  <label
+                    style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">旧：计时/分数字体（已被“数值字体”覆盖）</label>
+                  <select id="fontConfigTimer"
+                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                    <option value="">系统默认</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    style="display: block; font-size: 12px; color: #bbb; margin-bottom: 5px;">旧：控件/标签字体（已被“标签字体”覆盖）</label>
+                  <select id="fontConfigControlLabel"
+                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                    <option value="">系统默认</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+
+            <details style="margin-top: 12px;" open>
+              <summary style="cursor: pointer; color: #ffd700; font-size: 12px; font-weight: bold;">高级：选择器覆盖（CSS选择器 →
+                字体）</summary>
+              <div style="margin-top: 10px; font-size: 12px; color: #9aa4b2; line-height: 1.6;">
+                用于“更细到某个元素”的情况。示例：<code style="color:#ffd700;">.team-name</code>、<code
+                  style="color:#ffd700;">#bigScore</code>、<code style="color:#ffd700;">.kv .v</code>。
+              </div>
+              <div id="fontOverridesList" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 10px;">
+                <button onclick="addFontOverrideRow()"
+                  style="padding: 8px 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; cursor: pointer;">➕
+                  添加覆盖规则</button>
+                <div style="font-size: 12px; color: #888;">提示：留空字体=不覆盖；无效选择器会提示并阻止保存。</div>
+              </div>
+            </details>
+          </div>
+
+          <!-- 保存按钮 -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="closeFontSettings()"
+              style="padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; cursor: pointer;">取消</button>
+            <button onclick="saveFontConfig()"
+              style="padding: 10px 20px; background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%); border: none; border-radius: 6px; color: #1a1a2e; cursor: pointer; font-weight: bold;">保存配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 计时器控制 -->
+      <div class="panel">
+        <h2>计时器</h2>
+        <div class="timer-control">
+          <div class="timer-display" id="timerDisplay">0:00</div>
+          <div class="btn-group">
+            <button class="btn btn-success" onclick="startTimer()">开始</button>
+            <button class="btn btn-warning" onclick="pauseTimer()">暂停</button>
+            <button class="btn btn-danger" onclick="resetTimer()">重置</button>
+          </div>
+          <div>
+            <label>时长(秒):</label>
+            <input type="number" id="timerDuration" value="60" min="1" style="width: 80px; padding: 5px;">
+          </div>
+        </div>
+      </div>
+
+      <!-- 流程控制 -->
+      <div class="panel">
+        <h2>流程控制</h2>
+        <div class="btn-group" style="margin-bottom: 15px;">
+          <button class="btn btn-primary" id="startBpBtn" onclick="startBp()">开始BP</button>
+          <button class="btn btn-secondary" onclick="nextPhase()">下一阶段</button>
+          <button class="btn btn-warning" onclick="pauseBp()">暂停</button>
+          <button class="btn btn-danger" onclick="resetRound()">重置本局</button>
+        </div>
+
+        <h3 style="color: #888; font-size: 14px; margin: 15px 0 10px;">快速跳转阶段</h3>
+        <div class="phase-controls" id="phaseControls">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+
+      <!-- 当前状态 -->
+      <div class="panel">
+        <h2>当前BP状态 <span style="font-size: 12px; color: #888;">(点击可编辑)</span></h2>
+        <div class="current-state">
+          <div class="state-card">
+            <h4>已选求生者</h4>
+            <div class="items" id="selectedSurvivors" onclick="editSurvivors()">
+              <span class="item">暂无</span>
+            </div>
+          </div>
+          <div class="state-card">
+            <h4>已选监管者</h4>
+            <div class="items" id="selectedHunter" onclick="editHunter()">
+              <span class="item">暂无</span>
+            </div>
+          </div>
+          <div class="state-card">
+            <h4>被禁求生者</h4>
+            <div class="items" id="bannedSurvivors" onclick="editBannedSurvivors()">
+              <span class="item">暂无</span>
+            </div>
+          </div>
+          <div class="state-card">
+            <h4>被禁监管者</h4>
+            <div class="items" id="bannedHunters" onclick="editBannedHunters()">
+              <span class="item">暂无</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 全局禁选状态 -->
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 215, 0, 0.2);">
+          <h3 style="color: #9c27b0; font-size: 14px; margin-bottom: 15px;">🚫 全局禁选池 (整场比赛不可使用)</h3>
+          <div class="current-state">
+            <div class="state-card" style="border-color: rgba(156, 39, 176, 0.3);">
+              <h4 style="color: #ba68c8;">全局禁选求生者</h4>
+              <div class="items" id="globalBannedSurvivors">
+                <span class="item">暂无</span>
+              </div>
+            </div>
+            <div class="state-card" style="border-color: rgba(156, 39, 176, 0.3);">
+              <h4 style="color: #ba68c8;">全局禁选监管者</h4>
+              <div class="items" id="globalBannedHunters">
+                <span class="item">暂无</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 比分管理 -->
+      <div class="panel">
+        <h2>比分管理
+          <button class="btn btn-primary" onclick="openScoreboardWindow()"
+            style="float: right; padding: 8px 20px; font-size: 14px;">
+            打开比分展示窗口
+          </button>
+          <button class="btn btn-success" onclick="openScoreboardOverviewWindow()"
+            style="float: right; padding: 8px 20px; font-size: 14px; margin-right: 10px; background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);">
+            📊 总览比分板
+          </button>
+        </h2>
+
+        <!-- 队伍名称设置 -->
+        <div style="display: flex; gap: 20px; margin-bottom: 20px; align-items: center;">
+          <div style="flex: 1;">
+            <label style="color: #64b5f6; font-weight: bold; margin-right: 10px;">A队名称:</label>
+            <input type="text" id="teamAName" placeholder="请输入A队名称" value="A队"
+              onchange="updateTeamName('teamA', this.value)"
+              style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; width: 200px;">
+          </div>
+          <div style="flex: 1;">
+            <label style="color: #ef5350; font-weight: bold; margin-right: 10px;">B队名称:</label>
+            <input type="text" id="teamBName" placeholder="请输入B队名称" value="B队"
+              onchange="updateTeamName('teamB', this.value)"
+              style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; width: 200px;">
+          </div>
+        </div>
+
+        <!-- 比分板小比分显示控制 -->
+        <div style="display: flex; gap: 20px; margin-bottom: 20px; align-items: center;">
+          <div style="flex: 1;">
+            <label style="color: #64b5f6; font-weight: bold; margin-right: 10px;">A队比分板显示:</label>
+            <select id="scoreboardDisplayTeamA" onchange="updateScoreboardDisplay('teamA', this.value)"
+              style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; width: 200px;">
+              <option value="auto">自动</option>
+              <option value="upper">上半局</option>
+              <option value="lower">下半局</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="color: #ef5350; font-weight: bold; margin-right: 10px;">B队比分板显示:</label>
+            <select id="scoreboardDisplayTeamB" onchange="updateScoreboardDisplay('teamB', this.value)"
+              style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; width: 200px;">
+              <option value="auto">自动</option>
+              <option value="upper">上半局</option>
+              <option value="lower">下半局</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="scoreManagement">
+          <!-- 动态生成小局比分输入 -->
+        </div>
+      </div>
+
+      <!-- 赛后数据管理 -->
+      <div class="panel">
+        <h2>赛后数据（MATCH STATS）
+          <button class="btn btn-primary" onclick="openPostMatchWindow()"
+            style="float: right; padding: 8px 20px; font-size: 14px;">
+            打开赛后数据窗口
+          </button>
+        </h2>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div>
+            <label style="color: #aaa;">标题</label>
+            <input type="text" id="pmTitle" placeholder="赛后数据"
+              style="width: 100%; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+          </div>
+          <div>
+            <label style="color: #aaa;">副标题</label>
+            <input type="text" id="pmSubTitle" placeholder="MATCH STATS"
+              style="width: 100%; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+          </div>
+          <div>
+            <label style="color: #aaa;">场次标记</label>
+            <input type="text" id="pmGameLabel" placeholder="GAME 1"
+              style="width: 100%; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+          </div>
+          <div>
+            <label style="color: #aaa;">地图</label>
+            <input type="text" id="pmMapName" placeholder="地图"
+              style="width: 100%; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div style="border: 1px solid rgba(100, 181, 246, 0.35); border-radius: 8px; padding: 12px;">
+            <div style="color: #64b5f6; font-weight: bold; margin-bottom: 10px;">A队</div>
+            <div style="display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center;">
+              <label style="color: #aaa;">名称</label>
+              <input type="text" id="pmTeamAName"
+                style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+              <label style="color: #aaa;">Meta</label>
+              <input type="text" id="pmTeamAMeta" placeholder="W 0  D 0"
+                style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+              <label style="color: #aaa;">比分</label>
+              <input type="number" id="pmTeamAScore" min="0" value="0"
+                style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; width: 140px;">
+            </div>
+          </div>
+          <div style="border: 1px solid rgba(239, 83, 80, 0.35); border-radius: 8px; padding: 12px;">
+            <div style="color: #ef5350; font-weight: bold; margin-bottom: 10px;">B队</div>
+            <div style="display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center;">
+              <label style="color: #aaa;">名称</label>
+              <input type="text" id="pmTeamBName"
+                style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+              <label style="color: #aaa;">Meta</label>
+              <input type="text" id="pmTeamBMeta" placeholder="W 0  D 0"
+                style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+              <label style="color: #aaa;">比分</label>
+              <input type="number" id="pmTeamBScore" min="0" value="0"
+                style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; width: 140px;">
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <div style="color: #ffd700; font-weight: bold; margin-bottom: 10px;">求生者（4人）</div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="color: rgba(255,255,255,0.75); text-align: left;">
+                  <th style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12);">选手/角色</th>
+                  <th style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12);">破译(%)</th>
+                  <th style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12);">砸板</th>
+                  <th style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12);">救人</th>
+                  <th style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12);">治疗</th>
+                  <th style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.12);">牵制(s)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS1Name"
+                      type="text"
+                      style="width: 160px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS1Decode"
+                      type="number" min="0" max="500" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS1Pallet"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS1Rescue"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS1Heal"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS1Chase"
+                      type="number" min="0" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS2Name"
+                      type="text"
+                      style="width: 160px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS2Decode"
+                      type="number" min="0" max="500" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS2Pallet"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS2Rescue"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS2Heal"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS2Chase"
+                      type="number" min="0" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS3Name"
+                      type="text"
+                      style="width: 160px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS3Decode"
+                      type="number" min="0" max="500" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS3Pallet"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS3Rescue"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS3Heal"
+                      type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);"><input id="pmS3Chase"
+                      type="number" min="0" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px;"><input id="pmS4Name" type="text"
+                      style="width: 160px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px;"><input id="pmS4Decode" type="number" min="0" max="500" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px;"><input id="pmS4Pallet" type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px;"><input id="pmS4Rescue" type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px;"><input id="pmS4Heal" type="number" min="0" value="0"
+                      style="width: 80px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                  <td style="padding: 8px;"><input id="pmS4Chase" type="number" min="0" value="0"
+                      style="width: 90px; padding: 6px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <div style="color: #ffd700; font-weight: bold; margin-bottom: 10px;">监管者</div>
+          <div style="display: grid; grid-template-columns: 140px 1fr 140px 1fr; gap: 10px; align-items: center;">
+            <label style="color: #aaa;">名称</label>
+            <input id="pmHunterName" type="text" placeholder="监管者"
+              style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+            <label style="color: #aaa;">角色</label>
+            <input id="pmHunterRole" type="text" placeholder="角色"
+              style="padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+
+            <label style="color: #aaa;">剩余密码机</label>
+            <input id="pmHunterRemaining" type="number" min="0" value="0"
+              style="width: 140px; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+            <label style="color: #aaa;">破坏板子</label>
+            <input id="pmHunterPalletDestroy" type="number" min="0" value="0"
+              style="width: 140px; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+
+            <label style="color: #aaa;">命中次数</label>
+            <input id="pmHunterHit" type="number" min="0" value="0"
+              style="width: 140px; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+            <label style="color: #aaa;">震慑次数</label>
+            <input id="pmHunterTerror" type="number" min="0" value="0"
+              style="width: 140px; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+
+            <label style="color: #aaa;">击倒次数</label>
+            <input id="pmHunterDown" type="number" min="0" value="0"
+              style="width: 140px; padding: 8px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px;">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;">
+          <button class="btn btn-success" onclick="savePostMatch()">💾 保存赛后数据</button>
+          <button class="btn btn-secondary" onclick="loadPostMatch(true)">🔄 重新加载</button>
+        </div>
+
+        <div
+          style="margin-top: 10px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,215,0,0.18);">
+          <div style="color: #ffd700; font-weight: bold; margin-bottom: 8px;">OCR 自动填充</div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <input type="file" id="pmOcrFile" accept="image/*" style="color: #ccc;">
+            <button class="btn btn-primary" onclick="ocrFillPostMatch()">🧠 识别并回填</button>
+            <span style="color: #888; font-size: 12px;">接口有频率限制（约 15 秒一次），识别失败请稍后重试</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作日志 -->
+      <div class="panel">
+        <h2>操作日志</h2>
+        <div class="log-container" id="logContainer">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 角色选择弹窗 -->
+  <div class="character-modal" id="characterModal">
+    <div class="character-modal-content">
+      <div class="character-modal-header">
+        <h3 id="modalTitle">选择角色</h3>
+        <button class="character-modal-close" onclick="closeCharacterModal()">×</button>
+      </div>
+      <div class="character-modal-body">
+        <div class="character-grid" id="characterGrid">
+          <!-- 动态生成角色选项 -->
+        </div>
+      </div>
+      <div class="character-modal-footer">
+        <button class="btn btn-secondary" onclick="closeCharacterModal()">取消</button>
+        <button class="btn btn-success" onclick="confirmCharacterSelection()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/signalr.min.js"></script>
+  <script src="./js/backend-logic.js"></script>
+</body>
+
+</html>

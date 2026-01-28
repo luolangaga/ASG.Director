@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASG导播 - 角色展示</title>
+  
+  <link rel="stylesheet" href="./css/character-display.css">
+</head>
+
+<body>
+  <div class="drag-bar"></div>
+  <div class="edit-hint">编辑模式：拖拽移动 | 四角缩放 | 右键隐藏/显示 | F2 退出 | F3 背景 | Esc 关闭</div>
+  <img id="backgroundImage" alt="背景" />
+
+  <div id="layoutRoot" class="layout-root">
+    <!-- 队伍信息：Logo / 比分（两串文字，使用 teamA.meta / teamB.meta） -->
+    <div class="draggable-container" id="teamA-logo" data-role="teamA-logo">
+      <div class="control-label">A队 Logo</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="teamA-score" data-role="teamA-score">
+      <div class="control-label">A队 比分</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="teamB-logo" data-role="teamB-logo">
+      <div class="control-label">B队 Logo</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="teamB-score" data-role="teamB-score">
+      <div class="control-label">B队 比分</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+
+    <!-- 求生者 1-4：立绘 / 名字 / 天赋（都可独立拖拽缩放） -->
+    <div class="draggable-container" id="survivor0-img" data-role="survivor-img" data-index="0">
+      <div class="control-label">求生者1 立绘</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor0-name" data-role="survivor-name" data-index="0">
+      <div class="control-label">求生者1 名字</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor0-talents" data-role="survivor-talents" data-index="0">
+      <div class="control-label">求生者1 天赋</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+
+    <div class="draggable-container" id="survivor1-img" data-role="survivor-img" data-index="1">
+      <div class="control-label">求生者2 立绘</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor1-name" data-role="survivor-name" data-index="1">
+      <div class="control-label">求生者2 名字</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor1-talents" data-role="survivor-talents" data-index="1">
+      <div class="control-label">求生者2 天赋</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+
+    <div class="draggable-container" id="survivor2-img" data-role="survivor-img" data-index="2">
+      <div class="control-label">求生者3 立绘</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor2-name" data-role="survivor-name" data-index="2">
+      <div class="control-label">求生者3 名字</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor2-talents" data-role="survivor-talents" data-index="2">
+      <div class="control-label">求生者3 天赋</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+
+    <div class="draggable-container" id="survivor3-img" data-role="survivor-img" data-index="3">
+      <div class="control-label">求生者4 立绘</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor3-name" data-role="survivor-name" data-index="3">
+      <div class="control-label">求生者4 名字</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="survivor3-talents" data-role="survivor-talents" data-index="3">
+      <div class="control-label">求生者4 天赋</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+
+    <!-- 监管者：立绘 / 名字 / 天赋 / 技能 -->
+    <div class="draggable-container" id="hunter-img" data-role="hunter-img">
+      <div class="control-label">监管者 立绘</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="hunter-name" data-role="hunter-name">
+      <div class="control-label">监管者 名字</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="hunter-talents" data-role="hunter-talents">
+      <div class="control-label">监管者 天赋</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+    <div class="draggable-container" id="hunter-skills" data-role="hunter-skills">
+      <div class="control-label">监管者 技能</div>
+      <div class="widget-content">
+        <div class="empty-character">?</div>
+      </div>
+      <div class="resize-handle nw" data-dir="nw"></div>
+      <div class="resize-handle ne" data-dir="ne"></div>
+      <div class="resize-handle sw" data-dir="sw"></div>
+      <div class="resize-handle se" data-dir="se"></div>
+    </div>
+  </div>
+
+  <!-- 字体选择器弹窗 -->
+  <div class="modal" id="fontSelectorModal" onclick="closeFontSelector()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3 style="color:#ffd700; margin-bottom: 15px;">选择字体</h3>
+      <div id="fontSelectorList"></div>
+
+      <!-- 字体大小设置 -->
+      <div class="font-color-section" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: #ddd;">字体大小 (px)</h4>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="number" id="fontSizeInput" min="8" max="200" step="1"
+            style="width: 80px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff;">
+          <input type="range" id="fontSizeRange" min="8" max="200" step="1" style="flex: 1;">
+        </div>
+      </div>
+
+      <!-- 颜色选择部分 -->
+      <div class="font-color-section" style="margin-top: 15px;">
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: #ddd;">文字颜色</h4>
+        <div class="color-picker-container" style="display: flex; align-items: center; gap: 10px;">
+          <input type="color" id="textColorPicker" value="#ffffff"
+            style="width: 40px; height: 30px; padding: 0; border: none; background: none; cursor: pointer;" />
+          <div class="color-presets-inline" style="display: flex; gap: 8px;">
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #ffffff;"
+              data-color="#ffffff"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #ffd700;"
+              data-color="#ffd700"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #ff4444;"
+              data-color="#ff4444"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #64ffda;"
+              data-color="#64ffda"></div>
+            <div class="color-preset-inline"
+              style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #555; cursor: pointer; background: #64b5f6;"
+              data-color="#64b5f6"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/character-display-logic.js"></script>
+</body>
+
+</html>

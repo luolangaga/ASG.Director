@@ -1,0 +1,485 @@
+* {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      background: transparent;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      color: #fff;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    body.has-background {
+      background: transparent;
+    }
+
+    body.transparent-bg {
+      background: transparent !important;
+    }
+
+    body.transparent-bg .drag-bar {
+      background: transparent !important;
+      border-bottom-color: transparent !important;
+    }
+
+    body.transparent-bg .draggable {
+      background: transparent !important;
+      backdrop-filter: none !important;
+    }
+
+    .drag-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 28px;
+      z-index: 10000;
+      -webkit-app-region: drag;
+      background: rgba(255, 215, 0, 0.08);
+      border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+    }
+
+    body.edit-mode .drag-bar {
+      background: rgba(255, 215, 0, 0.25);
+    }
+
+    #backgroundImage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
+      display: none;
+    }
+
+    .edit-hint {
+      position: fixed;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 215, 0, 0.9);
+      color: #1a1a2e;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      z-index: 10001;
+      display: none;
+      white-space: nowrap;
+    }
+
+    body.edit-mode .edit-hint {
+      display: block;
+    }
+
+    .draggable {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      border-radius: 10px;
+      border: 2px solid transparent;
+      backdrop-filter: blur(2px);
+    }
+
+    body.edit-mode .draggable {
+      border-width: 1px;
+      border-color: rgba(255, 215, 0, 0.55);
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 0;
+    }
+
+    body.edit-mode .layout-hidden {
+      opacity: 0.25 !important;
+      filter: grayscale(1);
+    }
+
+    body.edit-mode .draggable:hover {
+      border-color: #ffd700;
+      box-shadow: none;
+    }
+
+    .draggable.dragging {
+      opacity: 0.85;
+      z-index: 9999;
+    }
+
+    body.is-dragging,
+    body.is-dragging * {
+      cursor: grabbing !important;
+    }
+
+    .resize-handle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: rgba(255, 215, 0, 0.75);
+      border: 1px solid #ffd700;
+      border-radius: 0;
+      display: none;
+      z-index: 10;
+    }
+
+    body.edit-mode .resize-handle {
+      display: block;
+    }
+
+    .resize-handle.nw {
+      top: -5px;
+      left: -5px;
+      cursor: nw-resize;
+    }
+
+    .resize-handle.n {
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: n-resize;
+    }
+
+    .resize-handle.ne {
+      top: -5px;
+      right: -5px;
+      cursor: ne-resize;
+    }
+
+    .resize-handle.e {
+      top: 50%;
+      right: -5px;
+      transform: translateY(-50%);
+      cursor: e-resize;
+    }
+
+    .resize-handle.se {
+      bottom: -5px;
+      right: -5px;
+      cursor: se-resize;
+    }
+
+    .resize-handle.s {
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: s-resize;
+    }
+
+    .resize-handle.sw {
+      bottom: -5px;
+      left: -5px;
+      cursor: sw-resize;
+    }
+
+    .resize-handle.w {
+      top: 50%;
+      left: -5px;
+      transform: translateY(-50%);
+      cursor: w-resize;
+    }
+
+    /* ====== 视觉结构：尽量贴近截图风格 ====== */
+
+    .title {
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .team-bar {
+      display: grid;
+      grid-template-columns: 1fr 420px 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .team-card {
+      display: grid;
+      grid-template-columns: 90px 1fr 90px;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    .team-logo {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.8));
+      display: none;
+    }
+
+    .team-name {
+      font-size: 34px;
+      font-weight: 900;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .team-meta {
+      margin-top: 4px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .team-score {
+      justify-self: end;
+      font-size: 64px;
+      font-weight: 900;
+      font-family: 'Arial Black', sans-serif;
+      text-shadow: 0 3px 12px rgba(0, 0, 0, 0.85);
+    }
+
+    .team-card.team-a {
+      border-left: 4px solid rgba(100, 181, 246, 0.9);
+    }
+
+    .team-card.team-a .team-name,
+    .team-card.team-a .team-score {
+      color: #64b5f6;
+    }
+
+    .team-card.team-b {
+      border-right: 4px solid rgba(239, 83, 80, 0.9);
+    }
+
+    .team-card.team-b .team-name,
+    .team-card.team-b .team-score {
+      color: #ef5350;
+    }
+
+    .center-card {
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .center-card .label {
+      font-size: 16px;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .center-card .map {
+      font-size: 18px;
+      font-weight: 900;
+      color: #ffd700;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .table th {
+      text-align: left;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 800;
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      white-space: nowrap;
+    }
+
+    .table td {
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      vertical-align: middle;
+    }
+
+    .player-name {
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .stat {
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+    }
+
+    .hunter-card {
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+
+    .hunter-header {
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .hunter-name {
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .hunter-role {
+      margin-top: 4px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .hunter-stats {
+      padding: 12px 14px 14px 14px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .kv {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kv .k {
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .kv .v {
+      font-weight: 900;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    /* 辅助对齐线 */
+    .snap-line {
+      position: fixed;
+      background: #00e5ff;
+      z-index: 99999;
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 0 4px rgba(0, 229, 255, 0.8);
+    }
+
+    .snap-line-v {
+      width: 1px;
+      height: 100%;
+      top: 0;
+    }
+
+    .snap-line-h {
+      height: 1px;
+      width: 100%;
+      left: 0;
+    }
+
+    /* 坐标显示 */
+    #coordDisplay {
+      position: fixed;
+      top: 80px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid #ffd700;
+      color: #ffd700;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 10002;
+      display: none;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    body.edit-mode #coordDisplay.show {
+      display: block;
+    }
+
+    /* 字体选择器弹窗 */
+    #fontSelectorModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 11000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #fontSelectorModal.show {
+      display: flex;
+    }
+
+    #fontSelectorModal .modal-content {
+      background: #1a1a2e;
+      border: 1px solid #ffd700;
+      width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .font-selector-item {
+      padding: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      color: #fff;
+      transition: background 0.2s;
+    }
+
+    .font-selector-item:hover {
+      background: rgba(255, 215, 0, 0.2);
+    }
+
+    .font-selector-item:last-child {
+      border-bottom: none;
+    }
+
+    /* 自定义组件样式 */
+    .custom-component {
+      background: transparent;
+    }
+
+    .custom-component-content {
+      color: #fff;
+    }
+
+    body.edit-mode .custom-component {
+      background: rgba(13, 71, 161, 0.1);
+      border: 1px dashed rgba(13, 71, 161, 0.5);
+    }
+
