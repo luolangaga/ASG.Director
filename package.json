@@ -1,6 +1,7 @@
 {
   "name": "asg-director",
   "version": "2.7.1",
+  "private": true,
   "description": "第五人格赛事导播端",
   "main": "main.js",
   "scripts": {
