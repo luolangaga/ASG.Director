@@ -74,6 +74,7 @@
       "updater-v2.js",
       "postinstall.js",
       "package.json",
+      "roles.json",
       "extracted_roles.json",
       "assets/**/*",
       "pages/**/*",
