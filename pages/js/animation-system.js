@@ -90,15 +90,15 @@
             keyframes: `@keyframes asg-select {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 rgba(100, 255, 218, 0);
+    box-shadow: none;
   }
   50% {
     transform: scale(1.05);
-    box-shadow: 0 0 30px rgba(100, 255, 218, 0.6);
+    box-shadow: none;
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 15px rgba(100, 255, 218, 0.3);
+    box-shadow: none;
   }
 }`,
             targets: ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
@@ -117,15 +117,12 @@
             fillMode: 'both',
             keyframes: `@keyframes asg-blink-pending {
   0% {
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8),
-                0 0 40px rgba(255, 215, 0, 0.4),
-                inset 0 0 20px rgba(255, 215, 0, 0.1);
-    border-color: rgba(255, 215, 0, 0.9);
+    box-shadow: none;
+    border-color: transparent;
   }
   100% {
-    box-shadow: 0 0 5px rgba(255, 215, 0, 0.3),
-                0 0 10px rgba(255, 215, 0, 0.1);
-    border-color: rgba(255, 215, 0, 0.4);
+    box-shadow: none;
+    border-color: transparent;
   }
 }`,
             targets: ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
@@ -542,6 +539,10 @@
         if (animation) {
             applyAnimation(targetId, animation.id)
 
+            // [Fix] 移除自动广播到所有 targets 的逻辑。
+            // animation.targets 是该动画支持的目标列表(whitelist)，而不是联动列表。
+            // 如果需要联动，应当使用 specificCategory 或者专门的联动配置。
+            /*
             if (animation.targets) {
                 animation.targets.forEach(t => {
                     if (t === targetId) return
@@ -554,6 +555,7 @@
                     }
                 })
             }
+            */
         }
 
         const specificCategory = `blink-${targetId}`
@@ -580,6 +582,8 @@
 
         stopAnimation(targetId)
 
+        // [Fix] 同样移除停止时的广播逻辑
+        /*
         const animation = findAnimationForTarget(targetId, 'blink')
         if (animation && animation.targets) {
             animation.targets.forEach(t => {
@@ -591,6 +595,7 @@
                 }
             })
         }
+        */
 
         const specificCategory = `blink-${targetId}`
         const specificAnims = AnimationSystem.animations.filter(a => a.category === specificCategory)

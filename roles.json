@@ -1,0 +1,574 @@
+{
+    "survivors": [
+        {
+            "id": "doctor",
+            "name": "医生",
+            "enName": "Doctor",
+            "abbr": "ys"
+        },
+        {
+            "id": "lawyer",
+            "name": "律师",
+            "enName": "Lawyer",
+            "abbr": "ls"
+        },
+        {
+            "id": "thief",
+            "name": "慈善家",
+            "enName": "Thief",
+            "abbr": "csj"
+        },
+        {
+            "id": "gardener",
+            "name": "园丁",
+            "enName": "Gardener",
+            "abbr": "yd"
+        },
+        {
+            "id": "magician",
+            "name": "魔术师",
+            "enName": "Magician",
+            "abbr": "mss"
+        },
+        {
+            "id": "explorer",
+            "name": "冒险家",
+            "enName": "Explorer",
+            "abbr": "mxj"
+        },
+        {
+            "id": "mercenary",
+            "name": "佣兵",
+            "enName": "Mercenary",
+            "abbr": "yb"
+        },
+        {
+            "id": "coordinator",
+            "name": "空军",
+            "enName": "Coordinator",
+            "abbr": "kj"
+        },
+        {
+            "id": "priestess",
+            "name": "祭司",
+            "enName": "Priestess",
+            "abbr": "js"
+        },
+        {
+            "id": "mechanic",
+            "name": "机械师",
+            "enName": "Mechanic",
+            "abbr": "jxs"
+        },
+        {
+            "id": "forward",
+            "name": "前锋",
+            "enName": "Forward",
+            "abbr": "qf"
+        },
+        {
+            "id": "mind_eye",
+            "name": "盲女",
+            "enName": "The Mind's Eye",
+            "abbr": "mn"
+        },
+        {
+            "id": "perfumer",
+            "name": "调香师",
+            "enName": "Perfumer",
+            "abbr": "txs"
+        },
+        {
+            "id": "cowboy",
+            "name": "牛仔",
+            "enName": "Cowboy",
+            "abbr": "nz"
+        },
+        {
+            "id": "dancer",
+            "name": "舞女",
+            "enName": "Female Dancer",
+            "abbr": "wn"
+        },
+        {
+            "id": "seer",
+            "name": "先知",
+            "enName": "Seer",
+            "abbr": "xz"
+        },
+        {
+            "id": "embalmer",
+            "name": "入殓师",
+            "enName": "Embalmer",
+            "abbr": "rls"
+        },
+        {
+            "id": "prospector",
+            "name": "勘探员",
+            "enName": "Prospector",
+            "abbr": "kty"
+        },
+        {
+            "id": "enchantress",
+            "name": "咒术师",
+            "enName": "Enchantress",
+            "abbr": "zss"
+        },
+        {
+            "id": "wildling",
+            "name": "野人",
+            "enName": "Wildling",
+            "abbr": "yr"
+        },
+        {
+            "id": "acrobat",
+            "name": "杂技演员",
+            "enName": "Acrobat",
+            "abbr": "zjyy"
+        },
+        {
+            "id": "first_officer",
+            "name": "大副",
+            "enName": "First Officer",
+            "abbr": "df"
+        },
+        {
+            "id": "barmaid",
+            "name": "调酒师",
+            "enName": "Barmaid",
+            "abbr": "tjs"
+        },
+        {
+            "id": "postman",
+            "name": "邮差",
+            "enName": "Postman",
+            "abbr": "yc"
+        },
+        {
+            "id": "grave_keeper",
+            "name": "守墓人",
+            "enName": "Grave Keeper",
+            "abbr": "smr"
+        },
+        {
+            "id": "prisoner",
+            "name": "囚徒",
+            "enName": "Prisoner",
+            "abbr": "qt"
+        },
+        {
+            "id": "entomologist",
+            "name": "昆虫学者",
+            "enName": "Entomologist",
+            "abbr": "kcxz"
+        },
+        {
+            "id": "painter",
+            "name": "画家",
+            "enName": "Painter",
+            "abbr": "hj"
+        },
+        {
+            "id": "batter",
+            "name": "击球手",
+            "enName": "Batter",
+            "abbr": "jqs"
+        },
+        {
+            "id": "toy_merchant",
+            "name": "玩具商",
+            "enName": "Toy Merchant",
+            "abbr": "wjs"
+        },
+        {
+            "id": "patient",
+            "name": "病患",
+            "enName": "Patient",
+            "abbr": "bh"
+        },
+        {
+            "id": "psychologist",
+            "name": "心理学家",
+            "enName": "Psychologist",
+            "abbr": "xlxj"
+        },
+        {
+            "id": "novelist",
+            "name": "小说家",
+            "enName": "Novelist",
+            "abbr": "xsj"
+        },
+        {
+            "id": "little_girl",
+            "name": "小女孩",
+            "enName": "Little Girl",
+            "abbr": "xnh"
+        },
+        {
+            "id": "weeping_clown",
+            "name": "哭泣小丑",
+            "enName": "Weeping Clown",
+            "abbr": "qqxc"
+        },
+        {
+            "id": "professor",
+            "name": "教授",
+            "enName": "Professor",
+            "abbr": "js_"
+        },
+        {
+            "id": "antiquarian",
+            "name": "古董商",
+            "enName": "Antiquarian",
+            "abbr": "gds"
+        },
+        {
+            "id": "cheerleader",
+            "name": "拉拉队员",
+            "enName": "Cheerleader",
+            "abbr": "lldy"
+        },
+        {
+            "id": "journalist",
+            "name": "记者",
+            "enName": "Journalist",
+            "abbr": "jz"
+        },
+        {
+            "id": "aeroplanist",
+            "name": "飞行家",
+            "enName": "Aeroplanist",
+            "abbr": "fxj"
+        },
+        {
+            "id": "composer",
+            "name": "作曲家",
+            "enName": "Composer",
+            "abbr": "zqj"
+        },
+        {
+            "id": "archer",
+            "name": "弓箭手",
+            "enName": "Archer",
+            "abbr": "gjs"
+        },
+        {
+            "id": "knight",
+            "name": "骑士",
+            "enName": "Knight",
+            "abbr": "qs"
+        },
+        {
+            "id": "puppeteer",
+            "name": "木偶师",
+            "enName": "Puppeteer",
+            "abbr": "mos"
+        },
+        {
+            "id": "lucky_guy",
+            "name": "幸运儿",
+            "enName": "Lucky Guy",
+            "abbr": "xye"
+        },
+        {
+            "id": "fire_investigator",
+            "name": "火灾调查员",
+            "enName": "Fire Investigator",
+            "abbr": "hzdcy"
+        },
+        {
+            "id": "escape_master",
+            "name": "逃脱大师",
+            "enName": "Escape Master",
+            "abbr": "ttds"
+        },
+        {
+            "id": "meteorologist",
+            "name": "气象学家",
+            "enName": "Meteorologist",
+            "abbr": "qxxj"
+        },
+        {
+            "id": "faro_lady",
+            "name": "法罗女士",
+            "enName": "Faro Lady",
+            "abbr": "flns"
+        }
+    ],
+    "hunters": [
+        {
+            "id": "hell_ember",
+            "name": "厂长",
+            "enName": "Hell Ember",
+            "abbr": "cz"
+        },
+        {
+            "id": "smiley_face",
+            "name": "小丑",
+            "enName": "Smiley Face",
+            "abbr": "xc"
+        },
+        {
+            "id": "gamekeeper",
+            "name": "鹿头",
+            "enName": "Gamekeeper",
+            "abbr": "lt"
+        },
+        {
+            "id": "ripper",
+            "name": "杰克",
+            "enName": "The Ripper",
+            "abbr": "jk"
+        },
+        {
+            "id": "soul_weaver",
+            "name": "蜘蛛",
+            "enName": "Soul Weaver",
+            "abbr": "zz"
+        },
+        {
+            "id": "geisha",
+            "name": "红蝶",
+            "enName": "Geisha",
+            "abbr": "hd"
+        },
+        {
+            "id": "feaster",
+            "name": "黄衣之主",
+            "enName": "The Feaster",
+            "abbr": "hyzz"
+        },
+        {
+            "id": "photographer",
+            "name": "摄影师",
+            "enName": "Photographer",
+            "abbr": "sys"
+        },
+        {
+            "id": "mad_eyes",
+            "name": "疯眼",
+            "enName": "Mad Eyes",
+            "abbr": "fy"
+        },
+        {
+            "id": "wu_chang",
+            "name": "宿伞之魂",
+            "enName": "Wu Chang",
+            "abbr": "sszh"
+        },
+        {
+            "id": "dream_witch",
+            "name": "梦之女巫",
+            "enName": "Dream Witch",
+            "abbr": "mznw"
+        },
+        {
+            "id": "axe_boy",
+            "name": "爱哭鬼",
+            "enName": "Axe Boy",
+            "abbr": "akg"
+        },
+        {
+            "id": "evil_reptilian",
+            "name": "孽蜥",
+            "enName": "Evil Reptilian",
+            "abbr": "nx"
+        },
+        {
+            "id": "bloody_queen",
+            "name": "红夫人",
+            "enName": "Bloody Queen",
+            "abbr": "hfr"
+        },
+        {
+            "id": "guard_26",
+            "name": "26号守卫",
+            "enName": "Guard 26",
+            "abbr": "bw"
+        },
+        {
+            "id": "disciple",
+            "name": "使徒",
+            "enName": "Disciple",
+            "abbr": "st"
+        },
+        {
+            "id": "violinist",
+            "name": "小提琴家",
+            "enName": "Violinist",
+            "abbr": "xtqj"
+        },
+        {
+            "id": "sculptor",
+            "name": "雕刻家",
+            "enName": "Sculptor",
+            "abbr": "dkj"
+        },
+        {
+            "id": "undead",
+            "name": "博士",
+            "enName": "Undead",
+            "abbr": "bs"
+        },
+        {
+            "id": "breaking_wheel",
+            "name": "破轮",
+            "enName": "The Breaking Wheel",
+            "abbr": "pl"
+        },
+        {
+            "id": "naiad",
+            "name": "渔女",
+            "enName": "Naiad",
+            "abbr": "yn"
+        },
+        {
+            "id": "wax_artist",
+            "name": "蜡像师",
+            "enName": "Wax Artist",
+            "abbr": "lxs"
+        },
+        {
+            "id": "nightmare",
+            "name": "噩梦",
+            "enName": "Nightmare",
+            "abbr": "em"
+        },
+        {
+            "id": "clerk",
+            "name": "记录员",
+            "enName": "Clerk",
+            "abbr": "jly"
+        },
+        {
+            "id": "hermit",
+            "name": "隐士",
+            "enName": "Hermit",
+            "abbr": "ys"
+        },
+        {
+            "id": "night_watch",
+            "name": "守夜人",
+            "enName": "Night Watch",
+            "abbr": "syr"
+        },
+        {
+            "id": "opera_singer",
+            "name": "歌剧演员",
+            "enName": "Opera Singer",
+            "abbr": "gjyy"
+        },
+        {
+            "id": "fools_gold",
+            "name": "愚人金",
+            "enName": "Fool's Gold",
+            "abbr": "yrj"
+        },
+        {
+            "id": "shadow",
+            "name": "时空之影",
+            "enName": "The Shadow",
+            "abbr": "skzy"
+        },
+        {
+            "id": "hullabaloo",
+            "name": "喧嚣",
+            "enName": "The Hullabaloo",
+            "abbr": "xx"
+        },
+        {
+            "id": "grocer",
+            "name": "杂货商",
+            "enName": "Grocer",
+            "abbr": "zhs"
+        },
+        {
+            "id": "lame_sheep",
+            "name": "跛脚羊",
+            "enName": "Goatman",
+            "abbr": "bjy"
+        },
+        {
+            "id": "billiard_player",
+            "name": "台球手",
+            "enName": "Billiard Player",
+            "abbr": "tqs"
+        },
+        {
+            "id": "billiard_player1",
+            "name": "台球手1",
+            "enName": "Billiard Player1",
+            "abbr": "tqs1"
+        }
+    ],
+    "survivorTalents": [
+        {
+            "name": "回光返照",
+            "desc": "Featured talent"
+        },
+        {
+            "name": "飞轮效应",
+            "desc": "Featured talent"
+        },
+        {
+            "name": "化险为夷",
+            "desc": "Featured talent"
+        },
+        {
+            "name": "膝跳反射",
+            "desc": "Featured talent"
+        }
+    ],
+    "hunterTalents": [
+        {
+            "name": "封闭空间",
+            "desc": "Featured talent"
+        },
+        {
+            "name": "底牌",
+            "desc": "Featured talent"
+        },
+        {
+            "name": "张狂",
+            "desc": "Featured talent"
+        },
+        {
+            "name": "挽留",
+            "desc": "Featured talent"
+        }
+    ],
+    "hunterSkills": [
+        {
+            "name": "聆听",
+            "desc": "Trait"
+        },
+        {
+            "name": "失常",
+            "desc": "Trait"
+        },
+        {
+            "name": "兴奋",
+            "desc": "Trait"
+        },
+        {
+            "name": "巡视者",
+            "desc": "Trait"
+        },
+        {
+            "name": "传送",
+            "desc": "Trait"
+        },
+        {
+            "name": "窥视者",
+            "desc": "Trait"
+        },
+        {
+            "name": "闪现",
+            "desc": "Trait"
+        },
+        {
+            "name": "移行",
+            "desc": "Trait"
+        }
+    ]
+}

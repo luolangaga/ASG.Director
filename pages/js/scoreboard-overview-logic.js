@@ -47,6 +47,12 @@ let editMode = false
 let layout = {}
 let availableFonts = []
 
+function toFileUrl(src) {
+    const normalized = String(src || '').replace(/\\/g, '/')
+    if (normalized.startsWith('/')) return `file://${encodeURI(normalized)}`
+    return `file:///${encodeURI(normalized)}`
+}
+
 // 初始化
 async function init() {
     const urlParams = new URLSearchParams(window.location.search)
@@ -292,8 +298,8 @@ function applyLayout() {
             const img = document.getElementById(id)
             if (img && layout.textures[id]) {
                 let src = layout.textures[id]
-                if (!src.startsWith('file:///') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
-                    src = 'file:///' + src.replace(/\\/g, '/')
+                if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
+                    src = toFileUrl(src)
                 }
                 img.src = src
             }
@@ -304,8 +310,8 @@ function applyLayout() {
     if (layout.backgroundImage) {
         const bg = document.getElementById('backgroundImage')
         let src = layout.backgroundImage
-        if (!src.startsWith('file:///') && !window.__ASG_OBS_MODE__) {
-            src = 'file:///' + src.replace(/\\/g, '/')
+        if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__) {
+            src = toFileUrl(src)
         }
         bg.src = src
         bg.style.display = 'block'
@@ -317,8 +323,8 @@ function applyLayout() {
         // GAME表头统一贴图
         if (layout.textures.gameHeaderBg) {
             let src = layout.textures.gameHeaderBg
-            if (!src.startsWith('file:///') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
+                src = toFileUrl(src)
             }
             for (let i = 0; i < boCount; i++) {
                 const img = document.getElementById(`game${i + 1}HeaderBg`)
@@ -328,8 +334,8 @@ function applyLayout() {
         // A队GAME统一贴图
         if (layout.textures.gameABg) {
             let src = layout.textures.gameABg
-            if (!src.startsWith('file:///') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
+                src = toFileUrl(src)
             }
             for (let i = 0; i < boCount; i++) {
                 const img = document.getElementById(`game${i + 1}ABg`)
@@ -339,8 +345,8 @@ function applyLayout() {
         // B队GAME统一贴图
         if (layout.textures.gameBBg) {
             let src = layout.textures.gameBBg
-            if (!src.startsWith('file:///') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__ && !src.startsWith('data:')) {
+                src = toFileUrl(src)
             }
             for (let i = 0; i < boCount; i++) {
                 const img = document.getElementById(`game${i + 1}BBg`)
@@ -436,8 +442,8 @@ async function selectTexture(targetId) {
             const img = document.getElementById(targetId)
             if (img) {
                 let src = result.path
-                if (!src.startsWith('file:///')) {
-                    src = 'file:///' + src.replace(/\\/g, '/')
+                if (!src.startsWith('file:')) {
+                    src = toFileUrl(src)
                 }
                 img.src = src
 
@@ -475,8 +481,8 @@ async function selectBackground() {
         if (result.success && result.path) {
             const bg = document.getElementById('backgroundImage')
             let src = result.path
-            if (!src.startsWith('file:///')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:')) {
+                src = toFileUrl(src)
             }
             bg.src = src
             bg.style.display = 'block'
@@ -555,8 +561,8 @@ async function selectGameHeaderTexture() {
         const result = await window.electronAPI.selectOverviewTexture()
         if (result.success && result.path) {
             let src = result.path
-            if (!src.startsWith('file:///')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:')) {
+                src = toFileUrl(src)
             }
             // 应用到所有GAME表头
             for (let i = 0; i < boCount; i++) {
@@ -592,8 +598,8 @@ async function selectGameATexture() {
         const result = await window.electronAPI.selectOverviewTexture()
         if (result.success && result.path) {
             let src = result.path
-            if (!src.startsWith('file:///')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:')) {
+                src = toFileUrl(src)
             }
             // 应用到所有A队GAME
             for (let i = 0; i < boCount; i++) {
@@ -628,8 +634,8 @@ async function selectGameBTexture() {
         const result = await window.electronAPI.selectOverviewTexture()
         if (result.success && result.path) {
             let src = result.path
-            if (!src.startsWith('file:///')) {
-                src = 'file:///' + src.replace(/\\/g, '/')
+            if (!src.startsWith('file:')) {
+                src = toFileUrl(src)
             }
             // 应用到所有B队GAME
             for (let i = 0; i < boCount; i++) {

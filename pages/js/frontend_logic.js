@@ -1504,7 +1504,9 @@ function setBackground(path) {
     bg.style.backgroundImage = `url('${asStr}')`
   } else {
     const normalizedPath = asStr.replace(/\\/g, '/')
-    const fileUrl = `file:///${encodeURI(normalizedPath)}`
+    const fileUrl = normalizedPath.startsWith('/')
+      ? `file://${encodeURI(normalizedPath)}`
+      : `file:///${encodeURI(normalizedPath)}`
     console.log('[Frontend] setBackground: 设置背景URL(file):', fileUrl)
     bg.style.backgroundImage = `url('${fileUrl}')`
   }
@@ -2298,10 +2300,10 @@ function updateDisplay(state) {
           // OBS模式下禁用3D模型（file:///资源无法访问）
           const use3d = !window.__ASG_OBS_MODE__ && currentLayout && currentLayout.model3d && currentLayout.model3d.enabled
           const surDir = currentLayout && currentLayout.model3d ? currentLayout.model3d.survivorModelDir : null
-          const modelPath = (use3d && surDir) ? `${surDir}/${currentCharacter}.pmx` : null
+          const modelPath = (use3d && surDir && currentCharacter) ? `${surDir}/${currentCharacter}/${currentCharacter}.pmx` : null
           if (use3d && modelPath) {
             hideImage(el)
-            show3DModelForBox(el, modelPath, 'survivor')
+            show3DModelForBox(el, modelPath, 'survivor', surDir, currentCharacter)
           } else {
             dispose3DForBox(el.id)
             showImageForCharacter(el, 'survivor', currentCharacter)
@@ -2351,10 +2353,10 @@ function updateDisplay(state) {
         // OBS模式下禁用3D模型（file:///资源无法访问）
         const use3dHun = !window.__ASG_OBS_MODE__ && currentLayout && currentLayout.model3d && currentLayout.model3d.enabled
         const hunDir = currentLayout && currentLayout.model3d ? currentLayout.model3d.hunterModelDir : null
-        const modelPathHun = (use3dHun && hunDir) ? `${hunDir}/${currentHunter}.pmx` : null
+        const modelPathHun = (use3dHun && hunDir && currentHunter) ? `${hunDir}/${currentHunter}/${currentHunter}.pmx` : null
         if (use3dHun && modelPathHun) {
           hideImage(hunterEl)
-          show3DModelForBox(hunterEl, modelPathHun, 'hunter')
+          show3DModelForBox(hunterEl, modelPathHun, 'hunter', hunDir, currentHunter)
         } else {
           dispose3DForBox(hunterEl.id)
           showImageForCharacter(hunterEl, 'hunter', currentHunter)
@@ -2608,6 +2610,26 @@ function showImageForCharacter(boxEl, roleType, name) {
 }
 
 const _modelViewers = {}
+let _officialModelMap = null
+let _officialModelMapPromise = null
+
+async function getOfficialModelUrl(roleName) {
+  if (!roleName) return null
+  if (_officialModelMap && _officialModelMap[roleName]) return _officialModelMap[roleName]
+  if (!_officialModelMapPromise && window.electronAPI && typeof window.electronAPI.getOfficialModelMap === 'function') {
+    _officialModelMapPromise = window.electronAPI.getOfficialModelMap()
+      .then((map) => {
+        _officialModelMap = map || {}
+        return _officialModelMap
+      })
+      .catch(() => {
+        _officialModelMap = {}
+        return _officialModelMap
+      })
+  }
+  const map = _officialModelMapPromise ? await _officialModelMapPromise : _officialModelMap
+  return map && map[roleName] ? map[roleName] : null
+}
 
 // 全局错误捕获
 window.onerror = function (msg, url, lineNo, columnNo, error) {
@@ -2662,6 +2684,7 @@ async function ensureThree() {
   // 3. 按顺序加载插件和组件
   const components = [
     { name: 'TGALoader', file: 'TGALoader.js', path: 'loaders/' },
+    { name: 'GLTFLoader', file: 'GLTFLoader.js', path: 'loaders/' },
     { name: 'MMDToonShader', file: 'MMDToonShader.js', path: 'shaders/' },
     { name: 'MMDLoader', file: 'MMDLoader.js', path: 'loaders/' },
     { name: 'OutlineEffect', file: 'OutlineEffect.js', path: 'effects/' },
@@ -2723,19 +2746,36 @@ function toFileUrl(p) {
   return 'file://' + encodeURI(normalized).replace(/#/g, '%23').replace(/\?/g, '%3F')
 }
 
-async function show3DModelForBox(boxEl, modelPath, roleType) {
+async function show3DModelForBox(boxEl, modelPath, roleType, modelDir, modelName) {
   if (!boxEl) return
   console.log(`[3D] Starting load for ${roleType}: ${modelPath}`)
 
   const charName = boxEl.querySelector('.name')?.textContent || ''
 
-  // 检查文件是否存在
-  if (window.electronAPI && window.electronAPI.invoke) {
-    const exists = await window.electronAPI.invoke('check-file-exists', modelPath)
+  let isRemotePath = typeof modelPath === 'string' && (/^https?:\/\//i.test(modelPath) || modelPath.startsWith('file:'))
+  if (window.electronAPI && window.electronAPI.invoke && !isRemotePath) {
+    let exists = await window.electronAPI.invoke('check-file-exists', modelPath)
+    if (!exists && /\.pmx$/i.test(modelPath)) {
+      const gltfPath = modelPath.replace(/\.pmx$/i, '.gltf')
+      const glbPath = modelPath.replace(/\.pmx$/i, '.glb')
+      if (await window.electronAPI.invoke('check-file-exists', gltfPath)) {
+        modelPath = gltfPath
+        exists = true
+      } else if (await window.electronAPI.invoke('check-file-exists', glbPath)) {
+        modelPath = glbPath
+        exists = true
+      }
+    }
     if (!exists) {
-      console.error(`[3D] Model file not found: ${modelPath}`)
-      showImageForCharacter(boxEl, roleType, charName)
-      return
+      const officialUrl = await getOfficialModelUrl(charName)
+      if (officialUrl) {
+        modelPath = officialUrl
+        isRemotePath = true
+      } else {
+        console.error(`[3D] Model file not found: ${modelPath}`)
+        showImageForCharacter(boxEl, roleType, charName)
+        return
+      }
     }
   }
 
@@ -2788,6 +2828,8 @@ async function show3DModelForBox(boxEl, modelPath, roleType) {
     if (dir && name) motionPath = `${dir}/${name}.vmd`
   }
   if (!motionPath && cfg.defaultMotionVmd) motionPath = cfg.defaultMotionVmd
+  const isGltfModel = typeof modelPath === 'string' && /\.(gltf|glb)(\?|#|$)/i.test(modelPath)
+  if (isGltfModel) motionPath = null
 
   let container = boxEl.querySelector('.three-view')
   if (!container) {
@@ -2805,6 +2847,9 @@ async function show3DModelForBox(boxEl, modelPath, roleType) {
 
   const width = boxEl.clientWidth || 200
   const height = boxEl.clientHeight || 400
+  const scaleCorrection = Number(cfg.scaleCorrection ?? 1.0)
+  const verticalOffset = Number(cfg.verticalOffset ?? 0)
+  const fitOptions = { scaleCorrection, verticalOffset }
 
   let viewer = _modelViewers[id]
   const modelChanged = !viewer || viewer.modelPath !== modelPath
@@ -2853,8 +2898,9 @@ async function show3DModelForBox(boxEl, modelPath, roleType) {
       }
     }
 
-    if (motionPath) viewer.loadMMDWithVMD(modelPath, motionPath, onReady, onError, cfg.defaultMotionVmd || null)
-    else viewer.loadMMD(modelPath, onReady, onError)
+    if (isGltfModel) viewer.loadGLTF(modelPath, onReady, onError, fitOptions)
+    else if (motionPath) viewer.loadMMDWithVMD(modelPath, motionPath, onReady, onError, cfg.defaultMotionVmd || null, fitOptions)
+    else viewer.loadMMD(modelPath, onReady, onError, fitOptions)
   } else {
     container.style.opacity = '1'
     container.style.display = 'block'
@@ -3119,6 +3165,7 @@ function createModelViewer(container, {
 
   let mesh = null
   let animation = null
+  let animationMixer = null
   let rafId = null
   let lastTime = 0
   const minDelta = 1000 / Math.max(15, targetFPS)
@@ -3129,6 +3176,9 @@ function createModelViewer(container, {
       lastTime = ts
       const delta = clock.getDelta()
       try { helper.update(delta) } catch { }
+      if (animationMixer) {
+        try { animationMixer.update(delta) } catch { }
+      }
       // 使用 OutlineEffect 或普通渲染
       if (outlineEffect) {
         outlineEffect.render(scene, camera)
@@ -3177,10 +3227,23 @@ function createModelViewer(container, {
     }
   }
 
-  function fitModelToView(targetMesh) {
+  function fitModelToView(targetMesh, options = {}) {
     if (!targetMesh) return
     try {
-      // 确保骨骼和矩阵已更新，以便正确计算包围盒
+      const baseScale = targetMesh.userData.__fitBaseScale || targetMesh.scale.clone()
+      const basePos = targetMesh.userData.__fitBasePos || targetMesh.position.clone()
+      const baseRot = targetMesh.userData.__fitBaseRot || targetMesh.rotation.clone()
+      if (!targetMesh.userData.__fitBaseScale) targetMesh.userData.__fitBaseScale = baseScale.clone()
+      if (!targetMesh.userData.__fitBasePos) targetMesh.userData.__fitBasePos = basePos.clone()
+      if (!targetMesh.userData.__fitBaseRot) targetMesh.userData.__fitBaseRot = baseRot.clone()
+      targetMesh.scale.copy(baseScale)
+      targetMesh.position.copy(basePos)
+      targetMesh.rotation.copy(baseRot)
+
+      const scaleCorrection = Number.isFinite(options.scaleCorrection) ? options.scaleCorrection : 1.0
+      const verticalOffset = Number.isFinite(options.verticalOffset) ? options.verticalOffset : 0
+      targetMesh.scale.multiplyScalar(scaleCorrection)
+
       targetMesh.updateMatrixWorld(true)
       const box = new THREE.Box3().setFromObject(targetMesh)
       const size = box.getSize(new THREE.Vector3())
@@ -3196,35 +3259,29 @@ function createModelViewer(container, {
       const dist = Math.abs(camera.position.z - center.z)
       const viewHeight = 2 * Math.tan((fov / 2) * Math.PI / 180) * dist
 
-      // 角色模型直接顶到组件顶端，不再预留边距
-      const topMarginRatio = 0.0
-      const targetHeight = viewHeight * 1.0 // 整体占满高度
-      const scale = targetHeight / size.y
-      targetMesh.scale.set(scale, scale, scale)
-
-      // 重新计算缩放后的中心和大小
       targetMesh.updateMatrixWorld(true)
       box.setFromObject(targetMesh)
       const newSize = box.getSize(new THREE.Vector3())
       const newCenter = box.getCenter(new THREE.Vector3())
 
-      // 设置位置：顶部直接对齐到视野顶部
+      // 设置位置：顶部对齐到视野顶部
       const viewTopY = viewHeight / 2
       const targetTopY = viewTopY
       const currentTopY = newCenter.y + (newSize.y / 2)
 
-      targetMesh.position.y += (targetTopY - currentTopY)
+      targetMesh.position.y += (targetTopY - currentTopY) + (verticalOffset * viewHeight)
       targetMesh.position.x = -newCenter.x
       targetMesh.position.z = 0 // 确保在原点平面
 
-      console.log('[3D] Model fitted. Scale:', scale.toFixed(4), 'TopY:', targetTopY.toFixed(2))
+      console.log('[3D] Model fitted. Scale:', scaleCorrection.toFixed(4), 'TopY:', targetTopY.toFixed(2))
     } catch (e) {
       console.error('[3D] Error fitting model:', e)
     }
   }
 
-  function loadMMD(modelPath, onReady, onError) {
+  function loadMMD(modelPath, onReady, onError, options = {}) {
     console.log('[3D] Loading MMD model:', modelPath)
+    animationMixer = null
     const loader = new THREE.MMDLoader()
     const url = toFileUrl(modelPath)
 
@@ -3249,7 +3306,7 @@ function createModelViewer(container, {
           })
         }
 
-        fitModelToView(mesh)
+        fitModelToView(mesh, options)
         scene.add(mesh)
 
         if (typeof onReady === 'function') onReady()
@@ -3268,8 +3325,9 @@ function createModelViewer(container, {
     }
   }
 
-  function loadMMDWithVMD(modelPath, vmdPath, onReady, onError, fallbackVmd) {
+  function loadMMDWithVMD(modelPath, vmdPath, onReady, onError, fallbackVmd, options = {}) {
     console.log('[3D] Loading MMD with VMD:', modelPath, vmdPath)
+    animationMixer = null
     const loader = new THREE.MMDLoader()
     const modelUrl = toFileUrl(modelPath)
     const vmdUrl = toFileUrl(vmdPath)
@@ -3289,7 +3347,7 @@ function createModelViewer(container, {
         mesh = m
         animation = a
 
-        fitModelToView(mesh)
+        fitModelToView(mesh, options)
         scene.add(mesh)
 
         if (animation) {
@@ -3306,14 +3364,49 @@ function createModelViewer(container, {
         console.error('[3D] Error loading MMD with VMD:', modelPath, err)
         if (fallbackVmd && fallbackVmd !== vmdPath) {
           console.log('[3D] Trying fallback VMD:', fallbackVmd)
-          loadMMDWithVMD(modelPath, fallbackVmd, onReady, onError, null)
+          loadMMDWithVMD(modelPath, fallbackVmd, onReady, onError, null, options)
         } else {
           console.log('[3D] Falling back to model only load')
-          loadMMD(modelPath, onReady, onError)
+          loadMMD(modelPath, onReady, onError, options)
         }
       })
     } catch (e) {
       console.error('[3D] Fatal error in loader.loadWithAnimation:', e)
+      if (typeof onError === 'function') onError(e)
+    }
+  }
+
+  function loadGLTF(modelPath, onReady, onError, options = {}) {
+    console.log('[3D] Loading GLTF model:', modelPath)
+    const loader = new THREE.GLTFLoader()
+    const url = toFileUrl(modelPath)
+    try {
+      loader.load(url, (gltf) => {
+        mesh = gltf.scene
+        fitModelToView(mesh, options)
+        scene.add(mesh)
+        if (animationMixer) {
+          try { animationMixer.stopAllAction() } catch { }
+        }
+        animationMixer = null
+        if (gltf.animations && gltf.animations.length) {
+          animationMixer = new THREE.AnimationMixer(mesh)
+          gltf.animations.forEach((clip) => {
+            try { animationMixer.clipAction(clip).play() } catch { }
+          })
+        }
+        if (typeof onReady === 'function') onReady()
+      }, (xhr) => {
+        if (xhr.lengthComputable) {
+          const percentComplete = xhr.loaded / xhr.total * 100
+          console.log('[3D] Download progress:', Math.round(percentComplete, 2) + '%')
+        }
+      }, (err) => {
+        console.error('[3D] Error loading GLTF model:', modelPath, err)
+        if (typeof onError === 'function') onError(err)
+      })
+    } catch (e) {
+      console.error('[3D] Fatal error in GLTF loader:', e)
       if (typeof onError === 'function') onError(e)
     }
   }
@@ -3329,6 +3422,7 @@ function createModelViewer(container, {
   function dispose() {
     try { cancelAnimationFrame(rafId) } catch { }
     try { if (mesh) helper.remove(mesh) } catch { }
+    try { if (animationMixer) { animationMixer.stopAllAction(); animationMixer.uncacheRoot(mesh) } } catch { }
     try { renderer.dispose() } catch { }
     try { while (scene.children.length) { scene.remove(scene.children[0]) } } catch { }
     try { container.innerHTML = '' } catch { }
@@ -3344,7 +3438,7 @@ function createModelViewer(container, {
 
   return {
     renderer, scene, camera, helper, clock, mesh,
-    setSize, dispose, loadMMD, loadMMDWithVMD,
+    setSize, dispose, loadMMD, loadMMDWithVMD, loadGLTF,
     updateLighting, updateOutline,
     modelPath: null, motionPath: null
   }

@@ -51,7 +51,7 @@ function safeRemoveDir(dir) {
       // Windows 下文件可能被占用，需要多次尝试
       let retries = 3
       let lastError = null
-      
+
       for (let i = 0; i < retries; i++) {
         try {
           fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
@@ -69,7 +69,7 @@ function safeRemoveDir(dir) {
           }
         }
       }
-      
+
       if (lastError) {
         console.warn('[PackManager] 删除目录失败 (将在程序退出时自动清理):', dir, lastError.message)
       }
@@ -127,6 +127,23 @@ function remapLayoutAssetPaths(layout) {
   // 角色展示窗口背景（本地BP）
   if (layout.characterDisplayLayout && typeof layout.characterDisplayLayout === 'object' && layout.characterDisplayLayout.backgroundImage) {
     layout.characterDisplayLayout.backgroundImage = remapOne(layout.characterDisplayLayout.backgroundImage)
+  }
+
+  // 总览比分板（Total Scoreboard）
+  if (layout.scoreboardOverviewLayout && typeof layout.scoreboardOverviewLayout === 'object') {
+    // 背景图
+    if (layout.scoreboardOverviewLayout.backgroundImage) {
+      layout.scoreboardOverviewLayout.backgroundImage = remapOne(layout.scoreboardOverviewLayout.backgroundImage)
+    }
+    // 贴图 textures
+    if (layout.scoreboardOverviewLayout.textures && typeof layout.scoreboardOverviewLayout.textures === 'object') {
+      for (const key of Object.keys(layout.scoreboardOverviewLayout.textures)) {
+        const texPath = layout.scoreboardOverviewLayout.textures[key]
+        if (texPath && typeof texPath === 'string' && !texPath.startsWith('data:')) {
+          layout.scoreboardOverviewLayout.textures[key] = remapOne(texPath)
+        }
+      }
+    }
   }
 
   return layout
@@ -214,7 +231,7 @@ async function prepareExportDir(options = {}) {
       console.warn('[PackManager] V2 布局文件无效，跳过导出:', e.message)
     }
   }
-  
+
   // 如果没有有效的布局文件，创建一个默认的
   if (!hasValidLayout) {
     console.log('[PackManager] 未找到有效布局，创建默认布局')
@@ -303,7 +320,7 @@ async function exportPack(options = {}) {
         // 忽略错误，后续会创建默认布局
       }
     }
-    
+
     if (!hasLayout) {
       const response = await dialog.showMessageBox({
         type: 'warning',
@@ -314,12 +331,12 @@ async function exportPack(options = {}) {
         defaultId: 0,
         cancelId: 1
       })
-      
+
       if (response.response === 1) {
         return { success: false, canceled: true }
       }
     }
-    
+
     // 选择保存路径
     const result = await dialog.showSaveDialog({
       title: '导出BP布局包',
@@ -342,7 +359,7 @@ async function exportPack(options = {}) {
 
     // 压缩为 ZIP
     const zipResult = await zipDirectory(tempDir, result.filePath)
-    
+
     if (!zipResult.success) {
       throw new Error('压缩失败')
     }
@@ -415,19 +432,19 @@ async function importPack(options = {}) {
     const layoutV2File = path.join(tempDir, 'layout-v2.json')
     const layoutFile = path.join(tempDir, 'layout.json')
     let layout = null
-    
+
     if (fs.existsSync(layoutV2File)) {
       // 新版 V2 布局格式
       try {
         const content = fs.readFileSync(layoutV2File, 'utf8').trim()
         console.log('[PackManager] 发现 V2 布局文件，大小:', content.length, '字节')
-        
+
         if (content) {
           const v2Layout = remapLayoutAssetPaths(JSON.parse(content))
           // 直接保存到 layout-v2.json，并同步写入 layout.json（当前应用仍主要读取 layout.json）
           fs.writeFileSync(layoutV2Path, JSON.stringify(v2Layout, null, 2))
           fs.writeFileSync(layoutPath, JSON.stringify(v2Layout, null, 2))
-          console.log('[PackManager] V2 布局文件已导入，包含页面:', 
+          console.log('[PackManager] V2 布局文件已导入，包含页面:',
             Object.keys(v2Layout).filter(k => k.startsWith('frontend') || k.startsWith('scoreboard'))
           )
           layout = v2Layout
@@ -440,10 +457,10 @@ async function importPack(options = {}) {
       try {
         const stats = fs.statSync(layoutFile)
         console.log('[PackManager] 布局文件大小:', stats.size, '字节')
-        
+
         const content = fs.readFileSync(layoutFile, 'utf8')
         console.log('[PackManager] 读取到的内容长度:', content.length)
-        
+
         const trimmedContent = content.trim()
         if (!trimmedContent) {
           console.warn('[PackManager] 布局文件为空，使用默认布局')
@@ -490,7 +507,7 @@ async function importPack(options = {}) {
     const extractedFiles = fs.readdirSync(tempDir)
     for (const file of extractedFiles) {
       if (file === 'layout.json' || file === 'layout-v2.json' || file === 'pack-config.json' || file === 'fonts') continue
-      
+
       const srcPath = path.join(tempDir, file)
       if (fs.statSync(srcPath).isFile()) {
         const destPath = path.join(bgImagePath, file)
@@ -536,7 +553,7 @@ async function importPack(options = {}) {
 
     // 应用窗口配置
     await applyPackData(packData, windowRefs)
-  
+
     // 通知窗口重新加载布局
     const { frontendWindow, scoreboardWindowA, scoreboardWindowB, postMatchWindow } = windowRefs
     if (frontendWindow && !frontendWindow.isDestroyed()) {
@@ -610,11 +627,11 @@ async function applyPackData(packData, windowRefs) {
  */
 async function installFromStore(packFilePath, packInfo, options = {}) {
   const { windowRefs = {} } = options
-  
+
   // 使用导入功能
-  const result = await importPack({ 
-    windowRefs, 
-    filePath: packFilePath 
+  const result = await importPack({
+    windowRefs,
+    filePath: packFilePath
   })
 
   if (result.success) {
@@ -663,7 +680,7 @@ async function refreshWindows(windowRefs) {
  */
 function saveInstalledPack(packInfo) {
   let installed = []
-  
+
   try {
     if (fs.existsSync(installedPacksPath)) {
       installed = JSON.parse(fs.readFileSync(installedPacksPath, 'utf8'))
@@ -752,7 +769,7 @@ async function resetLayout(windowRefs = {}) {
     }
     await clearScoreboardLegacyLocalStorage(scoreboardWindowA)
     await clearScoreboardLegacyLocalStorage(scoreboardWindowB)
-    
+
     // 通知比分板窗口重新加载
     if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
       scoreboardWindowA.webContents.send('reload-layout-from-pack')

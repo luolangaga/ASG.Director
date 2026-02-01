@@ -88,6 +88,274 @@ ipcMain.handle('check-file-exists', (event, filePath) => {
   return fs.existsSync(filePath)
 })
 
+ipcMain.handle('find-texture-dir', async (event, modelPath) => {
+  try {
+    if (!modelPath) return null
+    const modelDir = path.dirname(modelPath)
+    if (!fs.existsSync(modelDir)) return null
+
+    // 1. 检查当前目录是否有图片
+    const files = fs.readdirSync(modelDir)
+    const imageExtensions = ['.tga', '.png', '.bmp', '.jpg', '.jpeg']
+    const hasImages = files.some(f => imageExtensions.includes(path.extname(f).toLowerCase()))
+    if (hasImages) return null // 默认当前目录
+
+    // 2. 检查子目录
+    const entries = fs.readdirSync(modelDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const subDir = path.join(modelDir, entry.name)
+        try {
+          const subFiles = fs.readdirSync(subDir)
+          if (subFiles.some(f => imageExtensions.includes(path.extname(f).toLowerCase()))) {
+            return subDir
+          }
+        } catch {}
+      }
+    }
+  } catch (e) {
+    console.error('[Main] find-texture-dir error:', e)
+  }
+  return null
+})
+
+let officialModelMapCache = null
+let officialModelMapMtime = 0
+let officialModelDownloadPromise = null
+
+function sanitizeFileSegment(name) {
+  if (!name) return 'role'
+  const normalized = String(name)
+    .replace(/["'“”‘’]/g, '')
+    .trim()
+  return normalized.replace(/[\\/:*?<>|]/g, '_').trim() || 'role'
+}
+
+function getOfficialModelCacheDir() {
+  return path.join(userDataPath, 'official-models')
+}
+
+function buildOfficialModelEntries() {
+  const candidates = [
+    path.join(__dirname, 'extracted_roles.json'),
+    path.join(__dirname, '..', 'ASG.Api', 'extracted_roles.json')
+  ]
+  let filePath = null
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      filePath = p
+      break
+    }
+  }
+  if (!filePath) return []
+  const data = readJsonFileSafe(filePath, {})
+  const list = [
+    ...(Array.isArray(data.survivors) ? data.survivors : []),
+    ...(Array.isArray(data.hunters) ? data.hunters : [])
+  ]
+  const entries = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const nameRaw = item.zy || item.name
+    const modelUrl = item.model
+    if (!nameRaw || !modelUrl) continue
+    
+    // 统一去除引号，确保匹配准确
+    const name = nameRaw.replace(/["'“”‘’]/g, '')
+    
+    try {
+      const urlObj = new URL(modelUrl)
+      const baseName = path.basename(urlObj.pathname)
+      const safeName = sanitizeFileSegment(name)
+      const localDir = path.join(getOfficialModelCacheDir(), safeName)
+      const localPath = path.join(localDir, baseName)
+      entries.push({ name, rawName: nameRaw, modelUrl, localPath })
+    } catch {
+      continue
+    }
+  }
+  return entries
+}
+
+function getOfficialModelDownloadStatus() {
+  const entries = buildOfficialModelEntries()
+  let downloaded = 0
+  for (const item of entries) {
+    if (item.localPath && fs.existsSync(item.localPath)) downloaded++
+  }
+  return {
+    total: entries.length,
+    downloaded,
+    complete: entries.length > 0 && downloaded === entries.length
+  }
+}
+
+function loadOfficialModelMap() {
+  const candidates = [
+    path.join(__dirname, 'extracted_roles.json'),
+    path.join(__dirname, '..', 'ASG.Api', 'extracted_roles.json')
+  ]
+  let filePath = null
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      filePath = p
+      break
+    }
+  }
+  if (!filePath) return {}
+  try {
+    const stat = fs.statSync(filePath)
+    if (officialModelMapCache && officialModelMapMtime === stat.mtimeMs) {
+      return officialModelMapCache
+    }
+    const map = {}
+    const entries = buildOfficialModelEntries()
+    for (const item of entries) {
+      if (!item || !item.name) continue
+      const target = (item.localPath && fs.existsSync(item.localPath)) ? item.localPath : item.modelUrl
+      
+      map[item.name] = target
+      // 同时也映射原始名称（带引号的），防止前端查找失败
+      if (item.rawName && item.rawName !== item.name) {
+        map[item.rawName] = target
+      }
+    }
+    officialModelMapCache = map
+    officialModelMapMtime = stat.mtimeMs
+    return map
+  } catch (e) {
+    return {}
+  }
+}
+
+ipcMain.handle('get-official-model-map', () => {
+  return loadOfficialModelMap()
+})
+
+ipcMain.handle('get-official-model-download-status', () => {
+  return getOfficialModelDownloadStatus()
+})
+
+ipcMain.handle('prepare-official-models', async (event) => {
+  if (officialModelDownloadPromise) return officialModelDownloadPromise
+  officialModelDownloadPromise = (async () => {
+    const entries = buildOfficialModelEntries()
+    const total = entries.length
+    let downloaded = 0
+    let skipped = 0
+    for (let i = 0; i < entries.length; i++) {
+      const item = entries[i]
+      if (!item || !item.modelUrl || !item.localPath) continue
+
+      // 1. 确保主文件存在
+      if (!fs.existsSync(item.localPath)) {
+        await downloadFile(item.modelUrl, item.localPath, {
+          maxRetries: 3,
+          onProgress: (progress) => {
+            const overall = Math.round(((i + (progress / 100)) / Math.max(1, total)) * 100)
+            event.sender.send('official-models-download-progress', {
+              current: i + 1,
+              total,
+              roleName: item.name,
+              progress,
+              overall
+            })
+          }
+        })
+      } else {
+        skipped++
+      }
+
+      // 2. 如果是 GLTF，解析并下载依赖资源（bin, textures）
+      if (item.localPath.toLowerCase().endsWith('.gltf')) {
+        await ensureGltfDependencies(item.modelUrl, item.localPath)
+      }
+
+      downloaded++
+      event.sender.send('official-models-download-progress', {
+        current: i + 1,
+        total,
+        roleName: item.name,
+        progress: 100,
+        overall: Math.round((downloaded / Math.max(1, total)) * 100)
+      })
+    }
+    officialModelMapCache = null
+    return { success: true, total, downloaded, skipped }
+  })().finally(() => {
+    officialModelDownloadPromise = null
+  })
+  return officialModelDownloadPromise
+})
+
+ipcMain.handle('list-map-assets', async () => {
+  try {
+    // 使用 app.getAppPath() 确保路径正确，兼容开发和打包环境
+    const appPath = app.getAppPath()
+    const mapDir = path.join(appPath, 'assets', 'map')
+    
+    // 再次检查，如果 appPath 指向 asar，可能需要特殊处理（但 fs 模块通常支持）
+    if (!fs.existsSync(mapDir)) {
+      console.warn('[Main] Map dir not found at:', mapDir)
+      return { success: true, maps: [] }
+    }
+    const files = fs.readdirSync(mapDir)
+    const names = files
+      .filter(f => typeof f === 'string')
+      .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f))
+      .map(f => path.parse(f).name)
+      .filter(n => n && typeof n === 'string')
+
+    const unique = Array.from(new Set(names))
+    unique.sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
+    return { success: true, maps: unique }
+  } catch (error) {
+    console.error('[Main] Failed to list map assets:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+async function ensureGltfDependencies(modelUrl, localPath) {
+  try {
+    const content = fs.readFileSync(localPath, 'utf8')
+    const gltf = JSON.parse(content)
+    const dependencies = []
+
+    // 收集 buffer 依赖
+    if (gltf.buffers) {
+      for (const buffer of gltf.buffers) {
+        if (buffer.uri && !buffer.uri.startsWith('data:')) {
+          dependencies.push(buffer.uri)
+        }
+      }
+    }
+
+    // 收集图片依赖
+    if (gltf.images) {
+      for (const image of gltf.images) {
+        if (image.uri && !image.uri.startsWith('data:')) {
+          dependencies.push(image.uri)
+        }
+      }
+    }
+
+    // 下载依赖
+    for (const uri of dependencies) {
+      // 处理相对路径
+      const depUrl = new URL(uri, modelUrl).toString()
+      const localDir = path.dirname(localPath)
+      const depLocalPath = path.join(localDir, uri) // 简单拼接，假设 uri 是相对文件名
+
+      if (!fs.existsSync(depLocalPath)) {
+        console.log(`[Main] Downloading dependency for ${path.basename(localPath)}: ${uri}`)
+        await downloadFile(depUrl, depLocalPath, { maxRetries: 3 })
+      }
+    }
+  } catch (e) {
+    console.warn(`[Main] Failed to process GLTF dependencies for ${localPath}:`, e.message)
+  }
+}
+
 ipcMain.on('open-devtools', (event) => {
   const webContents = event.sender
   if (webContents) {
@@ -273,6 +541,17 @@ ipcMain.handle('switch-environment', (event, env) => {
 
 // 创建主窗口（链接展示）
 function createMainWindow() {
+  // 确保首次运行标志被设置，防止欢迎页面重复弹出
+  try {
+    const config = readJsonFileSafe(configPath, {})
+    if (!config.hasRunBefore) {
+      config.hasRunBefore = true
+      writeJsonFileSafe(configPath, config)
+    }
+  } catch (e) {
+    console.error('[Main] Failed to ensure hasRunBefore flag:', e)
+  }
+
   mainWindow = new BrowserWindow({
     width: 800,
     height: 700,
@@ -573,13 +852,14 @@ function createScoreboardWindow(roomId, team) {
     console.error('[Scoreboard] Failed to load window bounds:', e)
   }
 
+  const windowTitle = `导播 - ${team === 'teamA' ? 'A队' : 'B队'}比分板`
   const newWindow = new BrowserWindow({
     ...windowBounds,
-    title: `导播 - ${team === 'teamA' ? 'A队' : 'B队'}比分板`,
-    frame: false,
+    title: windowTitle,
+    frame: true,
     transparent: true,
     backgroundColor: '#00000000',
-    titleBarStyle: 'hidden',
+    resizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -587,11 +867,42 @@ function createScoreboardWindow(roomId, team) {
     }
   })
 
+  newWindow.setTitle(windowTitle)
+  newWindow.on('page-title-updated', (event) => {
+    event.preventDefault()
+    newWindow.setTitle(windowTitle)
+  })
+
   // 传递 roomId 和 team 参数
   const params = new URLSearchParams({ roomId: roomId || '', team: team })
   newWindow.loadFile('pages/scoreboard.html', { search: params.toString() })
 
+  let resizeTimer = null
+  newWindow.on('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      if (!newWindow || newWindow.isDestroyed()) return
+      try {
+        const bounds = newWindow.getBounds()
+        let layout = {}
+        try {
+          if (fs.existsSync(layoutPath)) {
+            const content = fs.readFileSync(layoutPath, 'utf8')
+            layout = content ? JSON.parse(content) : {}
+          }
+        } catch {
+          layout = {}
+        }
+        if (!layout.windowBounds) layout.windowBounds = {}
+        const boundsKey = team === 'teamA' ? 'scoreboardABounds' : 'scoreboardBBounds'
+        layout.windowBounds[boundsKey] = bounds
+        fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
+      } catch {}
+    }, 500)
+  })
+
   newWindow.on('closed', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
     if (team === 'teamA') scoreboardWindowA = null
     else scoreboardWindowB = null
   })
@@ -3138,33 +3449,35 @@ function __loadCharacterDisplayLayoutFromDiskIntoState__() {
 let characterIndexCache = null
 
 // 角色管理配置文件路径
-const characterConfigPath = path.join(app.getPath('userData'), 'characters.json')
+const characterConfigPath = path.join(__dirname, 'roles.json')
 
 function loadCharacterIndex() {
   if (characterIndexCache) return characterIndexCache
 
+  let rolesData = { survivors: [], hunters: [] }
+  try {
+    if (fs.existsSync(characterConfigPath)) {
+      const content = fs.readFileSync(characterConfigPath, 'utf-8')
+      rolesData = JSON.parse(content)
+    }
+  } catch (e) {
+    console.error('Error loading roles.json:', e)
+  }
+
+  // 提取单纯的名称列表，用于保持与旧逻辑兼容
+  const survivors = Array.isArray(rolesData.survivors) ? rolesData.survivors.map(c => typeof c === 'string' ? c : c.name) : []
+  const hunters = Array.isArray(rolesData.hunters) ? rolesData.hunters.map(c => typeof c === 'string' ? c : c.name) : []
+
   const assetsPath = path.join(app.getAppPath(), 'assets')
-  const surHalfPath = path.join(assetsPath, 'surHalf')
-  const hunHalfPath = path.join(assetsPath, 'hunHalf')
   const surBigPath = path.join(assetsPath, 'surBig')
   const hunBigPath = path.join(assetsPath, 'hunBig')
 
-  const survivors = fs.existsSync(surHalfPath)
-    ? fs.readdirSync(surHalfPath).filter(f => f.endsWith('.png')).map(f => f.replace('.png', ''))
-    : []
-  const hunters = fs.existsSync(hunHalfPath)
-    ? fs.readdirSync(hunHalfPath).filter(f => f.endsWith('.png')).map(f => f.replace('.png', ''))
-    : []
-
   // 检查全身图是否存在
-  const survivorsBig = fs.existsSync(surBigPath)
-    ? fs.readdirSync(surBigPath).filter(f => f.endsWith('.png')).map(f => f.replace('.png', ''))
-    : []
-  const huntersBig = fs.existsSync(hunBigPath)
-    ? fs.readdirSync(hunBigPath).filter(f => f.endsWith('.png')).map(f => f.replace('.png', ''))
-    : []
+  const survivorsBig = survivors.filter(name => fs.existsSync(path.join(surBigPath, `${name}.png`)))
+  const huntersBig = hunters.filter(name => fs.existsSync(path.join(hunBigPath, `${name}.png`)))
 
   characterIndexCache = {
+    fullData: rolesData,
     survivors,
     hunters,
     survivorSet: new Set(survivors),
@@ -3189,23 +3502,27 @@ function getCharacterDetails() {
   const index = loadCharacterIndex()
   const assetsPath = path.join(app.getAppPath(), 'assets')
 
-  const survivorDetails = index.survivors.map(name => ({
-    name,
-    type: 'survivor',
-    halfImage: path.join(assetsPath, 'surHalf', `${name}.png`),
-    bigImage: index.survivorBigSet.has(name) ? path.join(assetsPath, 'surBig', `${name}.png`) : null,
-    hasHalfImage: true,
-    hasBigImage: index.survivorBigSet.has(name)
-  }))
+  const normalize = (c, type) => {
+    const isObj = typeof c === 'object' && c !== null
+    const name = isObj ? c.name : c
+    const folder = type === 'survivor' ? 'sur' : 'hun'
+    const hasBig = type === 'survivor' ? index.survivorBigSet.has(name) : index.hunterBigSet.has(name)
 
-  const hunterDetails = index.hunters.map(name => ({
-    name,
-    type: 'hunter',
-    halfImage: path.join(assetsPath, 'hunHalf', `${name}.png`),
-    bigImage: index.hunterBigSet.has(name) ? path.join(assetsPath, 'hunBig', `${name}.png`) : null,
-    hasHalfImage: true,
-    hasBigImage: index.hunterBigSet.has(name)
-  }))
+    return {
+      name,
+      type,
+      id: isObj ? c.id : null,
+      enName: isObj ? c.enName : null,
+      abbr: isObj ? c.abbr : null,
+      halfImage: path.join(assetsPath, `${folder}Half`, `${name}.png`),
+      bigImage: hasBig ? path.join(assetsPath, `${folder}Big`, `${name}.png`) : null,
+      hasHalfImage: true,
+      hasBigImage: hasBig
+    }
+  }
+
+  const survivorDetails = (index.fullData?.survivors || index.survivors).map(c => normalize(c, 'survivor'))
+  const hunterDetails = (index.fullData?.hunters || index.hunters).map(c => normalize(c, 'hunter'))
 
   return { survivors: survivorDetails, hunters: hunterDetails }
 }
@@ -3233,7 +3550,11 @@ ipcMain.handle('character:get-index', async () => {
         survivors: index.survivors,
         hunters: index.hunters,
         survivorsBig: index.survivorsBig,
-        huntersBig: index.huntersBig
+        huntersBig: index.huntersBig,
+        // 返回完整配置中的其他数据
+        survivorTalents: index.fullData?.survivorTalents || [],
+        hunterTalents: index.fullData?.hunterTalents || [],
+        hunterSkills: index.fullData?.hunterSkills || []
       }
     }
   } catch (error) {
@@ -3243,10 +3564,34 @@ ipcMain.handle('character:get-index', async () => {
 })
 
 // 添加角色
-ipcMain.handle('character:add', async (event, { name, type, halfImagePath, bigImagePath }) => {
+ipcMain.handle('character:add', async (event, { name, type, halfImagePath, bigImagePath, id, enName, abbr }) => {
   try {
     if (!name || !type) {
       return { success: false, error: '角色名称和类型不能为空' }
+    }
+
+    // 更新 JSON 配置
+    const index = loadCharacterIndex()
+    // 确保 fullData 结构完整
+    if (!index.fullData.survivors) index.fullData.survivors = []
+    if (!index.fullData.hunters) index.fullData.hunters = []
+
+    const list = type === 'survivor' ? index.fullData.survivors : index.fullData.hunters
+    // 检查重名
+    if (list.some(c => (typeof c === 'string' ? c : c.name) === name)) {
+      return { success: false, error: '角色已存在' }
+    }
+
+    list.push({
+      id: id || '',
+      name,
+      enName: enName || '',
+      abbr: abbr || ''
+    })
+    try {
+      fs.writeFileSync(characterConfigPath, JSON.stringify(index.fullData, null, 2))
+    } catch (e) {
+      console.error('Failed to write roles.json', e)
     }
 
     const assetsPath = path.join(app.getAppPath(), 'assets')
@@ -3276,10 +3621,30 @@ ipcMain.handle('character:add', async (event, { name, type, halfImagePath, bigIm
 })
 
 // 更新角色
-ipcMain.handle('character:update', async (event, { oldName, newName, type, halfImagePath, bigImagePath }) => {
+ipcMain.handle('character:update', async (event, { oldName, newName, type, halfImagePath, bigImagePath, id, enName, abbr }) => {
   try {
     if (!oldName || !type) {
       return { success: false, error: '角色名称和类型不能为空' }
+    }
+
+    // 更新 JSON 配置
+    const index = loadCharacterIndex()
+    const list = type === 'survivor' ? index.fullData.survivors : index.fullData.hunters
+    const entryIndex = list.findIndex(c => (typeof c === 'string' ? c : c.name) === oldName)
+
+    if (entryIndex !== -1) {
+      const title = newName || oldName
+      const oldEntry = list[entryIndex]
+      const updated = typeof oldEntry === 'string'
+        ? { id: id || '', name: title, enName: enName || '', abbr: abbr || '' }
+        : { ...oldEntry, name: title, id: id !== undefined ? id : oldEntry.id, enName: enName !== undefined ? enName : oldEntry.enName, abbr: abbr !== undefined ? abbr : oldEntry.abbr }
+
+      list[entryIndex] = updated
+      try {
+        fs.writeFileSync(characterConfigPath, JSON.stringify(index.fullData, null, 2))
+      } catch (e) {
+        console.error('Failed to save roles.json', e)
+      }
     }
 
     const assetsPath = path.join(app.getAppPath(), 'assets')
@@ -3326,6 +3691,20 @@ ipcMain.handle('character:delete', async (event, { name, type }) => {
   try {
     if (!name || !type) {
       return { success: false, error: '角色名称和类型不能为空' }
+    }
+
+    // 更新 JSON 配置
+    const index = loadCharacterIndex()
+    const list = type === 'survivor' ? index.fullData.survivors : index.fullData.hunters
+    const entryIndex = list.findIndex(c => (typeof c === 'string' ? c : c.name) === name)
+
+    if (entryIndex !== -1) {
+      list.splice(entryIndex, 1)
+      try {
+        fs.writeFileSync(characterConfigPath, JSON.stringify(index.fullData, null, 2))
+      } catch (e) {
+        console.error('Failed to save roles.json', e)
+      }
     }
 
     const assetsPath = path.join(app.getAppPath(), 'assets')
@@ -3549,9 +3928,21 @@ function createLocalBpWindow() {
     return localBpWindow
   }
 
+  // Reading saved window size configuration
+  let windowBounds = { width: 1200, height: 800 }
+  try {
+    if (fs.existsSync(layoutPath)) {
+      const layout = JSON.parse(fs.readFileSync(layoutPath, 'utf8'))
+      if (layout.windowBounds && layout.windowBounds.localBpBounds) {
+        windowBounds = layout.windowBounds.localBpBounds
+      }
+    }
+  } catch (e) {
+    console.error('[LocalBP] Failed to load window bounds:', e)
+  }
+
   localBpWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...windowBounds,
     title: '本地BP控制',
     resizable: true,
     webPreferences: {
@@ -3563,6 +3954,43 @@ function createLocalBpWindow() {
 
   localBpWindow.loadFile('pages/local-bp.html')
   localBpWindow.setMenu(null)
+
+  // Listen for window size changes and auto-save
+  let resizeTimer = null
+  const saveBounds = () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      if (!localBpWindow || localBpWindow.isDestroyed()) return
+
+      try {
+        const bounds = localBpWindow.getBounds()
+
+        // Read existing layout
+        let layout = {}
+        try {
+          if (fs.existsSync(layoutPath)) {
+            const content = fs.readFileSync(layoutPath, 'utf8')
+            layout = content ? JSON.parse(content) : {}
+          }
+        } catch (e) {
+          console.warn('[LocalBP] Read layout failed:', e.message)
+        }
+
+        // Update window dimensions
+        if (!layout.windowBounds) layout.windowBounds = {}
+        layout.windowBounds.localBpBounds = bounds
+
+        // Save
+        fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
+        console.log('[LocalBP] Window size auto-saved:', bounds)
+      } catch (e) {
+        console.error('[LocalBP] Auto-save window size failed:', e)
+      }
+    }, 500)
+  }
+
+  localBpWindow.on('resize', saveBounds)
+  localBpWindow.on('move', saveBounds)
 
   localBpWindow.on('closed', () => {
     localBpWindow = null
@@ -3641,27 +4069,7 @@ ipcMain.handle('open-local-frontend', () => {
   }
 })
 
-// 列出内置地图资源（assets/map 下的图片文件名，去扩展名）
-ipcMain.handle('list-map-assets', () => {
-  try {
-    const mapDir = path.join(__dirname, 'assets', 'map')
-    if (!fs.existsSync(mapDir)) {
-      return { success: true, maps: [] }
-    }
-    const files = fs.readdirSync(mapDir)
-    const names = files
-      .filter(f => typeof f === 'string')
-      .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f))
-      .map(f => path.parse(f).name)
-      .filter(n => n && typeof n === 'string')
 
-    const unique = Array.from(new Set(names))
-    unique.sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
-    return { success: true, maps: unique }
-  } catch (error) {
-    return { success: false, error: error.message, maps: [] }
-  }
-})
 
 ipcMain.handle('open-local-backend', () => {
   try {
@@ -3669,6 +4077,29 @@ ipcMain.handle('open-local-backend', () => {
     if (backendWindow && !backendWindow.isDestroyed()) {
       backendWindow.show()
       backendWindow.focus()
+    }
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('open-font-settings', () => {
+  try {
+    ensureLocalBackendWindow()
+    if (backendWindow && !backendWindow.isDestroyed()) {
+      const sendOpen = () => {
+        try {
+          backendWindow.webContents.send('open-font-settings')
+        } catch {}
+      }
+      backendWindow.show()
+      backendWindow.focus()
+      if (backendWindow.webContents && backendWindow.webContents.isLoading()) {
+        backendWindow.webContents.once('did-finish-load', sendOpen)
+      } else {
+        sendOpen()
+      }
     }
     return { success: true }
   } catch (error) {
@@ -3804,7 +4235,11 @@ try {
     return true
   }
 
-  global.__asgLocalBp.getState = () => localBpState
+  global.__asgLocalBp.getState = () => {
+    __loadCharacterDisplayLayoutFromDiskIntoState__()
+    __normalizeLocalBpStateInPlace__()
+    return localBpState
+  }
 
   global.__asgLocalBp.setSurvivor = (index, character) => {
     const i = Number(index)
@@ -3847,6 +4282,53 @@ try {
     broadcastLocalBpState()
     return true
   }
+
+  global.__asgLocalBp.saveCharacterDisplayLayout = (positions) => {
+    try {
+      if (!localBpState.characterDisplayLayout) {
+        localBpState.characterDisplayLayout = { positions: {} }
+      }
+      if (!localBpState.characterDisplayLayout.positions) {
+        localBpState.characterDisplayLayout.positions = {}
+      }
+
+      const incoming = (positions && typeof positions === 'object') ? positions : {}
+      const normalized = {}
+      for (const [id, pos] of Object.entries(incoming)) {
+        if (!id || !pos || typeof pos !== 'object') continue
+        const x = Number.isFinite(pos.x) ? pos.x : Number.isFinite(pos.left) ? pos.left : undefined
+        const y = Number.isFinite(pos.y) ? pos.y : Number.isFinite(pos.top) ? pos.top : undefined
+        const width = Number.isFinite(pos.width) ? pos.width : undefined
+        const height = Number.isFinite(pos.height) ? pos.height : undefined
+        const hidden = (typeof pos.hidden === 'boolean') ? pos.hidden : undefined
+        const zIndex = Number.isFinite(pos.zIndex) ? pos.zIndex : (typeof pos.zIndex === 'string' && pos.zIndex.trim() !== '' && Number.isFinite(Number(pos.zIndex)) ? Number(pos.zIndex) : undefined)
+        const fontSize = Number.isFinite(pos.fontSize) ? pos.fontSize : (typeof pos.fontSize === 'string' && pos.fontSize.trim() !== '' && Number.isFinite(Number(pos.fontSize)) ? Number(pos.fontSize) : undefined)
+        const textColor = (typeof pos.textColor === 'string' && pos.textColor.trim() !== '') ? pos.textColor.trim() : undefined
+        const fontFamily = (typeof pos.fontFamily === 'string' && pos.fontFamily.trim() !== '') ? pos.fontFamily.trim() : (pos.fontFamily === null ? null : undefined)
+        const displayMode = (pos.displayMode === 'full' || pos.displayMode === 'half') ? pos.displayMode : undefined
+
+        const item = {}
+        if (Number.isFinite(x)) item.x = x
+        if (Number.isFinite(y)) item.y = y
+        if (Number.isFinite(width)) item.width = width
+        if (Number.isFinite(height)) item.height = height
+        if (typeof hidden === 'boolean') item.hidden = hidden
+        if (Number.isFinite(zIndex)) item.zIndex = zIndex
+        if (Number.isFinite(fontSize)) item.fontSize = fontSize
+        if (typeof textColor === 'string') item.textColor = textColor
+        if (fontFamily === null || typeof fontFamily === 'string') item.fontFamily = fontFamily
+        if (typeof displayMode === 'string') item.displayMode = displayMode
+        normalized[id] = item
+      }
+
+      Object.assign(localBpState.characterDisplayLayout.positions, normalized)
+      __persistCharacterDisplayLayoutToDisk__()
+      broadcastLocalBpState()
+      return true
+    } catch (e) {
+      return false
+    }
+  }
 } catch (e) {
   try {
     console.error('[LocalBP] 暴露 global.__asgLocalBp 失败:', e?.message || e)
@@ -3870,6 +4352,20 @@ ipcMain.handle('localBp:addBanHunter', (event, character) => {
     if (!character) return { success: true }
     if (!localBpState.survivorBannedHunters.includes(character)) localBpState.survivorBannedHunters.push(character)
     broadcastLocalBpState()
+
+    // Send event
+    try {
+      const { eventBus } = require('./plugins/core/EventBus')
+      eventBus.publish('bp:character-banned', {
+        character,
+        type: 'hunter',
+        isHunter: true,
+        isGlobal: false
+      })
+    } catch (e) {
+      console.warn('[LocalBP] Send event failed:', e)
+    }
+
     return { success: true }
   } catch (error) {
     return { success: false, error: error.message }
@@ -4068,6 +4564,11 @@ ipcMain.handle('localBp:saveCharacterDisplayLayout', (event, positions) => {
       const width = Number.isFinite(pos.width) ? pos.width : undefined
       const height = Number.isFinite(pos.height) ? pos.height : undefined
       const hidden = (typeof pos.hidden === 'boolean') ? pos.hidden : undefined
+      const zIndex = Number.isFinite(pos.zIndex) ? pos.zIndex : (typeof pos.zIndex === 'string' && pos.zIndex.trim() !== '' && Number.isFinite(Number(pos.zIndex)) ? Number(pos.zIndex) : undefined)
+      const fontSize = Number.isFinite(pos.fontSize) ? pos.fontSize : (typeof pos.fontSize === 'string' && pos.fontSize.trim() !== '' && Number.isFinite(Number(pos.fontSize)) ? Number(pos.fontSize) : undefined)
+      const textColor = (typeof pos.textColor === 'string' && pos.textColor.trim() !== '') ? pos.textColor.trim() : undefined
+      const fontFamily = (typeof pos.fontFamily === 'string' && pos.fontFamily.trim() !== '') ? pos.fontFamily.trim() : (pos.fontFamily === null ? null : undefined)
+      const displayMode = (pos.displayMode === 'full' || pos.displayMode === 'half') ? pos.displayMode : undefined
 
       const item = {}
       if (Number.isFinite(x)) item.x = x
@@ -4075,6 +4576,11 @@ ipcMain.handle('localBp:saveCharacterDisplayLayout', (event, positions) => {
       if (Number.isFinite(width)) item.width = width
       if (Number.isFinite(height)) item.height = height
       if (typeof hidden === 'boolean') item.hidden = hidden
+      if (Number.isFinite(zIndex)) item.zIndex = zIndex
+      if (Number.isFinite(fontSize)) item.fontSize = fontSize
+      if (typeof textColor === 'string') item.textColor = textColor
+      if (fontFamily === null || typeof fontFamily === 'string') item.fontFamily = fontFamily
+      if (typeof displayMode === 'string') item.displayMode = displayMode
       normalized[id] = item
     }
 
@@ -4140,7 +4646,14 @@ ipcMain.handle('localBp:openCharacterDisplay', () => {
 ipcMain.handle('localBp:getCharacters', () => {
   try {
     const idx = loadCharacterIndex()
-    return { success: true, data: { survivors: idx.survivors, hunters: idx.hunters } }
+    return {
+      success: true,
+      data: {
+        survivors: idx.survivors,
+        hunters: idx.hunters,
+        fullData: idx.fullData
+      }
+    }
   } catch (error) {
     return { success: false, error: error.message }
   }
@@ -4352,12 +4865,28 @@ ipcMain.handle('scan-models', async (event, dir) => {
     if (!dir || !fs.existsSync(dir)) {
       return { success: false, error: '目录不存在' }
     }
-    const files = fs.readdirSync(dir)
-    const models = files.filter(f => f.toLowerCase().endsWith('.pmx')).map(f => ({
-      name: path.basename(f, '.pmx'),
-      path: path.join(dir, f),
-      exists: true
-    }))
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    const models = []
+    entries.forEach(entry => {
+      if (entry.isFile() && entry.name.toLowerCase().endsWith('.pmx')) {
+        models.push({
+          name: path.basename(entry.name, '.pmx'),
+          path: path.join(dir, entry.name),
+          exists: true
+        })
+        return
+      }
+      if (entry.isDirectory()) {
+        const pmxPath = path.join(dir, entry.name, `${entry.name}.pmx`)
+        if (fs.existsSync(pmxPath)) {
+          models.push({
+            name: entry.name,
+            path: pmxPath,
+            exists: true
+          })
+        }
+      }
+    })
     return { success: true, models }
   } catch (error) {
     return { success: false, error: error.message }

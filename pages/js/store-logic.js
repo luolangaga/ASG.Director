@@ -481,13 +481,15 @@ async function uploadPack() {
   const includeFrontendB = document.getElementById('uploadFrontendB').checked
   const includeScoreboardA = document.getElementById('uploadScoreboardA').checked
   const includeScoreboardB = document.getElementById('uploadScoreboardB').checked
+  const includeScoreboardOverview = document.getElementById('uploadScoreboardOverview').checked
+  const includeCharacterDisplay = document.getElementById('uploadCharacterDisplay').checked
 
   if (!name || !version || !author) {
     showToast('请填写必填项', 'error')
     return
   }
 
-  if (!includeFrontendA && !includeFrontendB && !includeScoreboardA && !includeScoreboardB) {
+  if (!includeFrontendA && !includeFrontendB && !includeScoreboardA && !includeScoreboardB && !includeScoreboardOverview && !includeCharacterDisplay) {
     showToast('请至少选择一个布局类型', 'error')
     return
   }
@@ -507,7 +509,9 @@ async function uploadPack() {
       'frontend-a': includeFrontendA,
       'frontend-b': includeFrontendB,
       'scoreboard-a': includeScoreboardA,
-      'scoreboard-b': includeScoreboardB
+      'scoreboard-b': includeScoreboardB,
+      'scoreboard-overview': includeScoreboardOverview,
+      'character-display': includeCharacterDisplay
     }
   }
 

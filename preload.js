@@ -122,6 +122,7 @@ const electronAPI = {
   saveFontConfig: (config) => ipcRenderer.invoke('save-font-config', config),
   getFontConfig: () => ipcRenderer.invoke('get-font-config'),
   getFontUrl: (fileName) => ipcRenderer.invoke('get-font-url', fileName),
+  openFontSettings: () => ipcRenderer.invoke('open-font-settings'),
   onFontConfigUpdated: (callback) => ipcRenderer.on('font-config-updated', (event, config) => callback(config)),
   onCustomFontsChanged: (callback) => ipcRenderer.on('custom-fonts-changed', (event, payload) => callback(payload)),
   getScoreboardOverviewLayout: () => ipcRenderer.invoke('get-scoreboard-overview-layout'),
@@ -164,6 +165,10 @@ const electronAPI = {
 
   // 插件系统
   openPluginManager: () => ipcRenderer.invoke('open-plugin-manager'),
+  getOfficialModelMap: () => ipcRenderer.invoke('get-official-model-map'),
+  getOfficialModelsDownloadStatus: () => ipcRenderer.invoke('get-official-model-download-status'),
+  prepareOfficialModels: () => ipcRenderer.invoke('prepare-official-models'),
+  onOfficialModelsDownloadProgress: (callback) => ipcRenderer.on('official-models-download-progress', (event, data) => callback(data)),
   getEnvironment: () => ipcRenderer.invoke('get-environment'),
   switchEnvironment: (env) => ipcRenderer.invoke('switch-environment', env),
   storeGetPacks: (params) => ipcRenderer.invoke('store-get-packs', params),

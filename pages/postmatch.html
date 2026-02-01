@@ -136,13 +136,35 @@
   <!-- 字体选择器弹窗 -->
   <div id="fontSelectorModal">
     <div class="modal-content">
-      <div
-        style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #ffd700;padding-bottom:8px;">
-        <h3 style="margin:0;color:#ffd700;">选择字体</h3>
-        <button onclick="closeFontSelector()"
-          style="background:transparent;border:none;color:#fff;cursor:pointer;font-size:20px;">×</button>
+      <div class="modal-header">
+        <h3>字体与样式设置</h3>
+        <button class="close-btn" onclick="closeFontSelector()">×</button>
       </div>
       <div id="fontSelectorList"></div>
+
+      <div class="font-color-section">
+        <h4>字体大小 (px)</h4>
+        <div class="color-picker-container" style="gap: 10px; align-items: center;">
+          <input type="number" id="fontSizeInput" min="8" max="200" step="1"
+            style="width: 80px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff;">
+          <input type="range" id="fontSizeRange" min="8" max="200" step="1" style="flex: 1;">
+        </div>
+      </div>
+
+      <div class="font-color-section">
+        <h4>文字颜色</h4>
+        <div class="color-picker-container">
+          <input type="color" id="textColorPicker" value="#ffffff" />
+          <div class="color-presets-inline">
+            <div class="color-preset-inline" style="background: #ffffff;" data-color="#ffffff"></div>
+            <div class="color-preset-inline" style="background: #ffd700;" data-color="#ffd700"></div>
+            <div class="color-preset-inline" style="background: #ff4444;" data-color="#ff4444"></div>
+            <div class="color-preset-inline" style="background: #64ffda;" data-color="#64ffda"></div>
+            <div class="color-preset-inline" style="background: #64b5f6;" data-color="#64b5f6"></div>
+            <div class="color-preset-inline" style="background: #9c27b0;" data-color="#9c27b0"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

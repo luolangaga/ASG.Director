@@ -64,12 +64,20 @@ function init() {
         } catch (e) {
           console.warn('设置本地模式状态失败', e)
         }
+        // 即使是本地模式，也尝试加载一次角色列表
+        loadAllCharacters()
         return
       }
+
+      // 获取角色列表
+      loadAllCharacters()
 
       connectToServer()
     })
   }
+
+  // 初始尝试加载
+  loadAllCharacters()
 
   // 监听主题变更消息（来自主窗口）
   if (window.electronAPI) {
@@ -91,6 +99,16 @@ function init() {
         const saved = localStorage.getItem('asg_theme')
         if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark')
         else document.documentElement.removeAttribute('data-theme')
+      })
+    }
+
+    if (window.electronAPI.on) {
+      window.electronAPI.on('open-font-settings', async () => {
+        try {
+          await openFontSettings()
+        } catch (e) {
+          console.error('打开字体设置失败:', e)
+        }
       })
     }
   }
@@ -443,6 +461,13 @@ function savePostMatch() {
   }
   const data = collectPostMatchFromForm()
   localStorage.setItem(`postmatch_${roomData.roomId}`, JSON.stringify(data))
+  if (window.electronAPI && window.electronAPI.sendToFrontend) {
+    window.electronAPI.sendToFrontend({
+      type: 'postmatch',
+      roomId: roomData.roomId,
+      postMatchData: data
+    })
+  }
   addLog('赛后数据已保存（前台将自动刷新）', 'success')
 }
 
@@ -918,23 +943,27 @@ let selectedCharacters = []
 let availableCharacters = []
 
 // 所有角色列表
-const ALL_SURVIVORS = [
-  "医生", "律师", "慈善家", "园丁", "魔术师", "冒险家", "佣兵", "空军",
-  "祭司", "机械师", "前锋", "盲女", "调香师", "牛仔", "舞女", "先知",
-  "入殓师", "勘探员", "咒术师", "野人", "杂技演员", "大副", "调酒师",
-  "邮差", "守墓人", "囚徒", "昆虫学者", "画家", "击球手", "玩具商",
-  "病患", "心理学家", "小说家", "小女孩", "哭泣小丑", "教授", "古董商",
-  "拉拉队员", "记者", "飞行家", "作曲家", "弓箭手", "骑士", "木偶师",
-  "幸运儿", "火灾调查员", "逃脱大师", "气象学家", "法罗女士"
-]
+// 所有角色列表 - 将会从后端动态加载
+let ALL_SURVIVORS = []
+let ALL_HUNTERS = []
 
-const ALL_HUNTERS = [
-  "厂长", "小丑", "鹿头", "杰克", "蜘蛛", "红蝶", "黄衣之主",
-  "摄影师", "疯眼", "宿伞之魂", "梦之女巫", "破轮", "红夫人", "26号守卫",
-  "使徒", "小提琴家", "雕刻家", "守夜人", "记录员", "噩梦", "渔女", "蜡像师",
-  "喧嚣", "杂货商", "隐士", "愚人金", "时空之影", "歌剧演员", "爱哭鬼", "孽蜥", "跛脚羊",
-  "台球手", "博士"
-]
+async function loadAllCharacters() {
+  if (!window.electronAPI || !window.electronAPI.characterGetIndex) return
+  try {
+    const result = await window.electronAPI.characterGetIndex()
+    if (result.success && result.data) {
+      if (Array.isArray(result.data.survivors)) {
+        ALL_SURVIVORS = result.data.survivors
+      }
+      if (Array.isArray(result.data.hunters)) {
+        ALL_HUNTERS = result.data.hunters
+      }
+      addLog(`已加载角色列表: 求生者${ALL_SURVIVORS.length}名, 监管者${ALL_HUNTERS.length}名`, 'info')
+    }
+  } catch (e) {
+    console.error('加载角色列表失败:', e)
+  }
+}
 
 function showCharacterModal(title, characters, currentSelection, isMultiple = true) {
   currentEditType = { title, isMultiple }

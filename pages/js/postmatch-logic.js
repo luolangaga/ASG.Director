@@ -81,6 +81,17 @@ let layout = {}
 let availableFonts = []
 let activeFontContainerId = null
 
+function rgbToHex(color) {
+  if (!color) return '#ffffff'
+  if (color.startsWith('#')) return color
+  const rgb = color.match(/\d+/g)
+  if (!rgb) return '#ffffff'
+  return '#' + rgb.slice(0, 3).map(x => {
+    const hex = parseInt(x, 10).toString(16)
+    return hex.length === 1 ? '0' + hex : hex
+  }).join('')
+}
+
 // Font selection logic
 async function openFontSelector(containerId) {
   activeFontContainerId = containerId
@@ -88,6 +99,17 @@ async function openFontSelector(containerId) {
   let html = '<div class="font-selector-item" onclick="selectFont(\'\')">系统默认</div>'
   html += availableFonts.map(f => `<div class="font-selector-item" style="font-family:'${f.fontFamily}';" onclick="selectFont('${f.fontFamily}')">${f.fontFamily}</div>`).join('')
   list.innerHTML = html
+  const container = document.getElementById(containerId)
+  if (container) {
+    const style = window.getComputedStyle(container)
+    const fontSize = parseInt(style.fontSize) || 16
+    const sizeInput = document.getElementById('fontSizeInput')
+    const sizeRange = document.getElementById('fontSizeRange')
+    if (sizeInput) sizeInput.value = fontSize
+    if (sizeRange) sizeRange.value = fontSize
+    const picker = document.getElementById('textColorPicker')
+    if (picker) picker.value = rgbToHex(style.color)
+  }
   document.getElementById('fontSelectorModal').classList.add('show')
 }
 window.selectFont = async (fontFamily) => {
@@ -106,6 +128,50 @@ window.selectFont = async (fontFamily) => {
 function closeFontSelector() {
   document.getElementById('fontSelectorModal').classList.remove('show')
   activeFontContainerId = null
+}
+
+function initFontStyleControls() {
+  const sizeInput = document.getElementById('fontSizeInput')
+  const sizeRange = document.getElementById('fontSizeRange')
+  const colorInput = document.getElementById('textColorPicker')
+
+  const updateStyle = async () => {
+    if (!activeFontContainerId) return
+    const container = document.getElementById(activeFontContainerId)
+    if (!container) return
+    if (!layout.components) layout.components = {}
+    const prev = layout.components[activeFontContainerId] || {}
+
+    if (sizeInput) {
+      const val = sizeInput.value
+      container.style.fontSize = `${val}px`
+      layout.components[activeFontContainerId] = Object.assign({}, prev, { fontSize: val })
+    }
+
+    if (colorInput) {
+      const val = colorInput.value
+      container.style.color = val
+      layout.components[activeFontContainerId] = Object.assign({}, layout.components[activeFontContainerId] || prev, { textColor: val })
+    }
+
+    await saveLayout()
+  }
+
+  if (sizeInput && sizeRange) {
+    sizeInput.addEventListener('input', () => { sizeRange.value = sizeInput.value; updateStyle() })
+    sizeRange.addEventListener('input', () => { sizeInput.value = sizeRange.value; updateStyle() })
+  }
+  if (colorInput) {
+    colorInput.addEventListener('input', updateStyle)
+  }
+  document.querySelectorAll('.color-preset-inline').forEach(preset => {
+    preset.addEventListener('click', (e) => {
+      if (colorInput) {
+        colorInput.value = e.target.dataset.color
+        updateStyle()
+      }
+    })
+  })
 }
 
 // ========= 自定义字体（支持热重载） =========
@@ -509,9 +575,8 @@ function applyLayout() {
       }
       console.log('[PostMatch] OBS模式背景路径:', layout.backgroundImage, '->', imgSrc)
     } else {
-      // Electron模式：确保使用 file:/// 协议
-      if (!imgSrc.startsWith('file:///')) {
-        imgSrc = `file:///${imgSrc}`
+      if (!imgSrc.startsWith('file:')) {
+        imgSrc = imgSrc.startsWith('/') ? `file://${imgSrc}` : `file:///${imgSrc}`
       }
     }
 
@@ -538,6 +603,12 @@ function applyLayout() {
       el.style.fontFamily = `"${conf.fontFamily}", sans-serif`
     } else {
       el.style.fontFamily = ''
+    }
+    if (conf.fontSize) {
+      el.style.fontSize = `${conf.fontSize}px`
+    }
+    if (conf.textColor) {
+      el.style.color = conf.textColor
     }
 
     if (conf.zIndex !== undefined) {
@@ -633,12 +704,17 @@ function showUnifiedContextMenu(e, container) {
   // 1. 隐藏/显示
   menu.appendChild(createItem(isHidden ? '显示组件' : '隐藏组件', isHidden ? '👁️' : '🚫', async () => {
     const nextHidden = !isHidden
+    const computed = window.getComputedStyle(container)
+    const fontSize = parseInt(computed.fontSize) || null
+    const textColor = rgbToHex(computed.color)
     layout.components[container.id] = Object.assign({}, prev, {
       left: parseInt(container.style.left) || 0,
       top: parseInt(container.style.top) || 0,
       width: container.offsetWidth,
       height: container.offsetHeight,
       fontFamily: container.style.fontFamily ? container.style.fontFamily.replace(/"/g, '').split(',')[0].trim() : (prev.fontFamily || null),
+      fontSize: fontSize || prev.fontSize || null,
+      textColor: textColor || prev.textColor || null,
       hidden: nextHidden
     })
     applyLayout()
@@ -917,6 +993,9 @@ function initDraggable() {
 
       if (!layout.components) layout.components = {}
       const prev = layout.components[activeContainer.id] || {}
+      const computed = window.getComputedStyle(activeContainer)
+      const fontSize = parseInt(computed.fontSize) || null
+      const textColor = rgbToHex(computed.color)
       layout.components[activeContainer.id] = {
         left: parseInt(activeContainer.style.left) || activeContainer.offsetLeft,
         top: parseInt(activeContainer.style.top) || activeContainer.offsetTop,
@@ -924,6 +1003,8 @@ function initDraggable() {
         height: activeContainer.offsetHeight,
         height: activeContainer.offsetHeight,
         fontFamily: activeContainer.style.fontFamily ? activeContainer.style.fontFamily.replace(/"/g, '').split(',')[0].trim() : (prev.fontFamily || null),
+        fontSize: fontSize || prev.fontSize || null,
+        textColor: textColor || prev.textColor || null,
         hidden: (typeof prev.hidden === 'boolean') ? prev.hidden : false,
         zIndex: parseInt(activeContainer.style.zIndex) || 0
       }
@@ -956,6 +1037,7 @@ function init() {
   console.log('='.repeat(60))
 
   __loadCustomFonts()
+  initFontStyleControls()
 
   loadLayout()
 

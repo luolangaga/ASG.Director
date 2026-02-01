@@ -289,4 +289,6 @@ const FrontendOnboarding = {
 };
 
 window.FrontendOnboarding = FrontendOnboarding;
-document.addEventListener('DOMContentLoaded', () => FrontendOnboarding.start());
+document.addEventListener('DOMContentLoaded', () => {
+  // FrontendOnboarding.start() // User requested manual start only
+});

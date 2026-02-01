@@ -267,4 +267,6 @@ const AnimationOnboarding = {
 };
 
 window.AnimationOnboarding = AnimationOnboarding;
-document.addEventListener('DOMContentLoaded', () => AnimationOnboarding.start());
+document.addEventListener('DOMContentLoaded', () => {
+    // AnimationOnboarding.start() // User requested manual start only
+});

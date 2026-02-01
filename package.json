@@ -1,6 +1,6 @@
 {
   "name": "asg-director",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "description": "第五人格赛事导播端",
   "main": "main.js",
   "scripts": {
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/luolangaga/ASG.Director"
+    "url": "https://github.com/ASG/ASG.Director"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
@@ -49,11 +49,7 @@
       "output": "dist",
       "buildResources": "."
     },
-    "publish": [
-      {
-        "provider": "github"
-      }
-    ],
+    "publish": [],
     "win": {
       "target": [
         "nsis",
@@ -78,6 +74,7 @@
       "updater-v2.js",
       "postinstall.js",
       "package.json",
+      "extracted_roles.json",
       "assets/**/*",
       "pages/**/*",
       "plugins/**/*",

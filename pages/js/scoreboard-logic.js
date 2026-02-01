@@ -353,7 +353,10 @@ function applyLayout() {
   if (layout.backgroundImage) {
     const bg = document.getElementById('backgroundImage')
     let src = layout.backgroundImage
-    if (!src.startsWith('file:///') && !window.__ASG_OBS_MODE__) src = 'file:///' + src.replace(/\\/g, '/')
+    if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__) {
+      const normalized = src.replace(/\\/g, '/')
+      src = normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : `file:///${encodeURI(normalized)}`
+    }
     bg.src = src
     bg.style.display = 'block'
   }

@@ -821,6 +821,15 @@ const ASGOnboarding = {
       return false;
     }
 
+    // 确保在 Home 视图，以便目标元素可见
+    if (typeof switchView === 'function') {
+      try {
+        switchView('home');
+      } catch (e) {
+        console.warn('[ASG Onboarding] 切换到 Home 视图失败', e);
+      }
+    }
+
     console.log('[ASG Onboarding] 启动新手引导');
     this.createUI();
 
@@ -830,7 +839,7 @@ const ASGOnboarding = {
 
     setTimeout(() => {
       const backdrop = document.getElementById('asg-onboarding-backdrop');
-      backdrop.classList.add('show');
+      if (backdrop) backdrop.classList.add('show');
       this.showStep(startStep);
     }, 500);
 
@@ -848,9 +857,10 @@ const ASGOnboarding = {
 window.ASGOnboarding = ASGOnboarding;
 
 // 页面加载完成后自动检查并启动
+// 页面加载完成后自动检查并启动
 document.addEventListener('DOMContentLoaded', () => {
   // 延迟启动以确保页面完全加载
   setTimeout(() => {
-    ASGOnboarding.start();
+    // ASGOnboarding.start(); // User requested manual start only
   }, 1000);
 });

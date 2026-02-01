@@ -29,8 +29,90 @@ const LOCAL_ROOM_ID = 'local-bp'
 const MATCH_BASE_KEY = 'localBp_matchBase'
 const SCORE_STORAGE_KEY = `score_${LOCAL_ROOM_ID}`
 const POSTMATCH_STORAGE_KEY = `postmatch_${LOCAL_ROOM_ID}`
+const TEAM_MANAGER_KEY = 'asg_team_manager_teams'
+const TEAM_MANAGER_SELECTION_KEY = 'asg_team_manager_selection'
 
 let matchBase = null
+
+function loadTeamManagerTeams() {
+  try {
+    const raw = localStorage.getItem(TEAM_MANAGER_KEY)
+    const data = raw ? JSON.parse(raw) : []
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+function loadTeamManagerSelection() {
+  try {
+    const raw = localStorage.getItem(TEAM_MANAGER_SELECTION_KEY)
+    const data = raw ? JSON.parse(raw) : {}
+    return {
+      teamA: typeof data?.teamA === 'string' ? data.teamA : '',
+      teamB: typeof data?.teamB === 'string' ? data.teamB : ''
+    }
+  } catch {
+    return { teamA: '', teamB: '' }
+  }
+}
+
+function findTeamFromManager(teams, val) {
+  if (!val) return null
+  return teams.find(t => (t.id || t.name) === val) || null
+}
+
+function clearCurrentBpSelection() {
+  state.survivors = [null, null, null, null]
+  state.hunter = null
+  state.hunterBannedSurvivors = []
+  state.survivorBannedHunters = []
+  state.survivorTalents = [[], [], [], []]
+  state.hunterTalents = []
+  state.hunterSkills = []
+  document.querySelectorAll('.survivor-tab').forEach(tab => {
+    tab.classList.remove('active', 'has-talents')
+  })
+  updateDisplay()
+  updateCharacterStatus()
+  updateTalentSkillUI()
+  updateCurrentSurvivorTalentsDisplay()
+  resetSearchInputs()
+}
+
+function applyTeamsToLocalBpFromManager() {
+  const teams = loadTeamManagerTeams()
+  const selection = loadTeamManagerSelection()
+  const teamA = findTeamFromManager(teams, selection.teamA)
+  const teamB = findTeamFromManager(teams, selection.teamB)
+  if (!teamA && !teamB) {
+    alert('请先在主页选择队伍')
+    return
+  }
+  clearCurrentBpSelection()
+  if (!matchBase) loadMatchBase()
+  matchBase = normalizeMatchBase(matchBase || {})
+  if (teamA) {
+    matchBase.teamA.name = teamA.name || matchBase.teamA.name
+    const rosterA = (teamA.players || []).map(p => p.name || p.gameId).filter(Boolean)
+    if (rosterA.length) matchBase.teamA.members = ensureMembers5(rosterA)
+  }
+  if (teamB) {
+    matchBase.teamB.name = teamB.name || matchBase.teamB.name
+    const rosterB = (teamB.players || []).map(p => p.name || p.gameId).filter(Boolean)
+    if (rosterB.length) matchBase.teamB.members = ensureMembers5(rosterB)
+  }
+  matchBase.lineup.survivors = []
+  matchBase.lineup.hunter = null
+  saveMatchBase(false)
+  renderMatchBaseForm()
+  updateLineupOptions()
+  if (window.baseManager) {
+    window.baseManager.load()
+    window.baseManager.render()
+  }
+  alert('已应用到本地BP')
+}
 
 function getDefaultMatchBase() {
   return {
@@ -242,6 +324,12 @@ async function initMapSelects() {
     if (res && res.success && Array.isArray(res.maps)) maps = res.maps
   } catch {
     maps = []
+  }
+
+  // 兜底：如果列表为空，使用硬编码的默认地图列表，防止后端读取失败导致功能不可用
+  if (maps.length === 0) {
+    console.warn('[LocalBP] 未能获取地图列表，使用默认列表')
+    maps = ['军工厂', '红教堂', '圣心医院', '湖景村', '月亮河公园', '里奥的回忆', '永眠镇', '唐人街', '不归林']
   }
 
   for (const sel of selects) {
@@ -677,16 +765,66 @@ async function applyLineup() {
 }
 
 // 天赋和技能常量
-const SURVIVOR_TALENTS = ['回光返照', '飞轮效应', '化险为夷', '膝跳反射']
-const HUNTER_TALENTS = ['封闭空间', '底牌', '张狂', '挽留']
-const HUNTER_SKILLS = ['聆听', '失常', '兴奋', '巡视者', '传送', '窥视者', '闪现', '移行']
+let SURVIVOR_TALENTS = ['回光返照', '飞轮效应', '化险为夷', '膝跳反射']
+let HUNTER_TALENTS = ['封闭空间', '底牌', '张狂', '挽留']
+let HUNTER_SKILLS = ['聆听', '失常', '兴奋', '巡视者', '传送', '窥视者', '闪现', '移行']
 
 // 加载角色列表
 async function loadCharacters() {
   const result = await window.electronAPI.invoke('localBp:getCharacters')
   if (result.success) {
-    characters = result.data
+    if (result.data) {
+      // 保持兼容：使用字符串数组作为选择列表的核心
+      // 后端返回的 getCharacters 可能已经是 enriched data，或者只是 name
+      // 这里依赖 getCharacterIndex 的改动，或者 getCharacters 保持 name list
+      // 检查 result.data 结构
+      if (Array.isArray(result.data.survivors) && typeof result.data.survivors[0] === 'object') {
+        characters.survivors = result.data.survivors.map(c => c.name)
+        characters.hunters = result.data.hunters.map(c => c.name)
+      } else {
+        characters = result.data
+        if (characters.fullData) {
+          // 清空并重建搜索索引
+          CHAR_PY_MAP = {}
+          const process = (list) => {
+            if (Array.isArray(list)) {
+              list.forEach(c => {
+                if (c && c.name && c.abbr) {
+                  // 构造搜索条目：[缩写, 英文名/拼音?]
+                  // roles.json 只有 abbr (如 "ys") 和 enName (如 "Doctor")
+                  // 这里简单地将 abbr 和 enName 加入索引
+                  const keywords = [c.abbr.toLowerCase()]
+                  if (c.enName) keywords.push(c.enName.toLowerCase())
+                  CHAR_PY_MAP[c.name] = keywords
+                }
+              })
+            }
+          }
+          process(characters.fullData.survivors)
+          process(characters.fullData.hunters)
+
+          // 清理不需要的字段以免混淆
+          delete characters.fullData
+        }
+      }
+    }
   }
+
+  // 尝试获取 talents / skills 定义
+  const idxRes = await window.electronAPI.invoke('character:get-index')
+  if (idxRes.success && idxRes.data) {
+    if (idxRes.data.survivorTalents && idxRes.data.survivorTalents.length > 0) {
+      SURVIVOR_TALENTS = idxRes.data.survivorTalents.map(t => typeof t === 'string' ? t : t.name)
+    }
+    if (idxRes.data.hunterTalents && idxRes.data.hunterTalents.length > 0) {
+      HUNTER_TALENTS = idxRes.data.hunterTalents.map(t => typeof t === 'string' ? t : t.name)
+    }
+    if (idxRes.data.hunterSkills && idxRes.data.hunterSkills.length > 0) {
+      HUNTER_SKILLS = idxRes.data.hunterSkills.map(t => typeof t === 'string' ? t : t.name)
+    }
+  }
+
+  renderTalentSkillSelects()
 }
 
 async function loadState() {
@@ -1251,69 +1389,136 @@ async function triggerBlink(index) {
   }
 }
 
+function resetSearchInputs() {
+  document.querySelectorAll('.slot-search, .ban-search').forEach(input => {
+    input.value = ''
+    input.title = ''
+    input.style.borderColor = ''
+    input.style.backgroundColor = ''
+    input.disabled = false
+    input.readOnly = false
+    input.removeAttribute('disabled')
+    input.removeAttribute('readonly')
+    input.style.pointerEvents = 'auto'
+    input.tabIndex = 0
+    input.blur()
+  })
+}
+
+function unlockAllInputs() {
+  if (document.body) document.body.style.pointerEvents = 'auto'
+  document.querySelectorAll('input, textarea, select').forEach(input => {
+    input.disabled = false
+    input.readOnly = false
+    input.removeAttribute('disabled')
+    input.removeAttribute('readonly')
+    input.style.pointerEvents = 'auto'
+    if (input.tabIndex < 0) input.tabIndex = 0
+  })
+  const overlays = document.querySelectorAll('[id$="Overlay"], [id$="overlay"]')
+  overlays.forEach(el => {
+    if (el.id === 'commandPaletteOverlay') return
+    el.remove()
+  })
+  const backdrops = document.querySelectorAll('[id$="Backdrop"], [id$="backdrop"]')
+  backdrops.forEach(el => el.remove())
+  document.querySelectorAll('.context-menu').forEach(menu => menu.remove())
+}
+
+function resetInteractionOverlays() {
+  const pickModal = document.getElementById('pickModal')
+  if (pickModal) pickModal.classList.remove('show')
+  pickType = null
+  pickIndex = null
+  pickAction = null
+  const palette = document.getElementById('commandPaletteOverlay')
+  if (palette) palette.style.display = 'none'
+  const activeModals = document.querySelectorAll('.modal.show')
+  activeModals.forEach(modal => modal.classList.remove('show'))
+  const guideModal = document.getElementById('bpGuideModal')
+  if (guideModal) {
+    guideModal.classList.remove('show')
+    guideModal.classList.remove('bp-guide-actions-only')
+  }
+  if (document.body) document.body.classList.remove('bp-guide-embedded')
+  if (typeof unmountBpGuideWorkspace === 'function') unmountBpGuideWorkspace()
+  if (typeof closeBpGuide === 'function') closeBpGuide()
+  if (window.bpGuideState) {
+    window.bpGuideState.active = false
+    window.bpGuideState.started = false
+  }
+  const onboarding = document.getElementById('localbp-onboarding-overlay')
+  if (onboarding) onboarding.remove()
+  if (window.currentContextMenu) {
+    window.currentContextMenu.remove()
+    window.currentContextMenu = null
+  }
+}
+
+function scheduleResetReload() {
+  setTimeout(() => {
+    location.reload()
+  }, 120)
+}
+
 // 重置BP
 async function resetBp(keepGlobal) {
-  const msg = keepGlobal ? '确定要重置所有BP选择吗? (将保留全局禁用)' : '确定要重置所有BP选择吗? (将清空所有数据)'
-  if (confirm(msg)) {
-    if (keepGlobal) {
-      // 只重置 picks 和 普通 bans
-      await window.electronAPI.invoke('localBp:setSurvivor', { index: 0, character: null })
-      await window.electronAPI.invoke('localBp:setSurvivor', { index: 1, character: null })
-      await window.electronAPI.invoke('localBp:setSurvivor', { index: 2, character: null })
-      await window.electronAPI.invoke('localBp:setSurvivor', { index: 3, character: null })
-      await window.electronAPI.invoke('localBp:setHunter', null)
+  if (keepGlobal) {
+    await window.electronAPI.invoke('localBp:setSurvivor', { index: 0, character: null })
+    await window.electronAPI.invoke('localBp:setSurvivor', { index: 1, character: null })
+    await window.electronAPI.invoke('localBp:setSurvivor', { index: 2, character: null })
+    await window.electronAPI.invoke('localBp:setSurvivor', { index: 3, character: null })
+    await window.electronAPI.invoke('localBp:setHunter', null)
 
-      // 清除普通Ban位
-      for (const name of [...state.hunterBannedSurvivors]) {
-        await window.electronAPI.invoke('localBp:removeBanSurvivor', name)
-      }
-      for (const name of [...state.survivorBannedHunters]) {
-        await window.electronAPI.invoke('localBp:removeBanHunter', name)
-      }
-
-      state.survivors = [null, null, null, null]
-      state.hunter = null
-      state.hunterBannedSurvivors = []
-      state.survivorBannedHunters = []
-      state.survivorTalents = [[], [], [], []]
-      state.hunterTalents = []
-      state.hunterSkills = []
-    } else {
-      await window.electronAPI.invoke('localBp:reset')
-      state = {
-        survivors: [null, null, null, null],
-        hunter: null,
-        hunterBannedSurvivors: [],
-        survivorBannedHunters: [],
-        globalBannedSurvivors: [],
-        globalBannedHunters: [],
-        survivorTalents: [[], [], [], []],
-        hunterTalents: [],
-        hunterSkills: [],
-        playerNames: ['', '', '', '', ''],
-        editingSurvivorIndex: null
-      }
-      // 清空选手名字输入框
-      for (let i = 0; i < 5; i++) {
-        const input = document.getElementById(`player-name-${i}`)
-        if (input) input.value = ''
-      }
+    for (const name of [...state.hunterBannedSurvivors]) {
+      await window.electronAPI.invoke('localBp:removeBanSurvivor', name)
+    }
+    for (const name of [...state.survivorBannedHunters]) {
+      await window.electronAPI.invoke('localBp:removeBanHunter', name)
     }
 
-    // 重置求生者tab
-    document.querySelectorAll('.survivor-tab').forEach(tab => {
-      tab.classList.remove('active', 'has-talents')
-    })
-    updateDisplay()
-    updateCharacterStatus()
-    updateTalentSkillUI()
-    updateCurrentSurvivorTalentsDisplay()
-
-    // 通知前端重置布局状态 (恢复被动画强制显示的元素)
-    if (window.electronAPI && window.electronAPI.sendToFrontend) {
-      window.electronAPI.sendToFrontend({ type: 'bp-reset' })
+    state.survivors = [null, null, null, null]
+    state.hunter = null
+    state.hunterBannedSurvivors = []
+    state.survivorBannedHunters = []
+    state.survivorTalents = [[], [], [], []]
+    state.hunterTalents = []
+    state.hunterSkills = []
+  } else {
+    await window.electronAPI.invoke('localBp:reset')
+    state = {
+      survivors: [null, null, null, null],
+      hunter: null,
+      hunterBannedSurvivors: [],
+      survivorBannedHunters: [],
+      globalBannedSurvivors: [],
+      globalBannedHunters: [],
+      survivorTalents: [[], [], [], []],
+      hunterTalents: [],
+      hunterSkills: [],
+      playerNames: ['', '', '', '', ''],
+      editingSurvivorIndex: null
+    }
+    for (let i = 0; i < 5; i++) {
+      const input = document.getElementById(`player-name-${i}`)
+      if (input) input.value = ''
     }
   }
+
+  document.querySelectorAll('.survivor-tab').forEach(tab => {
+    tab.classList.remove('active', 'has-talents')
+  })
+  updateDisplay()
+  updateCharacterStatus()
+  updateTalentSkillUI()
+  updateCurrentSurvivorTalentsDisplay()
+  resetSearchInputs()
+  resetInteractionOverlays()
+
+  if (window.electronAPI && window.electronAPI.sendToFrontend) {
+    window.electronAPI.sendToFrontend({ type: 'bp-reset' })
+  }
+  scheduleResetReload()
 }
 
 async function resetBpForGuideNextHalf() {
@@ -1353,10 +1558,13 @@ async function resetBpForGuideNextHalf() {
   updateCharacterStatus()
   updateTalentSkillUI()
   updateCurrentSurvivorTalentsDisplay()
+  resetSearchInputs()
+  resetInteractionOverlays()
 
   if (window.electronAPI && window.electronAPI.sendToFrontend) {
     window.electronAPI.sendToFrontend({ type: 'bp-reset' })
   }
+  scheduleResetReload()
 }
 
 async function resetBpForGuideNextBo(keepGlobal) {
@@ -1389,9 +1597,12 @@ async function resetBpForGuideNextBo(keepGlobal) {
   updateCharacterStatus()
   updateTalentSkillUI()
   updateCurrentSurvivorTalentsDisplay()
+  resetSearchInputs()
+  resetInteractionOverlays()
   if (window.electronAPI && window.electronAPI.sendToFrontend) {
     window.electronAPI.sendToFrontend({ type: 'bp-reset' })
   }
+  scheduleResetReload()
 }
 
 async function resetBpForGuideNextBoKeepGlobal(source) {
@@ -1431,9 +1642,12 @@ async function resetBpForGuideNextBoKeepGlobal(source) {
   updateCharacterStatus()
   updateTalentSkillUI()
   updateCurrentSurvivorTalentsDisplay()
+  resetSearchInputs()
+  resetInteractionOverlays()
   if (window.electronAPI && window.electronAPI.sendToFrontend) {
     window.electronAPI.sendToFrontend({ type: 'bp-reset' })
   }
+  scheduleResetReload()
 }
 
 function captureGuideGlobalBans(half) {
@@ -2814,7 +3028,7 @@ function prevBpGuideStep() {
 }
 
 // 初始化
-Promise.all([loadCharacters(), loadState()]).then(() => {
+Promise.allSettled([loadCharacters(), loadState()]).then(() => {
   // Initialize Map Selects (External Data)
   initMapSelects().then(() => {
     // Initialize new Manager
@@ -2854,30 +3068,9 @@ window.addEventListener('local-bp-update', () => {
 })
 
 /* ========== 拼音搜索功能 ========== */
-const CHAR_PY_MAP = {
-  // Survivors
-  "医生": ["ys", "yisheng"], "律师": ["ls", "lvshi"], "慈善家": ["csj", "cishanjia"], "园丁": ["yd", "yuanding"],
-  "魔术师": ["mss", "moshushi"], "冒险家": ["mxj", "maoxianjia"], "佣兵": ["yb", "yongbing"], "空军": ["kj", "kongjun"],
-  "机械师": ["jxs", "jixieshi"], "前锋": ["qf", "qianfeng"], "盲女": ["mn", "mangnv"], "祭司": ["js", "jisi"],
-  "调香师": ["txs", "tiaoxiangshi"], "牛仔": ["nz", "niuzai"], "舞女": ["wn", "wunv"], "先知": ["xz", "xianzhi"],
-  "入殓师": ["rls", "rulianshi"], "勘探员": ["kty", "kantanyuan"], "咒术师": ["zss", "zhoushushi"], "野人": ["yr", "yeren"],
-  "杂技演员": ["zjyy", "zajiyanyuan"], "大副": ["df", "dafu"], "调酒师": ["tjs", "tiaojiushi"], "邮差": ["yc", "youchai"],
-  "守墓人": ["smr", "shoumuren"], "囚徒": ["qt", "qiutu"], "昆虫学者": ["kcxz", "kunchongxuezhe"], "画家": ["hj", "huajia"],
-  "击球手": ["jqs", "jiqiushou"], "玩具商": ["wjs", "wanjushang"], "病患": ["bh", "binghuan"], "心理学家": ["xlxj", "xinlixuejia"],
-  "小说家": ["xsj", "xiaoshuojia"], "小女孩": ["xnh", "xiaonvhai"], "哭泣小丑": ["kqxc", "kuqixiaochou"], "教授": ["js", "jiaoshou"],
-  "古董商": ["gds", "gudongshang"], "作曲家": ["zqj", "zuoqujia"], "记者": ["jz", "jizhe"], "飞行家": ["fxj", "feixingjia"],
-  "拉拉队员": ["lldy", "laladuiyuan"], "歌剧演员": ["gjyy", "gejuyanyuan"], "木偶师": ["mos", "muoushi"],
-  "火灾调查员": ["hzdcy", "huozaidiaochayuan"], "法罗女士": ["flns", "faluonvshi"], "骑士": ["qs", "qishi"], "幸运儿": ["xye", "xingyuner"],
-  "航空": ["hk", "hangkong"],
-  // Hunters
-  "厂长": ["cz", "changzhang"], "小丑": ["xc", "xiaochou"], "鹿头": ["lt", "lutou"], "杰克": ["jk", "jieke"],
-  "蜘蛛": ["zz", "zhizhu"], "红蝶": ["hd", "hongdie"], "黄衣之主": ["hyzz", "huangyizhizhu"], "宿伞之魂": ["sszh", "sushanzhihun"],
-  "摄影师": ["sys", "sheyingshi"], "疯眼": ["fy", "fengyan"], "梦之女巫": ["mznw", "mengzhinvwu"], "爱哭鬼": ["akg", "aikugui"],
-  "孽蜥": ["nx", "niexi"], "红夫人": ["hfr", "hongfuren"], "26号守卫": ["bw", "bangwei", "bangbang"], "使徒": ["st", "shitu"],
-  "小提琴家": ["xtqj", "xiaotiqinjia"], "雕刻家": ["dkj", "diaokejia"], "博士": ["bs", "boshi"], "破轮": ["pl", "polun"],
-  "渔女": ["yn", "yunv"], "蜡像师": ["lxs", "laxiangshi"], "噩梦": ["em", "emeng"], "记录员": ["jly", "jiluyuan"],
-  "隐士": ["ys", "yinshi"], "守夜人": ["syr", "shouyeren"], "愚人金": ["yrj", "yurenjin"],
-  "时空之影": ["skzy", "shikongzhiying"], "喧嚣": ["xx", "xuanxiao"]
+/* ========== 拼音搜索功能 ========== */
+let CHAR_PY_MAP = {
+  // 会从 roles.json 动态加载
 };
 
 function getSearchScore(name, query) {
@@ -3121,6 +3314,10 @@ window.addEventListener('DOMContentLoaded', () => {
   if (isGuideOnly) {
     if (!matchBase) loadMatchBase()
     openBpGuide()
+  } else {
+    resetInteractionOverlays()
+    resetSearchInputs()
+    unlockAllInputs()
   }
 })
 

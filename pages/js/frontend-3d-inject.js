@@ -8,12 +8,16 @@
   <h4>3D角色展示</h4>
   <div class="settings-grid">
     <div class="settings-item"><label>启用3D模型</label><input id="enable3dModels" type="checkbox"></div>
+    <div class="settings-item"><label>官方联网模型</label><input id="useOfficialModels" type="checkbox"></div>
     <div class="settings-item"><label>目标帧率</label><input id="model3dTargetFPS" type="number" min="15" max="60" value="30"></div>
     <div class="settings-item"><label>求生者模型目录</label><input id="survivorModelDir" type="text" placeholder="例如 C:/Models/Survivor"></div>
     <div class="settings-item"><label>监管者模型目录</label><input id="hunterModelDir" type="text" placeholder="例如 C:/Models/Hunter"></div>
     <div class="settings-item"><label>求生者动作目录</label><input id="survivorMotionDir" type="text" placeholder="例如 C:/Motions/Survivor"></div>
     <div class="settings-item"><label>监管者动作目录</label><input id="hunterMotionDir" type="text" placeholder="例如 C:/Motions/Hunter"></div>
     <div class="settings-item"><label>默认VMD动作</label><input id="defaultMotionVmd" type="text" placeholder="例如 C:/Motions/default.vmd"></div>
+    <div class="settings-item"><label>模型缩放修正</label><input id="model3dScaleCorrection" type="number" min="0.1" step="0.1" value="1.6" title="调整模型在框内的默认大小，可输入任意倍数"></div>
+    <div class="settings-item"><label>模型垂直偏移</label><input id="model3dVerticalOffset" type="number" min="-0.5" max="0.5" step="0.01" value="0.08" title="调整模型在视野中的上下位置，正值上移"></div>
+    <div class="settings-item"><label>模型旋转修正</label><input id="model3dRotationCorrection" type="range" min="0" max="360" step="15" value="0" title="调整模型默认朝向（度）"></div>
   </div>
   
   <h4 style="margin-top:16px;">渲染质量</h4>

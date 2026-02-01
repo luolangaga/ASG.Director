@@ -134,9 +134,7 @@
               </div>
             </div>
 
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button class="btn btn-primary" id="applyTeamsToLocalBpBtn">应用到本地BP</button>
-            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;"></div>
           </div>
 
           <div id="pluginCardsSection"
@@ -250,6 +248,12 @@
               </div>
 
               <div class="settings-grid">
+                <div class="control-group">
+                  <label class="control-label">官方模型</label>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" id="useOfficialModels"> <span>启用官方联网模型</span>
+                  </div>
+                </div>
                 <div class="control-group">
                   <label class="control-label">求生者模型目录</label>
                   <div style="display:flex; gap:8px;">
@@ -1551,6 +1555,7 @@
     function getDefaultModel3dConfig() {
       return {
         enabled: false,
+        useOfficialModels: false,
         targetFPS: 30,
         survivorModelDir: null,
         hunterModelDir: null,
@@ -1590,6 +1595,7 @@
       const auto = document.getElementById('model3dAutoApply')
       const ids = [
         'enable3dModels',
+        'useOfficialModels',
         'model3dTargetFPS',
         'survivorModelDir',
         'hunterModelDir',
@@ -1627,6 +1633,42 @@
         el.addEventListener('change', handler)
         el.addEventListener('input', handler)
       }
+    }
+
+    let __officialModelsProgressTick = 0
+    function initOfficialModelsDownloadProgress() {
+      if (!window.electronAPI || typeof window.electronAPI.onOfficialModelsDownloadProgress !== 'function') return
+      window.electronAPI.onOfficialModelsDownloadProgress((payload) => {
+        const modal = document.getElementById('downloadProgressModal')
+        const bar = document.getElementById('downloadProgressBar')
+        const text = document.getElementById('downloadProgressText')
+        const count = document.getElementById('downloadProgressCount')
+        const currentFile = document.getElementById('downloadCurrentFile')
+
+        if (modal && !modal.classList.contains('show')) {
+          modal.classList.add('show')
+        }
+
+        const now = Date.now()
+        if (now - __officialModelsProgressTick < 50) return
+        __officialModelsProgressTick = now
+
+        const current = Number(payload?.current || 0)
+        const total = Number(payload?.total || 0)
+        const overall = Number(payload?.overall || payload?.progress || 0)
+        const name = payload?.roleName || ''
+
+        if (bar) bar.style.width = `${overall}%`
+        if (text) text.textContent = `正在下载: ${name}`
+        if (count) count.textContent = `${current}/${total}`
+        if (currentFile) currentFile.textContent = name
+
+        if (current >= total && overall >= 100) {
+          setTimeout(() => {
+            if (modal) modal.classList.remove('show')
+          }, 1000)
+        }
+      })
     }
 
     async function pickFolderFor(inputId) {
@@ -1678,6 +1720,7 @@
         const m = { ...def, ...m0, viewports: (m0 && m0.viewports) ? m0.viewports : {} }
 
         __setVal('enable3dModels', !!m.enabled)
+        __setVal('useOfficialModels', !!m.useOfficialModels)
         __setVal('model3dTargetFPS', Number(m.targetFPS || 30))
         __setVal('survivorModelDir', m.survivorModelDir || '')
         __setVal('hunterModelDir', m.hunterModelDir || '')
@@ -1714,6 +1757,45 @@
 
     async function applyModel3dSettings(showToast) {
       try {
+        const useOfficialEl = document.getElementById('useOfficialModels')
+        const wantOfficial = !!useOfficialEl?.checked
+        if (wantOfficial && window.electronAPI && typeof window.electronAPI.prepareOfficialModels === 'function') {
+          const status = await window.electronAPI.getOfficialModelsDownloadStatus?.()
+          if (!status || !status.complete) {
+            const ok = confirm('将开始下载官方模型资源，下载完成后才会启用。是否继续？')
+            if (!ok) {
+              if (useOfficialEl) useOfficialEl.checked = false
+              return
+            }
+            if (useOfficialEl) useOfficialEl.disabled = true
+            
+            const modal = document.getElementById('downloadProgressModal')
+            if (modal) {
+              modal.classList.add('show')
+              const text = document.getElementById('downloadProgressText')
+              if (text) text.textContent = '准备下载...'
+              const bar = document.getElementById('downloadProgressBar')
+              if (bar) bar.style.width = '0%'
+              const count = document.getElementById('downloadProgressCount')
+              if (count) count.textContent = '0/0'
+            }
+            
+            try {
+              const res = await window.electronAPI.prepareOfficialModels()
+              if (!res || !res.success) {
+                throw new Error(res?.error || '下载失败')
+              }
+              showStatus('官方模型下载完成', 'success')
+            } catch (e) {
+              if (modal) modal.classList.remove('show')
+              showStatus('官方模型下载失败: ' + (e?.message || e), 'error')
+              if (useOfficialEl) useOfficialEl.checked = false
+              return
+            } finally {
+              if (useOfficialEl) useOfficialEl.disabled = false
+            }
+          }
+        }
         const result = await window.electronAPI.loadLayout()
         const layout = (result && result.success && result.layout) ? result.layout : {}
         const def = getDefaultModel3dConfig()
@@ -1721,6 +1803,7 @@
 
         const m = {
           enabled: !!document.getElementById('enable3dModels')?.checked,
+          useOfficialModels: !!document.getElementById('useOfficialModels')?.checked,
           targetFPS: Number(document.getElementById('model3dTargetFPS')?.value) || def.targetFPS,
           survivorModelDir: document.getElementById('survivorModelDir')?.value || null,
           hunterModelDir: document.getElementById('hunterModelDir')?.value || null,
@@ -1904,6 +1987,7 @@
     initModel3dCardToggle()
     loadModel3dSettings()
     bindModel3dAutoApply()
+    initOfficialModelsDownloadProgress()
 
     // 延迟静默检查更新
     setTimeout(silentCheckUpdate, 3000)
@@ -2585,6 +2669,57 @@
         throw new Error('队伍没有Logo')
       }
     }
+  </script>
+  <!-- Download Progress Modal -->
+  <div id="downloadProgressModal" class="modal">
+    <div class="modal-content" style="width: 450px; text-align: center;">
+      <h3 style="margin-bottom: 20px; font-size: 20px;">正在下载官方模型资源</h3>
+      <div class="progress-container"
+        style="background: rgba(255,255,255,0.1); border-radius: 10px; height: 12px; margin-bottom: 15px; overflow: hidden; position: relative;">
+        <div id="downloadProgressBar"
+          style="width: 0%; height: 100%; background: var(--primary-gradient, linear-gradient(45deg, #FFD700, #FFA500)); transition: width 0.3s ease;">
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 14px; color: var(--text-secondary);">
+        <span id="downloadProgressText">准备中...</span>
+        <span id="downloadProgressCount">0/0</span>
+      </div>
+      <div id="downloadCurrentFile"
+        style="margin-top: 10px; font-size: 12px; color: var(--text-secondary); opacity: 0.7; height: 1.2em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme Management
+    function initTheme() {
+      const saved = localStorage.getItem('theme') || 'dark';
+      const isLight = saved === 'light';
+      document.body.classList.toggle('light-theme', isLight);
+      const icon = document.getElementById('themeIcon');
+      if (icon) icon.textContent = isLight ? '☀️' : '🌙';
+    }
+
+    window.toggleTheme = function () {
+      const isLight = document.body.classList.contains('light-theme');
+      if (isLight) {
+        document.body.classList.remove('light-theme');
+        localStorage.setItem('theme', 'dark');
+        const icon = document.getElementById('themeIcon');
+        if (icon) icon.textContent = '🌙';
+      } else {
+        document.body.classList.add('light-theme');
+        localStorage.setItem('theme', 'light');
+        const icon = document.getElementById('themeIcon');
+        if (icon) icon.textContent = '☀️';
+      }
+    }
+
+    // Init on load
+    initTheme();
+
+    // Helper to get element by ID
+    const $id = (id) => document.getElementById(id);
   </script>
 </body>
 

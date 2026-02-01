@@ -30,6 +30,20 @@ if (!window.electronAPI) {
           return { success: false }
         }
       }
+      if (channel === 'localBp:saveCharacterDisplayLayout') {
+        try {
+          const payload = (args && args.length > 0) ? args[0] : {}
+          const resp = await fetch('/api/local-bp-character-display-layout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ positions: payload })
+          })
+          const data = await resp.json()
+          return data
+        } catch (e) {
+          return { success: false }
+        }
+      }
       return { success: false }
     },
     onLocalBpStateUpdate: (callback) => {
@@ -176,11 +190,11 @@ function closeFontSelector() {
 function normalizeFileSrc(src) {
   if (!src || typeof src !== 'string') return ''
   if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return src
-  // OBS 本地页面服务器可能返回 /userdata/xxx
-  if (src.startsWith('/')) return src
-  if (src.startsWith('file:///')) return src
+  if (src.startsWith('/background/') || src.startsWith('/assets/') || src.startsWith('/userdata/')) return src
+  if (src.startsWith('file:')) return src
   const normalized = src.replace(/\\/g, '/')
-  return `file:///${normalized}`
+  if (normalized.startsWith('/')) return `file://${encodeURI(normalized)}`
+  return `file:///${encodeURI(normalized)}`
 }
 
 // 加载状态

@@ -450,7 +450,50 @@
       width: 400px;
       max-height: 80vh;
       overflow-y: auto;
-      padding: 20px;
+      padding: 0;
+      border-radius: 8px;
+    }
+
+    #fontSelectorModal .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    #fontSelectorModal .modal-header h3 {
+      margin: 0;
+      color: #ffd700;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    #fontSelectorModal .close-btn {
+      background: none;
+      border: none;
+      color: #ffd700;
+      font-size: 28px;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background 0.2s;
+      line-height: 1;
+    }
+
+    #fontSelectorModal .close-btn:hover {
+      background: rgba(255, 215, 0, 0.2);
+    }
+
+    #fontSelectorModal #fontSelectorList {
+      padding: 0 20px;
+      max-height: 300px;
+      overflow-y: auto;
     }
 
     .font-selector-item {
@@ -467,6 +510,53 @@
 
     .font-selector-item:last-child {
       border-bottom: none;
+    }
+
+    .font-color-section {
+      margin-top: 20px;
+      padding: 0 20px 20px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .font-color-section h4 {
+      color: #ffd700;
+      font-size: 14px;
+      margin: 16px 0 12px 0;
+    }
+
+    .color-picker-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .color-picker-container input[type="color"] {
+      width: 100%;
+      height: 50px;
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      background: transparent;
+    }
+
+    .color-presets-inline {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+    }
+
+    .color-preset-inline {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .color-preset-inline:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
     }
 
     /* 自定义组件样式 */

@@ -4,18 +4,18 @@
  */
 
 const LocalBPOnboarding = {
-    // 本地存储key
-    STORAGE_KEY: 'asg_localbp_onboarding_completed',
+  // 本地存储key
+  STORAGE_KEY: 'asg_localbp_onboarding_completed',
 
-    // 当前步骤
-    currentStep: 0,
+  // 当前步骤
+  currentStep: 0,
 
-    // 引导步骤配置
-    steps: [
-        {
-            id: 'welcome',
-            title: '欢迎来到本地BP控制台! 🎮',
-            content: `
+  // 引导步骤配置
+  steps: [
+    {
+      id: 'welcome',
+      title: '欢迎来到本地BP控制台! 🎮',
+      content: `
         <p>这是您进行赛事导播的核心工具！</p>
         <p>让我们快速了解一下各个功能模块：</p>
         <div style="display:flex; gap:16px; margin-top:16px; flex-wrap:wrap; justify-content:center;">
@@ -37,13 +37,13 @@ const LocalBPOnboarding = {
           </div>
         </div>
       `,
-            target: null,
-            position: 'center'
-        },
-        {
-            id: 'bp-control',
-            title: 'BP控制面板 🎮',
-            content: `
+      target: null,
+      position: 'center'
+    },
+    {
+      id: 'bp-control',
+      title: 'BP控制面板 🎮',
+      content: `
         <p>这是您最常用的功能！</p>
         <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
           <li><strong>角色选择</strong> - 点击槽位选择角色</li>
@@ -54,14 +54,14 @@ const LocalBPOnboarding = {
           💡 <strong>提示：</strong>右键点击槽位可以设置默认图片
         </div>
       `,
-            target: '[data-page="bp"]',
-            position: 'bottom',
-            highlight: true
-        },
-        {
-            id: 'baseinfo',
-            title: '对局基础信息 🗺️',
-            content: `
+      target: '[data-page="bp"]',
+      position: 'bottom',
+      highlight: true
+    },
+    {
+      id: 'baseinfo',
+      title: '对局基础信息 🗺️',
+      content: `
         <p>在这里设置比赛的基本信息：</p>
         <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
           <li>队伍名称和Logo</li>
@@ -71,14 +71,14 @@ const LocalBPOnboarding = {
         </ul>
         <p style="color:#888; font-size:13px;">这些信息会显示在OBS前端画面中</p>
       `,
-            target: '[data-page="baseinfo"]',
-            position: 'bottom',
-            highlight: true
-        },
-        {
-            id: 'talents',
-            title: '天赋与技能 🧠',
-            content: `
+      target: '[data-page="baseinfo"]',
+      position: 'bottom',
+      highlight: true
+    },
+    {
+      id: 'talents',
+      title: '天赋与技能 🧠',
+      content: `
         <p>配置每位选手的天赋和技能选择！</p>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0;">
           <div style="background:#f7fafc; padding:12px; border-radius:8px; text-align:center;">
@@ -92,14 +92,14 @@ const LocalBPOnboarding = {
         </div>
         <p style="color:#888; font-size:13px;">支持为每位求生者单独配置天赋</p>
       `,
-            target: '[data-page="talents"]',
-            position: 'bottom',
-            highlight: true
-        },
-        {
-            id: 'score',
-            title: '比分管理 📊',
-            content: `
+      target: '[data-page="talents"]',
+      position: 'bottom',
+      highlight: true
+    },
+    {
+      id: 'score',
+      title: '比分管理 📊',
+      content: `
         <p>实时管理比赛比分！</p>
         <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
           <li>快速调整两队比分</li>
@@ -107,14 +107,14 @@ const LocalBPOnboarding = {
           <li>一键同步到记分板</li>
         </ul>
       `,
-            target: '[data-page="score"]',
-            position: 'bottom',
-            highlight: true
-        },
-        {
-            id: 'postmatch',
-            title: '赛后数据 📈',
-            content: `
+      target: '[data-page="score"]',
+      position: 'bottom',
+      highlight: true
+    },
+    {
+      id: 'postmatch',
+      title: '赛后数据 📈',
+      content: `
         <p>记录和展示赛后统计数据：</p>
         <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
           <li>选手详细数据</li>
@@ -122,26 +122,26 @@ const LocalBPOnboarding = {
           <li>数据可视化展示</li>
         </ul>
       `,
-            target: '[data-page="postmatch"]',
-            position: 'bottom',
-            highlight: true
-        },
-        {
-            id: 'update-btn',
-            title: '更新前端显示 🔄',
-            content: `
+      target: '[data-page="postmatch"]',
+      position: 'bottom',
+      highlight: true
+    },
+    {
+      id: 'update-btn',
+      title: '更新前端显示 🔄',
+      content: `
         <p>完成设置后，点击此按钮将数据推送到OBS前端！</p>
         <div style="background:#e8f5e9; padding:12px; border-radius:8px; margin-top:12px; border-left:4px solid #48bb78;">
           ✅ 前端窗口会实时更新显示您的配置
         </div>
       `,
-            target: null,
-            position: 'center'
-        },
-        {
-            id: 'complete',
-            title: '开始导播吧！🎬',
-            content: `
+      target: null,
+      position: 'center'
+    },
+    {
+      id: 'complete',
+      title: '开始导播吧！🎬',
+      content: `
         <p>恭喜您已经了解了本地BP控制台的所有功能！</p>
         <div style="text-align:center; margin:20px 0;">
           <div style="font-size:50px; margin-bottom:12px;">🎊</div>
@@ -151,21 +151,21 @@ const LocalBPOnboarding = {
           💡 <strong>小提示：</strong>您可以在顶部找到帮助按钮重新查看引导
         </div>
       `,
-            target: null,
-            position: 'center'
-        }
-    ],
+      target: null,
+      position: 'center'
+    }
+  ],
 
-    // 创建引导UI
-    createUI() {
-        // 如果已存在则移除
-        const existing = document.getElementById('localbp-onboarding-overlay');
-        if (existing) existing.remove();
+  // 创建引导UI
+  createUI() {
+    // 如果已存在则移除
+    const existing = document.getElementById('localbp-onboarding-overlay');
+    if (existing) existing.remove();
 
-        // 创建遮罩层
-        const overlay = document.createElement('div');
-        overlay.id = 'localbp-onboarding-overlay';
-        overlay.innerHTML = `
+    // 创建遮罩层
+    const overlay = document.createElement('div');
+    overlay.id = 'localbp-onboarding-overlay';
+    overlay.innerHTML = `
       <style>
         #localbp-onboarding-overlay {
           position: fixed;
@@ -214,12 +214,12 @@ const LocalBPOnboarding = {
         
         #localbp-onboarding-card {
           position: absolute;
-          width: 380px;
+          width: 420px;
           max-width: 90vw;
           background: #fff;
-          border: 2px solid #667eea;
+          border: 1px solid #e1dfdd;
           border-radius: 16px;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
           pointer-events: auto;
           opacity: 0;
           transform: translateY(20px) scale(0.95);
@@ -234,19 +234,20 @@ const LocalBPOnboarding = {
         
         .localbp-onboarding-header {
           padding: 20px 20px 14px;
-          border-bottom: 1px solid #e2e8f0;
+          border-bottom: 1px solid #e1dfdd;
+          background: #faf9f8;
         }
         
         .localbp-onboarding-title {
           font-size: 18px;
           font-weight: 700;
-          color: #2d3748;
+          color: #323130;
           margin: 0;
         }
         
         .localbp-onboarding-body {
           padding: 16px 20px;
-          color: #4a5568;
+          color: #605e5c;
           font-size: 14px;
           line-height: 1.6;
         }
@@ -261,11 +262,13 @@ const LocalBPOnboarding = {
         
         .localbp-onboarding-footer {
           padding: 14px 20px;
-          border-top: 1px solid #e2e8f0;
+          border-top: 1px solid #e1dfdd;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
+          flex-wrap: wrap;
+          background: #faf9f8;
         }
         
         .localbp-onboarding-progress {
@@ -277,69 +280,74 @@ const LocalBPOnboarding = {
           width: 8px;
           height: 8px;
           border-radius: 50%;
-          background: #e2e8f0;
+          background: #e1dfdd;
           transition: all 0.3s;
         }
         
         .localbp-onboarding-dot.active {
-          background: #667eea;
-          box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
+          background: #0078d4;
+          box-shadow: 0 0 8px rgba(0, 120, 212, 0.4);
         }
         
         .localbp-onboarding-dot.completed {
-          background: #48bb78;
+          background: #107c10;
         }
         
         .localbp-onboarding-buttons {
-          display: flex;
-          gap: 8px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 10px;
+          width: 100%;
         }
         
         .localbp-onboarding-btn {
-          padding: 8px 16px;
+          padding: 12px 16px;
           border: none;
-          border-radius: 8px;
-          font-size: 13px;
+          border-radius: 10px;
+          font-size: 14px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s;
           font-family: inherit;
+          min-height: 44px;
         }
         
         .localbp-onboarding-btn-skip {
-          background: transparent;
-          color: #a0aec0;
+          background: #ffffff;
+          color: #605e5c;
+          border: 1px solid #e1dfdd;
         }
         
         .localbp-onboarding-btn-skip:hover {
-          color: #4a5568;
-          background: #f7fafc;
+          color: #323130;
+          background: #faf9f8;
         }
         
         .localbp-onboarding-btn-prev {
-          background: #f7fafc;
-          color: #4a5568;
+          background: #ffffff;
+          color: #605e5c;
+          border: 1px solid #c8c6c4;
         }
         
         .localbp-onboarding-btn-prev:hover {
-          background: #edf2f7;
+          background: #f3f2f1;
         }
         
         .localbp-onboarding-btn-next {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: #0078d4;
           color: #fff;
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+          box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25);
         }
         
         .localbp-onboarding-btn-next:hover {
           transform: translateY(-1px);
-          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 6px 16px rgba(0, 120, 212, 0.35);
         }
         
         .localbp-onboarding-btn-complete {
-          background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+          background: #107c10;
           color: #fff;
-          box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+          box-shadow: 0 4px 12px rgba(16, 124, 16, 0.25);
         }
         
         .localbp-onboarding-arrow {
@@ -378,204 +386,204 @@ const LocalBPOnboarding = {
       </div>
     `;
 
-        document.body.appendChild(overlay);
-    },
+    document.body.appendChild(overlay);
+  },
 
-    // 显示当前步骤
-    showStep(stepIndex) {
-        const step = this.steps[stepIndex];
-        if (!step) return;
+  // 显示当前步骤
+  showStep(stepIndex) {
+    const step = this.steps[stepIndex];
+    if (!step) return;
 
-        this.currentStep = stepIndex;
+    this.currentStep = stepIndex;
 
-        const card = document.getElementById('localbp-onboarding-card');
-        const backdrop = document.getElementById('localbp-onboarding-backdrop');
-        const highlight = document.getElementById('localbp-onboarding-highlight');
-        const titleEl = document.getElementById('localbp-onboarding-title');
-        const bodyEl = document.getElementById('localbp-onboarding-body');
-        const progressEl = document.getElementById('localbp-onboarding-progress');
-        const buttonsEl = document.getElementById('localbp-onboarding-buttons');
+    const card = document.getElementById('localbp-onboarding-card');
+    const backdrop = document.getElementById('localbp-onboarding-backdrop');
+    const highlight = document.getElementById('localbp-onboarding-highlight');
+    const titleEl = document.getElementById('localbp-onboarding-title');
+    const bodyEl = document.getElementById('localbp-onboarding-body');
+    const progressEl = document.getElementById('localbp-onboarding-progress');
+    const buttonsEl = document.getElementById('localbp-onboarding-buttons');
 
-        card.classList.remove('show');
+    card.classList.remove('show');
 
-        setTimeout(() => {
-            titleEl.innerHTML = step.title;
-            bodyEl.innerHTML = step.content;
+    setTimeout(() => {
+      titleEl.innerHTML = step.title;
+      bodyEl.innerHTML = step.content;
 
-            progressEl.innerHTML = this.steps.map((s, i) => {
-                let className = 'localbp-onboarding-dot';
-                if (i < stepIndex) className += ' completed';
-                if (i === stepIndex) className += ' active';
-                return `<div class="${className}"></div>`;
-            }).join('');
+      progressEl.innerHTML = this.steps.map((s, i) => {
+        let className = 'localbp-onboarding-dot';
+        if (i < stepIndex) className += ' completed';
+        if (i === stepIndex) className += ' active';
+        return `<div class="${className}"></div>`;
+      }).join('');
 
-            let buttonsHtml = '';
+      let buttonsHtml = '';
 
-            if (stepIndex === 0) {
-                buttonsHtml = `
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-skip" onclick="LocalBPOnboarding.skip()">跳过</button>
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-next" onclick="LocalBPOnboarding.next()">开始 →</button>
+      if (stepIndex === 0) {
+        buttonsHtml = `
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-skip" onclick="LocalBPOnboarding.skip()">跳过引导</button>
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-next" onclick="LocalBPOnboarding.next()">开始引导</button>
         `;
-            } else if (stepIndex === this.steps.length - 1) {
-                buttonsHtml = `
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-prev" onclick="LocalBPOnboarding.prev()">← 返回</button>
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-complete" onclick="LocalBPOnboarding.complete()">完成 ✓</button>
+      } else if (stepIndex === this.steps.length - 1) {
+        buttonsHtml = `
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-prev" onclick="LocalBPOnboarding.prev()">返回上一步</button>
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-complete" onclick="LocalBPOnboarding.complete()">完成引导</button>
         `;
-            } else {
-                buttonsHtml = `
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-skip" onclick="LocalBPOnboarding.skip()">跳过</button>
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-prev" onclick="LocalBPOnboarding.prev()">←</button>
-          <button class="localbp-onboarding-btn localbp-onboarding-btn-next" onclick="LocalBPOnboarding.next()">下一步 →</button>
+      } else {
+        buttonsHtml = `
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-skip" onclick="LocalBPOnboarding.skip()">跳过引导</button>
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-prev" onclick="LocalBPOnboarding.prev()">上一步</button>
+          <button class="localbp-onboarding-btn localbp-onboarding-btn-next" onclick="LocalBPOnboarding.next()">下一步</button>
         `;
-            }
-            buttonsEl.innerHTML = buttonsHtml;
+      }
+      buttonsEl.innerHTML = buttonsHtml;
 
-            // 处理高亮和定位
-            if (step.target && step.highlight) {
-                const targetEl = document.querySelector(step.target);
-                if (targetEl) {
-                    const rect = targetEl.getBoundingClientRect();
-                    const padding = 6;
+      // 处理高亮和定位
+      if (step.target && step.highlight) {
+        const targetEl = document.querySelector(step.target);
+        if (targetEl) {
+          const rect = targetEl.getBoundingClientRect();
+          const padding = 6;
 
-                    highlight.style.display = 'block';
-                    highlight.style.left = (rect.left - padding) + 'px';
-                    highlight.style.top = (rect.top - padding) + 'px';
-                    highlight.style.width = (rect.width + padding * 2) + 'px';
-                    highlight.style.height = (rect.height + padding * 2) + 'px';
+          highlight.style.display = 'block';
+          highlight.style.left = (rect.left - padding) + 'px';
+          highlight.style.top = (rect.top - padding) + 'px';
+          highlight.style.width = (rect.width + padding * 2) + 'px';
+          highlight.style.height = (rect.height + padding * 2) + 'px';
 
-                    backdrop.classList.remove('show');
+          backdrop.classList.remove('show');
 
-                    this.positionCard(card, rect, step.position);
-                } else {
-                    this.centerCard(card);
-                    highlight.style.display = 'none';
-                    backdrop.classList.add('show');
-                }
-            } else {
-                this.centerCard(card);
-                highlight.style.display = 'none';
-                backdrop.classList.add('show');
-            }
-
-            setTimeout(() => {
-                card.classList.add('show');
-            }, 50);
-
-        }, 200);
-    },
-
-    positionCard(card, targetRect, position) {
-        const cardWidth = 380;
-        const cardHeight = card.offsetHeight || 300;
-        const padding = 16;
-
-        let left, top;
-        let arrowClass = '';
-
-        switch (position) {
-            case 'bottom':
-                left = targetRect.left + (targetRect.width / 2) - (cardWidth / 2);
-                top = targetRect.bottom + padding;
-                arrowClass = 'localbp-onboarding-arrow-top';
-                break;
-            case 'top':
-                left = targetRect.left + (targetRect.width / 2) - (cardWidth / 2);
-                top = targetRect.top - cardHeight - padding;
-                arrowClass = 'localbp-onboarding-arrow-bottom';
-                break;
-            default:
-                this.centerCard(card);
-                return;
+          this.positionCard(card, rect, step.position);
+        } else {
+          this.centerCard(card);
+          highlight.style.display = 'none';
+          backdrop.classList.add('show');
         }
+      } else {
+        this.centerCard(card);
+        highlight.style.display = 'none';
+        backdrop.classList.add('show');
+      }
 
-        left = Math.max(20, Math.min(left, window.innerWidth - cardWidth - 20));
-        top = Math.max(20, Math.min(top, window.innerHeight - cardHeight - 20));
+      setTimeout(() => {
+        card.classList.add('show');
+      }, 50);
 
-        card.style.left = left + 'px';
-        card.style.top = top + 'px';
-        card.style.transform = 'none';
+    }, 200);
+  },
 
-        const oldArrow = card.querySelector('.localbp-onboarding-arrow');
-        if (oldArrow) oldArrow.remove();
+  positionCard(card, targetRect, position) {
+    const cardWidth = 380;
+    const cardHeight = card.offsetHeight || 300;
+    const padding = 16;
 
-        if (arrowClass) {
-            const arrow = document.createElement('div');
-            arrow.className = `localbp-onboarding-arrow ${arrowClass}`;
-            card.appendChild(arrow);
-        }
-    },
+    let left, top;
+    let arrowClass = '';
 
-    centerCard(card) {
-        card.style.left = '50%';
-        card.style.top = '50%';
-        card.style.transform = 'translate(-50%, -50%)';
-
-        const oldArrow = card.querySelector('.localbp-onboarding-arrow');
-        if (oldArrow) oldArrow.remove();
-    },
-
-    next() {
-        if (this.currentStep < this.steps.length - 1) {
-            this.showStep(this.currentStep + 1);
-        }
-    },
-
-    prev() {
-        if (this.currentStep > 0) {
-            this.showStep(this.currentStep - 1);
-        }
-    },
-
-    skip() {
-        this.complete();
-    },
-
-    complete() {
-        localStorage.setItem(this.STORAGE_KEY, 'true');
-
-        const overlay = document.getElementById('localbp-onboarding-overlay');
-        const card = document.getElementById('localbp-onboarding-card');
-        const backdrop = document.getElementById('localbp-onboarding-backdrop');
-
-        card.classList.remove('show');
-        backdrop.classList.remove('show');
-
-        setTimeout(() => {
-            if (overlay) overlay.remove();
-        }, 400);
-    },
-
-    shouldShow() {
-        return localStorage.getItem(this.STORAGE_KEY) !== 'true';
-    },
-
-    reset() {
-        localStorage.removeItem(this.STORAGE_KEY);
-        console.log('[LocalBP Onboarding] 引导已重置');
-    },
-
-    start() {
-        if (!this.shouldShow()) {
-            console.log('[LocalBP Onboarding] 用户已完成引导，跳过');
-            return false;
-        }
-
-        console.log('[LocalBP Onboarding] 启动本地BP新手引导');
-        this.createUI();
-
-        setTimeout(() => {
-            const backdrop = document.getElementById('localbp-onboarding-backdrop');
-            backdrop.classList.add('show');
-            this.showStep(0);
-        }, 500);
-
-        return true;
-    },
-
-    forceStart() {
-        this.reset();
-        this.start();
+    switch (position) {
+      case 'bottom':
+        left = targetRect.left + (targetRect.width / 2) - (cardWidth / 2);
+        top = targetRect.bottom + padding;
+        arrowClass = 'localbp-onboarding-arrow-top';
+        break;
+      case 'top':
+        left = targetRect.left + (targetRect.width / 2) - (cardWidth / 2);
+        top = targetRect.top - cardHeight - padding;
+        arrowClass = 'localbp-onboarding-arrow-bottom';
+        break;
+      default:
+        this.centerCard(card);
+        return;
     }
+
+    left = Math.max(20, Math.min(left, window.innerWidth - cardWidth - 20));
+    top = Math.max(20, Math.min(top, window.innerHeight - cardHeight - 20));
+
+    card.style.left = left + 'px';
+    card.style.top = top + 'px';
+    card.style.transform = 'none';
+
+    const oldArrow = card.querySelector('.localbp-onboarding-arrow');
+    if (oldArrow) oldArrow.remove();
+
+    if (arrowClass) {
+      const arrow = document.createElement('div');
+      arrow.className = `localbp-onboarding-arrow ${arrowClass}`;
+      card.appendChild(arrow);
+    }
+  },
+
+  centerCard(card) {
+    card.style.left = '50%';
+    card.style.top = '50%';
+    card.style.transform = 'translate(-50%, -50%)';
+
+    const oldArrow = card.querySelector('.localbp-onboarding-arrow');
+    if (oldArrow) oldArrow.remove();
+  },
+
+  next() {
+    if (this.currentStep < this.steps.length - 1) {
+      this.showStep(this.currentStep + 1);
+    }
+  },
+
+  prev() {
+    if (this.currentStep > 0) {
+      this.showStep(this.currentStep - 1);
+    }
+  },
+
+  skip() {
+    this.complete();
+  },
+
+  complete() {
+    localStorage.setItem(this.STORAGE_KEY, 'true');
+
+    const overlay = document.getElementById('localbp-onboarding-overlay');
+    const card = document.getElementById('localbp-onboarding-card');
+    const backdrop = document.getElementById('localbp-onboarding-backdrop');
+
+    card.classList.remove('show');
+    backdrop.classList.remove('show');
+
+    setTimeout(() => {
+      if (overlay) overlay.remove();
+    }, 400);
+  },
+
+  shouldShow() {
+    return localStorage.getItem(this.STORAGE_KEY) !== 'true';
+  },
+
+  reset() {
+    localStorage.removeItem(this.STORAGE_KEY);
+    console.log('[LocalBP Onboarding] 引导已重置');
+  },
+
+  start() {
+    if (!this.shouldShow()) {
+      console.log('[LocalBP Onboarding] 用户已完成引导，跳过');
+      return false;
+    }
+
+    console.log('[LocalBP Onboarding] 启动本地BP新手引导');
+    this.createUI();
+
+    setTimeout(() => {
+      const backdrop = document.getElementById('localbp-onboarding-backdrop');
+      backdrop.classList.add('show');
+      this.showStep(0);
+    }, 500);
+
+    return true;
+  },
+
+  forceStart() {
+    this.reset();
+    this.start();
+  }
 };
 
 // 导出到全局
@@ -583,7 +591,11 @@ window.LocalBPOnboarding = LocalBPOnboarding;
 
 // 页面加载完成后自动检查并启动
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        LocalBPOnboarding.start();
-    }, 800);
+  // 检查是否是 BP 引导模式 (guide=1)，如果是则不启动新手引导
+  const isGuideMode = new URLSearchParams(window.location.search || '').get('guide') === '1';
+  if (isGuideMode) return;
+
+  setTimeout(() => {
+    // LocalBPOnboarding.start(); // User requested manual start only
+  }, 800);
 });

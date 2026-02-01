@@ -29,12 +29,10 @@
         <span class="tab-icon">📈</span>赛后数据
       </button>
     </div>
-    <button class="menu-tab" onclick="openBpGuideWindow()" title="BP引导"
-      style="margin-left:auto; background:rgba(255,255,255,0.1); color:#9ae6b4;">
+    <button class="menu-tab menu-action menu-action-first" onclick="openBpGuideWindow()" title="BP引导">
       <span class="tab-icon">🧭</span>BP引导
     </button>
-    <button class="menu-tab" onclick="LocalBPOnboarding.forceStart()" title="新手引导"
-      style="background:rgba(255,255,255,0.1); color:#ffd700;">
+    <button class="menu-tab menu-action" onclick="LocalBPOnboarding.forceStart()" title="新手引导">
       <span class="tab-icon">❓</span>帮助
     </button>
   </div>
@@ -49,31 +47,27 @@
           <button class="btn btn-primary" onclick="updateFrontend()">更新前端显示</button>
           <button class="btn btn-success" onclick="openCharacterDisplay()">角色展示</button>
           <button class="btn btn-danger" onclick="resetBp()">重置BP</button>
-          <button class="btn btn-danger" style="background:#feb2b2; color:#c53030; border:1px solid #fc8181;"
-            onclick="resetBp(true)">重置BP (保留全局禁用)</button>
+          <button class="btn btn-secondary" onclick="resetBp(true)">重置BP (保留全局禁用)</button>
           <button class="btn btn-warning" onclick="openAllFrontendWindows()">一键打开所有窗口</button>
         </div>
 
         <!-- 倒计时控制 (新增) -->
-        <div class="controls"
-          style="margin-top: 10px; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px;">
-          <div style="font-weight: bold; color: #4a5568;">⏱️ 倒计时</div>
-          <div id="localTimerDisplay"
-            style="font-size: 24px; font-weight: bold; font-family: monospace; min-width: 70px; color: #2d3748; text-align: center;">
+        <div class="controls timer-controls">
+          <div class="timer-label">⏱️ 倒计时</div>
+          <div id="localTimerDisplay" class="timer-display">
             0:00</div>
-          <div style="display: flex; gap: 8px;">
+          <div class="timer-actions">
             <button class="btn btn-success" onclick="startLocalTimer()">开始</button>
             <button class="btn btn-warning" onclick="pauseLocalTimer()">暂停</button>
             <button class="btn btn-danger" onclick="resetLocalTimer()">重置</button>
           </div>
-          <div style="display: flex; align-items: center; gap: 5px; margin-left: auto;">
-            <label
-              style="font-size: 13px; color: #718096; display: flex; align-items: center; gap: 4px; cursor: pointer; margin-right: 10px;">
+          <div class="timer-options">
+            <label class="timer-option-label">
               <input type="checkbox" id="localTimerIndeterminate" onchange="toggleTimerIndeterminate()"> 无进度模式
             </label>
-            <label style="font-size: 13px; color: #718096;">时长(秒)</label>
-            <input type="number" id="localTimerDuration" value="60" min="1" class="player-name-input"
-              style="width: 60px; text-align: center;">
+            <label class="timer-duration-label">时长(秒)</label>
+            <input type="number" id="localTimerDuration" value="60" min="1"
+              class="player-name-input timer-duration-input">
           </div>
         </div>
 
@@ -326,6 +320,7 @@
         <div class="controls" style="margin-bottom: 20px;">
           <button class="btn btn-primary" onclick="baseManager.save()">保存</button>
           <button class="btn btn-danger" onclick="baseManager.reset()">重置</button>
+          <button class="btn btn-primary" onclick="applyTeamsToLocalBpFromManager()">应用主页队伍到本地BP</button>
         </div>
 
         <div class="scroll-container">
@@ -686,7 +681,7 @@
           <div style="margin-top:10px;color:#718096;font-size:12px;line-height:1.6;">
             全局禁用按每个BO的上/下半局分别记录。进入下一BO前可选择继承上一BO上半局或下半局的全局禁用。每个步骤满足数量后会自动进入下一步。
           </div>
-          <button class="btn btn-primary" onclick="startBpGuide()">开始引导</button>
+          <button class="btn btn-primary bp-guide-start-btn" onclick="startBpGuide()">开始BP引导</button>
         </div>
 
         <div class="bp-guide-step" id="bpGuideStep" style="display:none;">

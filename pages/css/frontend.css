@@ -286,23 +286,25 @@ body.tab3d-adjust .three-view::after {
   display: block;
 }
 
-/* 待选状态 - 闪烁框 */
+/* 待选状态 - 闪烁框 (已禁用) */
 .character-box.pending {
-  animation: pulse-border 1.5s infinite;
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  /* animation: pulse-border 1.5s infinite; */
+  /* box-shadow: 0 0 20px rgba(255, 215, 0, 0.6); */
+  box-shadow: none;
+  border: none;
 }
 
 @keyframes pulse-border {
 
   0%,
   100% {
-    border-color: rgba(255, 215, 0, 0.8);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+    /* border-color: rgba(255, 215, 0, 0.8); */
+    /* box-shadow: 0 0 20px rgba(255, 215, 0, 0.6); */
   }
 
   50% {
-    border-color: rgba(255, 215, 0, 0.3);
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+    /* border-color: rgba(255, 215, 0, 0.3); */
+    /* box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); */
   }
 }
 
@@ -474,8 +476,10 @@ body.tab3d-adjust .three-view::after {
 
 /* 待选状态 - 闪烁框 */
 .hunter-box.pending {
-  animation: pulse-border 1.5s infinite;
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  /* animation: pulse-border 1.5s infinite; */
+  /* box-shadow: 0 0 20px rgba(255, 215, 0, 0.6); */
+  box-shadow: none;
+  border: none;
 }
 
 .hunter-box img {
