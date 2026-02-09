@@ -2250,10 +2250,13 @@ function updateDisplay(state) {
       }
 
       if (logo.startsWith('file://') || logo.startsWith('data:')) {
-        imgEl.src = logo
+        const rev = state && state.assetRev ? `?rev=${state.assetRev}` : ''
+        imgEl.src = logo + rev
       } else {
         const normalizedPath = logo.replace(/\\/g, '/')
-        imgEl.src = `file:///${normalizedPath}`
+        const baseUrl = `file:///${normalizedPath}`
+        const rev = state && state.assetRev ? `?rev=${state.assetRev}` : ''
+        imgEl.src = baseUrl + rev
       }
       imgEl.style.display = 'block'
     }

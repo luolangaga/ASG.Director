@@ -702,7 +702,8 @@ function createFrontendWindow(roomData) {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       devTools: true,
-      webSecurity: false
+      webSecurity: false,
+      backgroundThrottling: false
     }
   })
 
@@ -773,7 +774,8 @@ function createBackendWindow(roomData) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false
     }
   })
 
@@ -803,7 +805,8 @@ function createMapDisplayWindow(action, mapName, team) {
       resizable: false,
       webPreferences: {
         nodeIntegration: false,
-        contextIsolation: true
+        contextIsolation: true,
+        backgroundThrottling: false
       }
     })
 
@@ -863,7 +866,8 @@ function createScoreboardWindow(roomId, team) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false
     }
   })
 
@@ -942,7 +946,8 @@ function createScoreboardOverviewWindow(roomId, boCount) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false
     }
   })
 
@@ -990,7 +995,8 @@ function createPostMatchWindow(roomId) {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: true
+      devTools: true,
+      backgroundThrottling: false
     }
   })
 
@@ -1363,6 +1369,30 @@ ipcMain.handle('export-layout', async (event, layout) => {
   }
 })
 
+// 选择默认位置图像（用于未选择角色时显示）
+ipcMain.handle('select-image-for-slot', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: '选择默认图像',
+      filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+      properties: ['openFile']
+    })
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      ensureDirectories()
+      const srcPath = result.filePaths[0]
+      const ext = path.extname(srcPath)
+      // 使用时间戳避免文件名冲突
+      const destPath = path.join(bgImagePath, `default-slot-${Date.now()}${ext}`)
+      fs.copyFileSync(srcPath, destPath)
+      return { success: true, path: destPath }
+    }
+    return { success: false, canceled: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
 // 导入布局
 ipcMain.handle('import-layout', async () => {
   try {
@@ -1650,7 +1680,7 @@ ipcMain.handle('select-team-logo', async (event, team) => {
     })
 
     if (!result.canceled && result.filePaths.length > 0) {
-      // 复制到用户数据目录，使用队伍名称作为文件名
+      ensureDirectories()
       const srcPath = result.filePaths[0]
       const ext = path.extname(srcPath)
       const destPath = path.join(bgImagePath, `${team}-logo${ext}`)
@@ -2981,7 +3011,8 @@ ipcMain.handle('asg-logout', async () => {
 ipcMain.handle('asg-get-auth-status', async () => {
   return {
     isLoggedIn: !!authToken,
-    user: currentUser
+    user: currentUser,
+    token: authToken
   }
 })
 
@@ -3329,6 +3360,10 @@ let localBpState = {
     transparentBackground: false
   }
 }
+
+// 本地比分数据缓存
+let localBpScoreData = null
+
 
 // 本地BP：旧字段/旧命名兼容
 const __LOCAL_BP_NAME_ALIASES__ = {
@@ -3820,6 +3855,7 @@ function broadcastUpdateData(data) {
     backendWindow,
     scoreboardWindowA,
     scoreboardWindowB,
+    scoreboardOverviewWindow,
     postMatchWindow,
     storeWindow,
     mapDisplayWindow,
@@ -3875,6 +3911,7 @@ function buildLocalBpFrontendState() {
     phaseName: '本地BP',
     phaseAction: '',
     currentMap: localBpState.mapName || '本地模式',
+    assetRev: localBpState.__assetRev || Date.now(),
     currentRoundData: {
       selectedSurvivors: localBpState.survivors || [null, null, null, null],
       selectedHunter: localBpState.hunter || null,
@@ -3893,7 +3930,8 @@ function buildLocalBpFrontendState() {
     gameLabel: localBpState.gameLabel || '',
     mapName: localBpState.mapName || '',
     characterDisplayLayout: localBpState.characterDisplayLayout || null,
-    characterDisplayBackground: localBpState.characterDisplayBackground || null
+    characterDisplayBackground: localBpState.characterDisplayBackground || null,
+    defaultImages: localBpState.defaultImages || null
   }
 }
 
@@ -3948,7 +3986,8 @@ function createLocalBpWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false
     }
   })
 
@@ -4013,7 +4052,8 @@ function createLocalBpGuideWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false
     }
   })
 
@@ -4321,7 +4361,12 @@ try {
         normalized[id] = item
       }
 
-      Object.assign(localBpState.characterDisplayLayout.positions, normalized)
+      for (const [id, item] of Object.entries(normalized)) {
+        const prev = (localBpState.characterDisplayLayout.positions[id] && typeof localBpState.characterDisplayLayout.positions[id] === 'object')
+          ? localBpState.characterDisplayLayout.positions[id]
+          : {}
+        localBpState.characterDisplayLayout.positions[id] = { ...prev, ...item }
+      }
       __persistCharacterDisplayLayoutToDisk__()
       broadcastLocalBpState()
       return true
@@ -4442,6 +4487,7 @@ ipcMain.handle('localBp:reset', () => {
       teamB: { name: '监管者队', logo: '', meta: '' },
       gameLabel: '',
       mapName: '',
+      defaultImages: null,
       characterDisplayLayout: {
         backgroundImage: null,
         positions: {},
@@ -4461,6 +4507,17 @@ ipcMain.handle('localBp:triggerBlink', (event, index) => {
     const i = Number(index)
     if (!Number.isInteger(i) || i < 0 || i > 4) return { success: false, error: 'index 无效' }
     broadcastUpdateData({ type: 'local-bp-blink', index: i })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+// 设置默认图片
+ipcMain.handle('localBp:setDefaultImages', (event, images) => {
+  try {
+    localBpState.defaultImages = images || null
+    broadcastLocalBpState()
     return { success: true }
   } catch (error) {
     return { success: false, error: error.message }
@@ -4501,12 +4558,36 @@ ipcMain.handle('localBp:applyMatchBase', (event, payload) => {
     applyTeam('teamA', p.teamA)
     applyTeam('teamB', p.teamB)
 
+    localBpState.__assetRev = Date.now()
+
+    // 修复：同步选手名字
+    if (Array.isArray(p.playerNames)) {
+      if (!localBpState.playerNames) localBpState.playerNames = ['', '', '', '', '']
+      for (let i = 0; i < 5; i++) {
+        if (typeof p.playerNames[i] === 'string') {
+          localBpState.playerNames[i] = p.playerNames[i]
+        }
+      }
+    }
+
     broadcastLocalBpState()
     return { success: true }
   } catch (error) {
     return { success: false, error: error.message }
   }
 })
+
+// ✨ 修复：接收并广播比分数据，解决插件比分不同步问题
+ipcMain.handle('localBp:updateScoreData', (event, payload) => {
+  try {
+    localBpScoreData = payload
+    broadcastUpdateData({ type: 'score', scoreData: payload })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
 
 // 设置单个求生者的天赋（index: 0-3, talents: 天赋数组）
 ipcMain.handle('localBp:setSurvivorTalents', (event, { index, talents }) => {
@@ -4584,7 +4665,12 @@ ipcMain.handle('localBp:saveCharacterDisplayLayout', (event, positions) => {
       normalized[id] = item
     }
 
-    Object.assign(localBpState.characterDisplayLayout.positions, normalized)
+    for (const [id, item] of Object.entries(normalized)) {
+      const prev = (localBpState.characterDisplayLayout.positions[id] && typeof localBpState.characterDisplayLayout.positions[id] === 'object')
+        ? localBpState.characterDisplayLayout.positions[id]
+        : {}
+      localBpState.characterDisplayLayout.positions[id] = { ...prev, ...item }
+    }
     __persistCharacterDisplayLayoutToDisk__()
     broadcastLocalBpState()
     return { success: true }

@@ -182,13 +182,13 @@ function normalizeMatchBase(raw) {
     teamA: {
       name: typeof r.teamA?.name === 'string' ? r.teamA.name : d.teamA.name,
       logo: typeof r.teamA?.logo === 'string' ? r.teamA.logo : d.teamA.logo,
-      members: ensureMembers5(r.teamA?.members),
+      members: ensureMembers5(r.teamA?.members || r.teamA?.roster),
       memberRoles: ensureMemberRoles5(r.teamA?.memberRoles)
     },
     teamB: {
       name: typeof r.teamB?.name === 'string' ? r.teamB.name : d.teamB.name,
       logo: typeof r.teamB?.logo === 'string' ? r.teamB.logo : d.teamB.logo,
-      members: ensureMembers5(r.teamB?.members),
+      members: ensureMembers5(r.teamB?.members || r.teamB?.roster),
       memberRoles: ensureMemberRoles5(r.teamB?.memberRoles)
     },
     lineup: {
@@ -232,6 +232,16 @@ function toFileUrl(p) {
 }
 
 function loadMatchBase() {
+  if (window.baseManager) {
+    // ✨ 优先使用 baseManager 的状态，避免 desync
+    try {
+      const raw = JSON.parse(JSON.stringify(window.baseManager.state))
+      matchBase = normalizeMatchBase(raw)
+      return matchBase
+    } catch (e) {
+      console.error('Failed to load matchBase from baseManager:', e)
+    }
+  }
   const raw = localStorage.getItem(MATCH_BASE_KEY)
   matchBase = normalizeMatchBase(tryParseJson(raw))
   return matchBase
@@ -509,6 +519,10 @@ function resetMatchBase() {
 }
 
 function updateMatchBaseTeamName(team, name) {
+  if (window.baseManager) {
+    window.baseManager.updateTeamName(team, name)
+    return
+  }
   if (!matchBase) loadMatchBase()
   if (team === 'A') matchBase.teamA.name = name || 'A队'
   if (team === 'B') matchBase.teamB.name = name || 'B队'
@@ -1266,7 +1280,12 @@ async function selectDefaultImageFor(slotKey) {
     console.log('[DefaultImage] Selection result:', res)
 
     if (res && res.success && res.path) {
+      // ✨ 确保 matchBase 存在，避免讨厌的 null 错误~
+      if (!matchBase) {
+        matchBase = getDefaultMatchBase()
+      }
       if (!matchBase.defaultImages) matchBase.defaultImages = {}
+      
       const fileUrl = toFileUrl(res.path)
       console.log('[DefaultImage] Original path:', res.path)
       console.log('[DefaultImage] Converted URL:', fileUrl)
@@ -1908,22 +1927,39 @@ function loadScoreDataAny() {
 function syncScoreStorageBaseFields() {
   // 从现有 scoreData（或本地存储）读出来，更新队名/Logo，再写回 score_${LOCAL_ROOM_ID}
   const data = normalizeScoreData(scoreData && typeof scoreData === 'object' ? scoreData : loadScoreDataAny())
-  data.teamAName = matchBase?.teamA?.name || data.teamAName || 'A队'
-  data.teamBName = matchBase?.teamB?.name || data.teamBName || 'B队'
-  data.teamALogo = matchBase?.teamA?.logo || data.teamALogo || ''
-  data.teamBLogo = matchBase?.teamB?.logo || data.teamBLogo || ''
+  let currentMatchBase = matchBase
+  if (window.baseManager) {
+    currentMatchBase = window.baseManager.state
+  } else if (!currentMatchBase) {
+    loadMatchBase()
+    currentMatchBase = matchBase
+  }
+  if (currentMatchBase) {
+    if (typeof currentMatchBase.teamA?.name === 'string') data.teamAName = currentMatchBase.teamA.name
+    if (typeof currentMatchBase.teamB?.name === 'string') data.teamBName = currentMatchBase.teamB.name
+    if (typeof currentMatchBase.teamA?.logo === 'string') data.teamALogo = currentMatchBase.teamA.logo
+    if (typeof currentMatchBase.teamB?.logo === 'string') data.teamBLogo = currentMatchBase.teamB.logo
+  }
   localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(data))
   localStorage.setItem('localBp_score', JSON.stringify(data))
 }
 
 function initScorePage() {
-  if (!matchBase) loadMatchBase()
+  if (!matchBase && !window.baseManager) loadMatchBase()
   scoreData = loadScoreDataAny()
-  // 统一从 matchBase 覆盖队名/Logo
-  scoreData.teamAName = matchBase.teamA.name || scoreData.teamAName || 'A队'
-  scoreData.teamBName = matchBase.teamB.name || scoreData.teamBName || 'B队'
-  scoreData.teamALogo = matchBase.teamA.logo || scoreData.teamALogo || ''
-  scoreData.teamBLogo = matchBase.teamB.logo || scoreData.teamBLogo || ''
+  let currentMatchBase = matchBase
+  if (window.baseManager) {
+    currentMatchBase = window.baseManager.state
+  } else if (!currentMatchBase) {
+    loadMatchBase()
+    currentMatchBase = matchBase
+  }
+  if (currentMatchBase) {
+    if (typeof currentMatchBase.teamA?.name === 'string') scoreData.teamAName = currentMatchBase.teamA.name
+    if (typeof currentMatchBase.teamB?.name === 'string') scoreData.teamBName = currentMatchBase.teamB.name
+    if (typeof currentMatchBase.teamA?.logo === 'string') scoreData.teamALogo = currentMatchBase.teamA.logo
+    if (typeof currentMatchBase.teamB?.logo === 'string') scoreData.teamBLogo = currentMatchBase.teamB.logo
+  }
   document.getElementById('scoreTeamAName').value = scoreData.teamAName || 'A队'
   document.getElementById('scoreTeamBName').value = scoreData.teamBName || 'B队'
   calculateScore()
@@ -1936,8 +1972,10 @@ function initScorePage() {
 function updateScoreTeamName(team, name) {
   updateMatchBaseTeamName(team, name)
   // updateMatchBaseTeamName 内部会同步存储与 UI，这里仅刷新显示
-  if (team === 'A') scoreData.teamAName = matchBase?.teamA?.name || name || 'A队'
-  else scoreData.teamBName = matchBase?.teamB?.name || name || 'B队'
+  let currentMatchBase = matchBase
+  if (window.baseManager) currentMatchBase = window.baseManager.state
+  if (team === 'A') scoreData.teamAName = (typeof currentMatchBase?.teamA?.name === 'string' ? currentMatchBase.teamA.name : (name || 'A队'))
+  else scoreData.teamBName = (typeof currentMatchBase?.teamB?.name === 'string' ? currentMatchBase.teamB.name : (name || 'B队'))
   updateScoreDisplay()
 }
 
@@ -1959,11 +1997,11 @@ function renderBoList() {
       result === 'B' ? '<span style="color:#ef5350;font-weight:bold;">B队胜</span>' :
         result === 'D' ? '<span style="color:#ffd700;font-weight:bold;">平局</span>' : '<span style="color:#999;">待定</span>'
 
-    return `<div style="background:#f7fafc;border:2px solid ${isActive ? '#ffd700' : '#e2e8f0'};box-shadow: ${isActive ? '0 0 12px rgba(255, 215, 0, 0.3)' : 'none'};border-radius:10px;padding:15px;margin-bottom:15px; transition: all 0.3s;">
+    return `<div id="bo-item-${i}" style="background:#f7fafc;border:2px solid ${isActive ? '#ffd700' : '#e2e8f0'};box-shadow: ${isActive ? '0 0 12px rgba(255, 215, 0, 0.3)' : 'none'};border-radius:10px;padding:15px;margin-bottom:15px; transition: all 0.3s;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <div>
-                ${isActive ? '<span style="color:#ffd700;margin-right:5px;">馃搳</span>' : ''}
-                <strong>第${i + 1}个BO</strong> ${badge}
+                ${isActive ? '<span style="color:#ffd700;margin-right:5px;">🏆</span>' : ''}
+                <strong>第${i + 1}个BO</strong> <span id="bo-badge-${i}">${badge}</span>
             </div>
             <button class="btn btn-danger btn-small" onclick="removeBo(${i})">删除</button>
           </div>
@@ -1987,12 +2025,31 @@ function renderBoList() {
   }).join('')
 }
 
+let saveScoreTimer = null
+
+function debouncedSaveScoreData() {
+  if (saveScoreTimer) clearTimeout(saveScoreTimer)
+  saveScoreTimer = setTimeout(() => {
+    saveScoreData()
+  }, 500)
+}
+
 function updateBo(boIndex, half, team, value) {
   scoreData.bos[boIndex][half][team] = parseInt(value) || 0
   calculateScore()
-  saveScoreData()
-  renderBoList()
+  debouncedSaveScoreData()
+  // renderBoList() // ✨ 优化：不再重绘列表，避免输入框失去焦点
   updateScoreDisplay()
+
+  // ✨ 仅更新胜负标签
+  const bo = scoreData.bos[boIndex]
+  const result = getBoResult(bo)
+  const badgeHtml = result === 'A' ? '<span style="color:#64b5f6;font-weight:bold;">A队胜</span>' :
+      result === 'B' ? '<span style="color:#ef5350;font-weight:bold;">B队胜</span>' :
+      result === 'D' ? '<span style="color:#ffd700;font-weight:bold;">平局</span>' : '<span style="color:#999;">待定</span>'
+  
+  const badgeEl = document.getElementById(`bo-badge-${boIndex}`)
+  if (badgeEl) badgeEl.innerHTML = badgeHtml
 }
 
 function removeBo(index) {
@@ -2047,13 +2104,45 @@ function updateScoreDisplay() {
 }
 
 function saveScoreData() {
-  if (!matchBase) loadMatchBase()
-  scoreData.teamAName = matchBase.teamA.name || scoreData.teamAName || 'A队'
-  scoreData.teamBName = matchBase.teamB.name || scoreData.teamBName || 'B队'
-  scoreData.teamALogo = matchBase.teamA.logo || scoreData.teamALogo || ''
-  scoreData.teamBLogo = matchBase.teamB.logo || scoreData.teamBLogo || ''
-  localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(scoreData))
-  localStorage.setItem('localBp_score', JSON.stringify(scoreData))
+  // 关键修复：优先从 baseManager 获取最新的 matchBase 状态
+  // 避免全局变量 matchBase 是旧值导致 Logo 被清空或回滚
+  let currentMatchBase = matchBase
+  if (window.baseManager) {
+    currentMatchBase = window.baseManager.state
+  } else {
+    if (!currentMatchBase) loadMatchBase()
+    currentMatchBase = matchBase
+  }
+
+  // ✨ 确保从最新的 currentMatchBase 同步队名和Logo
+  // 只有当 currentMatchBase 中有值时才覆盖 scoreData，避免意外清空
+  if (currentMatchBase) {
+    if (typeof currentMatchBase.teamA?.name === 'string') scoreData.teamAName = currentMatchBase.teamA.name
+    if (typeof currentMatchBase.teamB?.name === 'string') scoreData.teamBName = currentMatchBase.teamB.name
+    // 使用 typeof 检查，允许空字符串（即清除Logo）被同步，同时避免 undefined 覆盖现有值
+    if (typeof currentMatchBase.teamA?.logo === 'string') scoreData.teamALogo = currentMatchBase.teamA.logo
+    if (typeof currentMatchBase.teamB?.logo === 'string') scoreData.teamBLogo = currentMatchBase.teamB.logo
+  }
+  
+  // 如果 scoreData 中还是空的，尝试保留原值或使用默认值，不做破坏性覆盖
+
+  try {
+    scoreData.__assetRev = Date.now()
+    localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(scoreData))
+    localStorage.setItem('localBp_score', JSON.stringify(scoreData))
+    
+    // ✨ 同步到主进程，解决插件不同步问题
+    if (window.electronAPI && window.electronAPI.invoke) {
+      window.electronAPI.invoke('localBp:updateScoreData', scoreData).catch(e => {
+        console.error('[Score] Failed to sync score data:', e)
+      })
+    }
+  } catch (e) {
+    console.error('Failed to save scoreData:', e)
+  }
+  
+  // 广播更新
+
   syncMatchBaseToFrontend()
 }
 

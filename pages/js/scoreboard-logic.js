@@ -52,6 +52,9 @@ async function init() {
   setInterval(loadScoreData, 1000)
   initDraggable()
   setupOBSMode()
+  if (window.electronAPI && window.electronAPI.onUpdateData) {
+    window.electronAPI.onUpdateData(handleUpdateData)
+  }
 
   // 监听字体配置更新
   if (window.electronAPI && window.electronAPI.onFontConfigUpdated) {
@@ -670,6 +673,23 @@ function initDraggable() {
   })
 }
 
+function handleUpdateData(data) {
+  if (!data) return
+  if (data.type === 'score' && data.scoreData) {
+    scoreData = data.scoreData
+    updateDisplay()
+    return
+  }
+  if (data.scoreData) {
+    scoreData = data.scoreData
+    updateDisplay()
+    return
+  }
+  if (data.state && data.state.bos) {
+    scoreData = data.state
+    updateDisplay()
+  }
+}
 function loadScoreData() { if (roomId) { const s = localStorage.getItem('score_' + roomId); if (s) { scoreData = JSON.parse(s); updateDisplay() } } }
 function updateDisplay() {
   const isA = team === 'teamA'
@@ -714,7 +734,7 @@ function updateDisplay() {
 
   document.getElementById('bigScore').textContent = s
   document.getElementById('teamName').textContent = isA ? (scoreData.teamAName || 'A队') : (scoreData.teamBName || 'B队')
-  const logo = isA ? scoreData.teamALogo : scoreData.teamBLogo; if (logo) { const l = document.getElementById('teamLogo'); l.src = logo; l.style.display = 'block' } else { document.getElementById('teamLogo').style.display = 'none' }
+  const logo = isA ? scoreData.teamALogo : scoreData.teamBLogo; if (logo) { const l = document.getElementById('teamLogo'); const rev = scoreData.__assetRev ? `?rev=${scoreData.__assetRev}` : ''; l.src = logo + rev; l.style.display = 'block' } else { document.getElementById('teamLogo').style.display = 'none' }
   const wins = isA ? scoreData.teamAWins : scoreData.teamBWins, draws = isA ? scoreData.teamADraws : scoreData.teamBDraws, comp = scoreData.bos.filter(b => (b.upper.teamA > 0 || b.upper.teamB > 0) && (b.lower.teamA > 0 || b.lower.teamB > 0)).length
   document.getElementById('record').textContent = `${wins}胜 ${draws}平 ${comp - wins - draws}负`
 
@@ -735,7 +755,7 @@ function updateDisplay() {
 function setupOBSMode() {
   if (window.__ASG_OBS_MODE__) {
     window.addEventListener('asg-state-update', e => {
-      const s = e.detail.state; if (s) { Object.assign(scoreData, s); updateDisplay() }
+      handleUpdateData(e.detail)
     })
   }
 }

@@ -2924,12 +2924,15 @@ function updateDisplay(state) {
       }
 
       if (logo.startsWith('file://') || logo.startsWith('data:')) {
-        imgEl.src = logo
+        const rev = state && state.assetRev ? `?rev=${state.assetRev}` : ''
+        imgEl.src = logo + rev
       } else {
         const normalizedPath = logo.replace(/\\/g, '/')
-        imgEl.src = normalizedPath.startsWith('/')
+        const baseUrl = normalizedPath.startsWith('/')
           ? `file://${encodeURI(normalizedPath)}`
           : `file:///${encodeURI(normalizedPath)}`
+        const rev = state && state.assetRev ? `?rev=${state.assetRev}` : ''
+        imgEl.src = baseUrl + rev
       }
       imgEl.style.display = 'block'
       const containerId = teamKey === 'teamA' ? 'teamALogo' : 'teamBLogo'
@@ -3027,7 +3030,8 @@ function updateDisplay(state) {
 
           if (hasChanged || nameEl.textContent !== playerName) {
             nameEl.textContent = playerName
-            placeholder.style.display = 'block'
+            // 只有当没有名字且没有角色时才显示问号 placeholder (Align with Hunter logic)
+            placeholder.style.display = playerName ? 'none' : 'block'
             if (imgEl) {
               imgEl.style.display = 'none'
               imgEl.classList.remove('dissolve-in')

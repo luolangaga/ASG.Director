@@ -114,6 +114,7 @@ const electronAPI = {
   selectPostMatchBackground: () => ipcRenderer.invoke('select-postmatch-background'),
   getBackgroundPath: () => ipcRenderer.invoke('get-background-path'),
   selectTeamLogo: (team) => ipcRenderer.invoke('select-team-logo', team),
+  selectImageForSlot: () => ipcRenderer.invoke('select-image-for-slot'),
 
   // 自定义字体
   selectCustomFont: () => ipcRenderer.invoke('select-custom-font'),

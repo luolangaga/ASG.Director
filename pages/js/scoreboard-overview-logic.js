@@ -91,6 +91,9 @@ async function init() {
             applyFontSettings()
         })
     }
+    if (window.electronAPI && window.electronAPI.onUpdateData) {
+        window.electronAPI.onUpdateData(handleUpdateData)
+    }
 }
 
 // 加载布局配置
@@ -234,6 +237,24 @@ function loadScoreData() {
     }
 }
 
+function handleUpdateData(data) {
+    if (!data) return
+    if (data.type === 'score' && data.scoreData) {
+        scoreData = data.scoreData
+        updateScoreDisplay()
+        return
+    }
+    if (data.scoreData) {
+        scoreData = data.scoreData
+        updateScoreDisplay()
+        return
+    }
+    if (data.state && data.state.bos) {
+        scoreData = data.state
+        updateScoreDisplay()
+    }
+}
+
 // 更新比分显示
 function updateScoreDisplay() {
     // 更新队伍名称
@@ -243,11 +264,12 @@ function updateScoreDisplay() {
     // 更新队伍Logo
     const logoA = document.getElementById('teamALogo')
     const logoB = document.getElementById('teamBLogo')
+    const rev = scoreData.__assetRev ? `?rev=${scoreData.__assetRev}` : ''
     if (scoreData.teamALogo) {
-        logoA.src = scoreData.teamALogo
+        logoA.src = scoreData.teamALogo + rev
     }
     if (scoreData.teamBLogo) {
-        logoB.src = scoreData.teamBLogo
+        logoB.src = scoreData.teamBLogo + rev
     }
 
     // 更新各游戏比分
@@ -545,11 +567,7 @@ function setupKeyboardShortcuts() {
 function setupOBSMode() {
     if (window.__ASG_OBS_MODE__) {
         window.addEventListener('asg-state-update', e => {
-            const s = e.detail.state
-            if (s) {
-                Object.assign(scoreData, s)
-                updateScoreDisplay()
-            }
+            handleUpdateData(e.detail)
         })
     }
 }

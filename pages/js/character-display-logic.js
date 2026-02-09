@@ -193,8 +193,9 @@ function normalizeFileSrc(src) {
   if (src.startsWith('/background/') || src.startsWith('/assets/') || src.startsWith('/userdata/')) return src
   if (src.startsWith('file:')) return src
   const normalized = src.replace(/\\/g, '/')
-  if (normalized.startsWith('/')) return `file://${encodeURI(normalized)}`
-  return `file:///${encodeURI(normalized)}`
+  const base = normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : `file:///${encodeURI(normalized)}`
+  const rev = (state && state.assetRev) ? `?rev=${state.assetRev}` : ''
+  return base + rev
 }
 
 // 加载状态

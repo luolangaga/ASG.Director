@@ -7,6 +7,7 @@ class MatchBaseManager {
     constructor() {
         this.STORAGE_KEY = 'localBp_matchBase';
         this.state = this.getDefaultState();
+        this.saveTimer = null;
     }
 
     getDefaultState() {
@@ -55,6 +56,13 @@ class MatchBaseManager {
     }
 
     save() {
+        if (this.saveTimer) clearTimeout(this.saveTimer);
+        this.saveTimer = setTimeout(() => {
+            this._performSave();
+        }, 300);
+    }
+
+    _performSave() {
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.state));
 
@@ -65,6 +73,17 @@ class MatchBaseManager {
             if (window.syncMatchBaseToFrontend) {
                 // Ensure legacy structure for frontend
                 window.syncMatchBaseToFrontend();
+            }
+
+            // ✨ 修复：同时同步到比分和赛后数据，防止Logo/队名不同步
+            if (window.syncMatchBaseToScoreAndPostMatch) {
+                window.syncMatchBaseToScoreAndPostMatch();
+            }
+
+            // ✨ 修复：确保比分数据也能获取到最新的Logo并同步给插件
+            // 如果页面上有 saveScoreData 函数（local-bp-logic.js），调用它会触发 localBp:updateScoreData
+            if (window.saveScoreData) {
+                window.saveScoreData();
             }
         } catch (e) {
             console.error('Failed to save matchBase:', e);
