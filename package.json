@@ -89,6 +89,7 @@
       "assets/**/*",
       "pages/**/*",
       "internal/**/*",
+      "src/**/*",
       "plugins/**/*",
       "scripts/**/*",
       "utils/**/*",
