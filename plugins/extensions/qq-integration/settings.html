@@ -1,0 +1,197 @@
+<div class="qq-integration-settings">
+    <style>
+        .qq-integration-settings {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+            color: var(--text-main, #333);
+            /* background-color: transparent; Remove global background */
+        }
+        .qq-integration-settings .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .qq-integration-settings h1 {
+            border-bottom: 1px solid var(--border-color, #eee);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            color: var(--text-main, #333);
+        }
+        .qq-integration-settings .form-group {
+            margin-bottom: 15px;
+        }
+        .qq-integration-settings label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--text-main, #333);
+        }
+        .qq-integration-settings input[type="text"], 
+        .qq-integration-settings input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color, #ccc);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: var(--surface-color, #fff);
+            color: var(--text-main, #333);
+        }
+        .qq-integration-settings .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .qq-integration-settings .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .qq-integration-settings .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .qq-integration-settings .btn:hover {
+            opacity: 0.9;
+        }
+        .qq-integration-settings .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .qq-integration-settings .status.success {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            display: block;
+            border: 1px solid #28a745;
+        }
+        .qq-integration-settings .status.error {
+            background-color: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+            display: block;
+            border: 1px solid #dc3545;
+        }
+        .qq-integration-settings .help-text {
+            font-size: 12px;
+            color: var(--text-secondary, #666);
+            margin-top: 5px;
+        }
+    </style>
+
+    <div class="container">
+        <h1>QQ Integration Settings</h1>
+        
+        <div class="form-group">
+            <label for="groupId">QQ Group ID</label>
+            <input type="text" id="groupId" placeholder="e.g. 123456789">
+            <div class="help-text">The QQ Group ID to send BP messages to.</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="host">OneBot HTTP Host</label>
+            <input type="text" id="host" value="127.0.0.1">
+        </div>
+        
+        <div class="form-group">
+            <label for="port">OneBot HTTP Port</label>
+            <input type="number" id="port" value="3000">
+            <div class="help-text">Default port is usually 3000 or 5700.</div>
+        </div>
+        
+        <div class="form-group">
+            <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+            <button id="installBtn" class="btn btn-success">Install LiteLoader</button>
+        </div>
+        
+        <div id="statusMsg" class="status"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    console.log('[QQ Integration] Settings page script loaded');
+    
+    // Scoped selectors to avoid conflicts
+    const container = document.querySelector('.qq-integration-settings');
+    if (!container) {
+        console.error('[QQ Integration] Container not found');
+        return;
+    }
+
+    const saveBtn = container.querySelector('#saveBtn');
+    const installBtn = container.querySelector('#installBtn');
+    const groupIdInput = container.querySelector('#groupId');
+    const hostInput = container.querySelector('#host');
+    const portInput = container.querySelector('#port');
+    const statusMsg = container.querySelector('#statusMsg');
+
+    function showStatus(msg, type) {
+        statusMsg.textContent = msg;
+        statusMsg.className = 'status ' + type;
+        statusMsg.style.display = 'block';
+        setTimeout(() => {
+            statusMsg.style.display = 'none';
+        }, 5000);
+    }
+
+    // Load config
+    async function loadConfig() {
+        try {
+            const api = window.plugins || window.electronAPI;
+            if (!api) {
+                console.error('[QQ Integration] API not found');
+                return;
+            }
+            
+            const config = await api.executeCommand('qq-integration.getConfig');
+            if (config) {
+                if (config.groupId) groupIdInput.value = config.groupId;
+                if (config.host) hostInput.value = config.host;
+                if (config.port) portInput.value = config.port;
+            }
+        } catch (e) {
+            console.error('[QQ Integration] Failed to load config:', e);
+        }
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            try {
+                const api = window.plugins || window.electronAPI;
+                const config = {
+                    groupId: groupIdInput.value,
+                    host: hostInput.value,
+                    port: parseInt(portInput.value)
+                };
+                
+                await api.executeCommand('qq-integration.saveConfig', config);
+                showStatus('Settings saved successfully!', 'success');
+            } catch (e) {
+                console.error(e);
+                showStatus('Failed to save: ' + e.message, 'error');
+            }
+        });
+    }
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            console.log('[QQ Integration] Install button clicked');
+            showStatus('Starting installer...', 'success');
+            try {
+                const api = window.plugins || window.electronAPI;
+                if (!api) throw new Error('Plugin API not available');
+                
+                await api.executeCommand('qq-integration.installLiteLoader');
+                showStatus('Installer launched! Please check the new blue window.', 'success');
+            } catch (e) {
+                console.error('[QQ Integration] Install failed:', e);
+                showStatus('Failed to start installer: ' + e.message, 'error');
+            }
+        });
+    }
+
+    // Initial load
+    loadConfig();
+})();
+</script>

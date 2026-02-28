@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OBS Timer</title>
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Press Start 2P: 像素风; Orbitron: 科技风; Audiowide: 宽体科技; Pacifico: 手写风 -->
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Orbitron:wght@700&family=Pacifico&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        /* 默认样式 */
+        color: #ffffff;
+      }
+
+      #timer {
+        transition: font-family 0.3s ease, text-shadow 0.3s ease;
+        cursor: default;
+      }
+
+      /* 字体风格预设 */
+      .style-impact {
+        font-family: "Impact", "Charcoal", sans-serif;
+        font-size: 120px;
+        letter-spacing: 2px;
+        text-shadow: 
+          4px 4px 0 #000,
+          -1px -1px 0 #000,  
+          1px -1px 0 #000,
+          -1px 1px 0 #000,
+          1px 1px 0 #000;
+      }
+
+      .style-pixel {
+        font-family: 'Press Start 2P', cursive;
+        font-size: 60px; /* 像素字体通常比较大，稍微调小一点 */
+        letter-spacing: -2px;
+        text-shadow: 
+          4px 4px 0 #000,
+          -2px -2px 0 #000;
+      }
+
+      .style-digital {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 80px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-shadow: 
+          0 0 10px rgba(0, 255, 255, 0.8),
+          2px 2px 0 #000;
+        color: #e0ffff;
+      }
+
+      .style-neon {
+        font-family: 'Audiowide', cursive;
+        font-size: 90px;
+        color: #fff;
+        text-shadow:
+          0 0 5px #fff,
+          0 0 10px #fff,
+          0 0 20px #ff00de,
+          0 0 30px #ff00de,
+          0 0 40px #ff00de;
+      }
+
+      .style-simple {
+        font-family: "Segoe UI", sans-serif;
+        font-size: 100px;
+        font-weight: 800;
+        text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      }
+
+      /* 右键菜单样式 */
+      #context-menu {
+        position: absolute;
+        display: none;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 8px 0;
+        min-width: 180px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        color: #fff;
+        font-family: "Segoe UI", sans-serif;
+        font-size: 14px;
+      }
+
+      .menu-item {
+        padding: 8px 16px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s;
+      }
+
+      .menu-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .menu-item.active {
+        color: #4facfe;
+        font-weight: bold;
+      }
+      
+      .menu-separator {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 4px 0;
+      }
+
+      .menu-group-title {
+        padding: 4px 16px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      /* Checkbox visual for toggle */
+      .toggle-check {
+        width: 16px;
+        height: 16px;
+        border: 1px solid rgba(255,255,255,0.5);
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 10px;
+      }
+      .toggle-check::after {
+        content: '';
+        display: block;
+        width: 8px;
+        height: 8px;
+        background: #4facfe;
+        border-radius: 1px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .menu-item.checked .toggle-check::after {
+        opacity: 1;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="timer" class="style-impact">00:00:00</div>
+
+    <!-- 自定义右键菜单 -->
+    <div id="context-menu">
+      <div class="menu-group-title">风格 (Style)</div>
+      <div class="menu-item active" data-style="style-impact">Impact (默认)</div>
+      <div class="menu-item" data-style="style-pixel">Pixel (像素)</div>
+      <div class="menu-item" data-style="style-digital">Digital (科技)</div>
+      <div class="menu-item" data-style="style-neon">Neon (霓虹)</div>
+      <div class="menu-item" data-style="style-simple">Simple (简约)</div>
+      
+      <div class="menu-separator"></div>
+      
+      <div class="menu-group-title">设置 (Settings)</div>
+      <div class="menu-item checked" id="toggle-hours">
+        显示小时 (Show Hours)
+        <div class="toggle-check"></div>
+      </div>
+    </div>
+
+    <script>
+      // 状态管理
+      const state = {
+        style: localStorage.getItem('timer_style') || 'style-impact',
+        showHours: localStorage.getItem('timer_show_hours') !== 'false', // 默认 true
+        elapsedSeconds: 0
+      };
+
+      const timerEl = document.getElementById("timer");
+      const contextMenu = document.getElementById("context-menu");
+      const toggleHoursEl = document.getElementById("toggle-hours");
+      const styleItems = document.querySelectorAll('[data-style]');
+
+      // 初始化视图
+      function initView() {
+        // 应用保存的风格
+        timerEl.className = state.style;
+        
+        // 更新菜单选中状态
+        styleItems.forEach(item => {
+          if (item.dataset.style === state.style) {
+            item.classList.add('active');
+          } else {
+            item.classList.remove('active');
+          }
+        });
+
+        // 更新小时开关状态
+        if (state.showHours) {
+          toggleHoursEl.classList.add('checked');
+        } else {
+          toggleHoursEl.classList.remove('checked');
+        }
+      }
+
+      // 计时逻辑
+      const updateTimer = () => {
+        const hours = Math.floor(state.elapsedSeconds / 3600);
+        const minutes = Math.floor((state.elapsedSeconds % 3600) / 60);
+        const seconds = state.elapsedSeconds % 60;
+
+        const mm = String(minutes).padStart(2, "0");
+        const ss = String(seconds).padStart(2, "0");
+
+        if (state.showHours) {
+          const hh = String(hours).padStart(2, "0");
+          timerEl.textContent = `${hh}:${mm}:${ss}`;
+        } else {
+          // 如果不显示小时，分钟数累加
+          const totalMinutes = String(Math.floor(state.elapsedSeconds / 60)).padStart(2, "0");
+          timerEl.textContent = `${totalMinutes}:${ss}`;
+        }
+      };
+
+      // 启动计时器
+      updateTimer(); // 立即执行一次
+      setInterval(() => {
+        state.elapsedSeconds += 1;
+        updateTimer();
+      }, 1000);
+
+      // 右键菜单逻辑
+      document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const { clientX: mouseX, clientY: mouseY } = e;
+        
+        // 防止菜单溢出屏幕
+        const menuWidth = 200;
+        const menuHeight = 250;
+        let x = mouseX;
+        let y = mouseY;
+        
+        if (x + menuWidth > window.innerWidth) x -= menuWidth;
+        if (y + menuHeight > window.innerHeight) y -= menuHeight;
+
+        contextMenu.style.left = `${x}px`;
+        contextMenu.style.top = `${y}px`;
+        contextMenu.style.display = 'block';
+      });
+
+      // 点击其他地方关闭菜单
+      document.addEventListener('click', (e) => {
+        if (!contextMenu.contains(e.target)) {
+          contextMenu.style.display = 'none';
+        }
+      });
+
+      // 菜单项点击处理
+      styleItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const newStyle = item.dataset.style;
+          state.style = newStyle;
+          localStorage.setItem('timer_style', newStyle);
+          
+          initView();
+          contextMenu.style.display = 'none';
+        });
+      });
+
+      toggleHoursEl.addEventListener('click', () => {
+        state.showHours = !state.showHours;
+        localStorage.setItem('timer_show_hours', state.showHours);
+        
+        initView();
+        updateTimer(); // 立即刷新显示格式
+        // 不关闭菜单，方便连续操作，或者关闭也行。这里选择不关闭体验可能好点，或者根据习惯关闭。
+        // 为了简洁，选择点击后保持菜单开启或关闭？通常点击Checkbox不关闭，点击选项关闭。
+        // 但为了简单实现，这里可以先不手动关闭，让用户点外面关闭。
+      });
+
+      // 初始化
+      initView();
+
+    </script>
+  </body>
+</html>

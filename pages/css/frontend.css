@@ -29,6 +29,50 @@ body.transparent-bg #solidBackground {
   display: none !important;
 }
 
+.transparent-border-blink {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 4px solid #22c55e;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 99999;
+  opacity: 0;
+}
+
+.transparent-border-blink.active {
+  animation: transparentBorderBlink 0.5s linear infinite;
+}
+
+@keyframes transparentBorderBlink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.transparent-drag-hint {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0) 0%, rgba(34, 197, 94, 0.7) 50%, rgba(34, 197, 94, 0) 100%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1003;
+  transition: opacity 0.2s ease;
+}
+
+.transparent-drag-hint.active {
+  opacity: 0.6;
+}
+
+body:not(.transparent-bg) .transparent-drag-hint {
+  display: none;
+}
+
 /* 顶部拖拽条（用于移动窗口） */
 .drag-bar {
   position: absolute;

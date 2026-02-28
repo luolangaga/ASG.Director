@@ -1,0 +1,14 @@
+{
+  "name": "qq-integration",
+  "displayName": "QQ Integration (LiteLoader)",
+  "version": "1.0.0",
+  "description": "Send real-time BP info to QQ Group via LiteLoader/OneBot.",
+  "main": "index.js",
+  "author": "ASG Team",
+  "engines": {
+    "director": "^1.0.0"
+  },
+  "permissions": [
+    "network"
+  ]
+}

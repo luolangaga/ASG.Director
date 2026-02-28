@@ -19,10 +19,255 @@ let characters = {
   hunters: []
 }
 
+const AUTO_GLOBAL_BAN_KEY = 'localBp_autoGlobalBan'
+let autoGlobalBan = loadAutoGlobalBanState()
+
+function getDefaultAutoGlobalBanState() {
+  return {
+    enabled: false,
+    currentRole: 'asbh',
+    rounds: []
+  }
+}
+
+function normalizeAutoGlobalBanState(raw) {
+  const base = getDefaultAutoGlobalBanState()
+  if (!raw || typeof raw !== 'object') return base
+  const role = raw.currentRole === 'ahbs' ? 'ahbs' : 'asbh'
+  const rounds = Array.isArray(raw.rounds) ? raw.rounds : []
+  return {
+    enabled: !!raw.enabled,
+    currentRole: role,
+    rounds: rounds.map(round => {
+      const survivors = Array.isArray(round?.survivors) ? round.survivors.filter(Boolean) : []
+      const hunter = typeof round?.hunter === 'string' ? round.hunter : ''
+      const assigned = round?.assigned === 'ahbs' ? 'ahbs' : (round?.assigned === 'asbh' ? 'asbh' : null)
+      const id = typeof round?.id === 'string' && round.id ? round.id : `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const timestamp = typeof round?.timestamp === 'number' ? round.timestamp : Date.now()
+      return { id, survivors, hunter, assigned, timestamp }
+    })
+  }
+}
+
+function loadAutoGlobalBanState() {
+  try {
+    const raw = localStorage.getItem(AUTO_GLOBAL_BAN_KEY)
+    const data = raw ? JSON.parse(raw) : null
+    return normalizeAutoGlobalBanState(data)
+  } catch {
+    return getDefaultAutoGlobalBanState()
+  }
+}
+
+function saveAutoGlobalBanState() {
+  localStorage.setItem(AUTO_GLOBAL_BAN_KEY, JSON.stringify(autoGlobalBan))
+}
+
+function uniqueList(list) {
+  return Array.from(new Set((Array.isArray(list) ? list : []).filter(Boolean)))
+}
+
+function clearAutoGlobalBanHistory() {
+  autoGlobalBan.rounds = []
+  saveAutoGlobalBanState()
+  renderAutoGlobalBanUI()
+}
+
+function toggleAutoGlobalBan(enabled) {
+  autoGlobalBan.enabled = !!enabled
+  saveAutoGlobalBanState()
+  renderAutoGlobalBanUI()
+  applyAutoGlobalBans(true)
+}
+
+function setAutoGlobalRole(role) {
+  if (role !== 'asbh' && role !== 'ahbs') return
+  autoGlobalBan.currentRole = role
+  saveAutoGlobalBanState()
+  renderAutoGlobalBanUI()
+  applyAutoGlobalBans(true)
+}
+
+function recordAutoGlobalBanRound() {
+  const survivors = state.survivors.filter(Boolean)
+  const hunter = state.hunter || ''
+  if (survivors.length === 0 && !hunter) return
+  const round = {
+    id: `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    survivors,
+    hunter,
+    assigned: null,
+    timestamp: Date.now()
+  }
+  autoGlobalBan.rounds.unshift(round)
+  saveAutoGlobalBanState()
+  renderAutoGlobalBanUI()
+  if (autoGlobalBan.enabled) applyAutoGlobalBans()
+}
+
+function assignAutoGlobalBanRound(roundId, role) {
+  const targetRole = role === 'asbh' || role === 'ahbs' ? role : null
+  const round = autoGlobalBan.rounds.find(r => r.id === roundId)
+  if (!round) return
+  round.assigned = targetRole
+  saveAutoGlobalBanState()
+  renderAutoGlobalBanUI()
+  applyAutoGlobalBans(true)
+}
+
+function buildAutoGlobalBanItem(round) {
+  const el = document.createElement('div')
+  el.className = 'auto-global-ban-item'
+  el.draggable = true
+  el.dataset.roundId = round.id
+
+  const survivorsRow = document.createElement('div')
+  survivorsRow.className = 'auto-global-ban-item-row'
+  survivorsRow.textContent = round.survivors.length ? round.survivors.join(' / ') : '无求生'
+
+  const hunterRow = document.createElement('div')
+  hunterRow.className = 'auto-global-ban-item-row'
+  hunterRow.textContent = round.hunter || '无监管'
+
+  el.appendChild(survivorsRow)
+  el.appendChild(hunterRow)
+
+  el.addEventListener('dragstart', (event) => {
+    el.classList.add('dragging')
+    event.dataTransfer.setData('text/plain', round.id)
+  })
+
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging')
+  })
+
+  return el
+}
+
+function renderAutoGlobalBanPool(bodyEl, rounds) {
+  if (!bodyEl) return
+  bodyEl.innerHTML = ''
+  if (!rounds.length) {
+    const empty = document.createElement('div')
+    empty.className = 'auto-global-ban-empty'
+    empty.textContent = '拖拽对局到这里'
+    bodyEl.appendChild(empty)
+    return
+  }
+  rounds.forEach(round => {
+    bodyEl.appendChild(buildAutoGlobalBanItem(round))
+  })
+}
+
+function renderAutoGlobalBanUI() {
+  const toggleEl = document.getElementById('autoGlobalBanToggle')
+  if (toggleEl) toggleEl.checked = autoGlobalBan.enabled
+
+  const roleASBH = document.getElementById('autoGlobalRoleASBH')
+  const roleAHBS = document.getElementById('autoGlobalRoleAHBS')
+  if (roleASBH) roleASBH.classList.toggle('active', autoGlobalBan.currentRole === 'asbh')
+  if (roleAHBS) roleAHBS.classList.toggle('active', autoGlobalBan.currentRole === 'ahbs')
+
+  const unassigned = autoGlobalBan.rounds.filter(r => !r.assigned)
+  const asbhRounds = autoGlobalBan.rounds.filter(r => r.assigned === 'asbh')
+  const ahbsRounds = autoGlobalBan.rounds.filter(r => r.assigned === 'ahbs')
+
+  renderAutoGlobalBanPool(document.getElementById('autoGlobalPoolUnassignedBody'), unassigned)
+  renderAutoGlobalBanPool(document.getElementById('autoGlobalPoolASBHBody'), asbhRounds)
+  renderAutoGlobalBanPool(document.getElementById('autoGlobalPoolAHBSBody'), ahbsRounds)
+}
+
+function initAutoGlobalBanDnD() {
+  const pools = document.querySelectorAll('.auto-global-ban-pool')
+  pools.forEach(pool => {
+    pool.addEventListener('dragover', (event) => {
+      event.preventDefault()
+      pool.classList.add('drag-over')
+    })
+    pool.addEventListener('dragleave', () => {
+      pool.classList.remove('drag-over')
+    })
+    pool.addEventListener('drop', (event) => {
+      event.preventDefault()
+      pool.classList.remove('drag-over')
+      const roundId = event.dataTransfer.getData('text/plain')
+      const role = pool.dataset.role || ''
+      assignAutoGlobalBanRound(roundId, role)
+    })
+  })
+}
+
+function computeAutoGlobalBans(role) {
+  const rounds = autoGlobalBan.rounds.filter(r => r.assigned === role)
+  const survivorSet = new Set()
+  const hunterSet = new Set()
+  rounds.forEach(round => {
+    round.survivors.forEach(name => survivorSet.add(name))
+    if (round.hunter) hunterSet.add(round.hunter)
+  })
+  return {
+    survivors: Array.from(survivorSet),
+    hunters: Array.from(hunterSet)
+  }
+}
+
+async function replaceGlobalBans(survivors, hunters) {
+  const uniqueSurvivors = uniqueList(survivors)
+  const uniqueHunters = uniqueList(hunters)
+
+  let survivorSetOk = false
+  let hunterSetOk = false
+
+  try {
+    const res = await window.electronAPI.invoke('localBp:setGlobalBan', 'survivor', uniqueSurvivors)
+    if (!res || res.success !== false) survivorSetOk = true
+  } catch {}
+
+  try {
+    const res = await window.electronAPI.invoke('localBp:setGlobalBan', 'hunter', uniqueHunters)
+    if (!res || res.success !== false) hunterSetOk = true
+  } catch {}
+
+  if (!survivorSetOk) {
+    for (const name of [...state.globalBannedSurvivors]) {
+      await window.electronAPI.invoke('localBp:removeGlobalBanSurvivor', name)
+    }
+    for (const name of uniqueSurvivors) {
+      await window.electronAPI.invoke('localBp:addGlobalBanSurvivor', name)
+    }
+  }
+
+  if (!hunterSetOk) {
+    for (const name of [...state.globalBannedHunters]) {
+      await window.electronAPI.invoke('localBp:removeGlobalBanHunter', name)
+    }
+    for (const name of uniqueHunters) {
+      await window.electronAPI.invoke('localBp:addGlobalBanHunter', name)
+    }
+  }
+
+  state.globalBannedSurvivors = uniqueSurvivors
+  state.globalBannedHunters = uniqueHunters
+  updateDisplay()
+  updateCharacterStatus()
+}
+
+async function applyAutoGlobalBans(force) {
+  if (!force && !autoGlobalBan.enabled) return
+  const role = autoGlobalBan.currentRole
+  const next = computeAutoGlobalBans(role)
+  await replaceGlobalBans(next.survivors, next.hunters)
+}
+
 let pickType = null
 let pickIndex = null
 let pickAction = null
 let currentSurvivorIndex = 0 // 当前选中的求生者索引（用于天赋选择）
+
+if (typeof window !== 'undefined') {
+  window.alert = () => {}
+  window.confirm = () => true
+}
 
 // ========== 对局基础信息（matchBase）统一源 ==========
 const LOCAL_ROOM_ID = 'local-bp'
@@ -31,6 +276,18 @@ const SCORE_STORAGE_KEY = `score_${LOCAL_ROOM_ID}`
 const POSTMATCH_STORAGE_KEY = `postmatch_${LOCAL_ROOM_ID}`
 const TEAM_MANAGER_KEY = 'asg_team_manager_teams'
 const TEAM_MANAGER_SELECTION_KEY = 'asg_team_manager_selection'
+
+let teamManagerTeams = []
+
+let localTeamCsvInput = null
+let localImportTeamCsvBtn = null
+let localTeamManagerClearBtn = null
+let localTeamManagerCount = null
+let localTeamManagerTeamA = null
+let localTeamManagerTeamB = null
+let localTeamManagerPreviewA = null
+let localTeamManagerPreviewB = null
+let localApplyTeamManagerBtn = null
 
 let matchBase = null
 
@@ -42,6 +299,10 @@ function loadTeamManagerTeams() {
   } catch {
     return []
   }
+}
+
+function saveTeamManagerData() {
+  localStorage.setItem(TEAM_MANAGER_KEY, JSON.stringify(teamManagerTeams))
 }
 
 function loadTeamManagerSelection() {
@@ -57,9 +318,166 @@ function loadTeamManagerSelection() {
   }
 }
 
+function saveTeamManagerSelection(sel) {
+  localStorage.setItem(TEAM_MANAGER_SELECTION_KEY, JSON.stringify(sel || {}))
+}
+
+function parseCsvRows(text) {
+  const rows = []
+  let row = []
+  let field = ''
+  let inQuotes = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    const next = text[i + 1]
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        field += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+    if (!inQuotes && (ch === '\n' || ch === '\r')) {
+      if (ch === '\r' && next === '\n') i++
+      row.push(field)
+      rows.push(row)
+      row = []
+      field = ''
+      continue
+    }
+    if (!inQuotes && ch === ',') {
+      row.push(field)
+      field = ''
+      continue
+    }
+    field += ch
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field)
+    rows.push(row)
+  }
+  return rows.map(r => r.map(v => (v || '').trim())).filter(r => r.some(v => v !== ''))
+}
+
+function normalizeHeader(h) {
+  return (h || '').replace('\uFEFF', '').trim().toLowerCase()
+}
+
+function parseTeamsFromCsv(text) {
+  const rows = parseCsvRows(text)
+  if (rows.length <= 1) return []
+  const header = rows[0].map(normalizeHeader)
+  const idx = {
+    teamName: header.findIndex(h => h === 'teamname'),
+    teamId: header.findIndex(h => h === 'teamid'),
+    qq: header.findIndex(h => h === 'qqnumber'),
+    playerName: header.findIndex(h => h === 'playername'),
+    gameId: header.findIndex(h => h === 'gameid'),
+    gameRank: header.findIndex(h => h === 'gamerank'),
+    playerDesc: header.findIndex(h => h === 'playerdescription')
+  }
+  const map = new Map()
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]
+    const teamName = idx.teamName >= 0 ? row[idx.teamName] : ''
+    const teamId = idx.teamId >= 0 ? row[idx.teamId] : ''
+    if (!teamName && !teamId) continue
+    const key = teamId || teamName
+    if (!map.has(key)) {
+      map.set(key, {
+        id: teamId,
+        name: teamName || teamId,
+        qq: idx.qq >= 0 ? row[idx.qq] : '',
+        players: []
+      })
+    }
+    const team = map.get(key)
+    const playerName = idx.playerName >= 0 ? row[idx.playerName] : ''
+    const gameId = idx.gameId >= 0 ? row[idx.gameId] : ''
+    const gameRank = idx.gameRank >= 0 ? row[idx.gameRank] : ''
+    const playerDescription = idx.playerDesc >= 0 ? row[idx.playerDesc] : ''
+    if (playerName || gameId) {
+      const exists = team.players.some(p => (p.name || '') === playerName && (p.gameId || '') === gameId)
+      if (!exists) {
+        team.players.push({ name: playerName, gameId, gameRank, description: playerDescription })
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'))
+}
+
 function findTeamFromManager(teams, val) {
   if (!val) return null
   return teams.find(t => (t.id || t.name) === val) || null
+}
+
+function renderTeamManager() {
+  if (localTeamManagerCount) {
+    localTeamManagerCount.textContent = teamManagerTeams.length ? `已导入 ${teamManagerTeams.length} 支队伍` : '未导入'
+  }
+  const selection = loadTeamManagerSelection()
+  const buildOptions = (selectEl, selectedId) => {
+    if (!selectEl) return
+    const options = ['<option value="">请选择</option>'].concat(teamManagerTeams.map(t => {
+      const val = t.id || t.name
+      const label = t.name + (t.id ? ` (${t.id.slice(0, 6)}...)` : '')
+      return `<option value="${val}">${label}</option>`
+    }))
+    selectEl.innerHTML = options.join('')
+    if (selectedId) selectEl.value = selectedId
+  }
+  buildOptions(localTeamManagerTeamA, selection.teamA || '')
+  buildOptions(localTeamManagerTeamB, selection.teamB || '')
+  updateTeamPreview()
+}
+
+function renderPreview(el, team) {
+  if (!el) return
+  if (!team) {
+    el.textContent = ''
+    return
+  }
+  const players = team.players || []
+  const list = players.map(p => p.name || p.gameId).filter(Boolean)
+  el.textContent = list.length ? `阵容：${list.join('、')}` : '未识别选手'
+}
+
+function updateTeamPreview() {
+  const teamA = findTeamFromManager(teamManagerTeams, localTeamManagerTeamA?.value)
+  const teamB = findTeamFromManager(teamManagerTeams, localTeamManagerTeamB?.value)
+  renderPreview(localTeamManagerPreviewA, teamA)
+  renderPreview(localTeamManagerPreviewB, teamB)
+  saveTeamManagerSelection({ teamA: localTeamManagerTeamA?.value || '', teamB: localTeamManagerTeamB?.value || '' })
+}
+
+async function importTeamCsv() {
+  const file = localTeamCsvInput?.files?.[0]
+  if (!file) {
+    alert('请选择CSV文件')
+    return
+  }
+  try {
+    const text = await file.text()
+    const teams = parseTeamsFromCsv(text)
+    if (!teams.length) {
+      alert('CSV未解析到队伍数据')
+      return
+    }
+    teamManagerTeams = teams
+    saveTeamManagerData()
+    renderTeamManager()
+    alert(`已导入 ${teams.length} 支队伍`)
+  } catch (e) {
+    alert('导入失败: ' + (e?.message || e))
+  }
+}
+
+function clearTeamManager() {
+  teamManagerTeams = []
+  saveTeamManagerData()
+  renderTeamManager()
 }
 
 function clearCurrentBpSelection() {
@@ -112,6 +530,26 @@ function applyTeamsToLocalBpFromManager() {
     window.baseManager.render()
   }
   alert('已应用到本地BP')
+}
+
+function initLocalTeamManagerUI() {
+  localTeamCsvInput = document.getElementById('localTeamCsvInput')
+  localImportTeamCsvBtn = document.getElementById('localImportTeamCsvBtn')
+  localTeamManagerClearBtn = document.getElementById('localTeamManagerClearBtn')
+  localTeamManagerCount = document.getElementById('localTeamManagerCount')
+  localTeamManagerTeamA = document.getElementById('localTeamManagerTeamA')
+  localTeamManagerTeamB = document.getElementById('localTeamManagerTeamB')
+  localTeamManagerPreviewA = document.getElementById('localTeamManagerPreviewA')
+  localTeamManagerPreviewB = document.getElementById('localTeamManagerPreviewB')
+  localApplyTeamManagerBtn = document.getElementById('localApplyTeamManagerBtn')
+  if (!localTeamManagerCount) return
+  localImportTeamCsvBtn?.addEventListener('click', importTeamCsv)
+  localTeamManagerClearBtn?.addEventListener('click', clearTeamManager)
+  localTeamManagerTeamA?.addEventListener('change', updateTeamPreview)
+  localTeamManagerTeamB?.addEventListener('change', updateTeamPreview)
+  localApplyTeamManagerBtn?.addEventListener('click', applyTeamsToLocalBpFromManager)
+  teamManagerTeams = loadTeamManagerTeams()
+  renderTeamManager()
 }
 
 function getDefaultMatchBase() {
@@ -797,28 +1235,8 @@ async function loadCharacters() {
         characters.hunters = result.data.hunters.map(c => c.name)
       } else {
         characters = result.data
-        if (characters.fullData) {
-          // 清空并重建搜索索引
-          CHAR_PY_MAP = {}
-          const process = (list) => {
-            if (Array.isArray(list)) {
-              list.forEach(c => {
-                if (c && c.name && c.abbr) {
-                  // 构造搜索条目：[缩写, 英文名/拼音?]
-                  // roles.json 只有 abbr (如 "ys") 和 enName (如 "Doctor")
-                  // 这里简单地将 abbr 和 enName 加入索引
-                  const keywords = [c.abbr.toLowerCase()]
-                  if (c.enName) keywords.push(c.enName.toLowerCase())
-                  CHAR_PY_MAP[c.name] = keywords
-                }
-              })
-            }
-          }
-          process(characters.fullData.survivors)
-          process(characters.fullData.hunters)
-
-          // 清理不需要的字段以免混淆
-          delete characters.fullData
+        if (characters.pinyinMap && typeof characters.pinyinMap === 'object') {
+          CHAR_PY_MAP = characters.pinyinMap
         }
       }
     }
@@ -849,8 +1267,8 @@ async function loadState() {
     state.hunter = data.hunter || null
     state.hunterBannedSurvivors = Array.isArray(data.hunterBannedSurvivors) ? data.hunterBannedSurvivors : []
     state.survivorBannedHunters = Array.isArray(data.survivorBannedHunters) ? data.survivorBannedHunters : []
-    state.globalBannedSurvivors = Array.isArray(data.globalBannedSurvivors) ? data.globalBannedSurvivors : []
-    state.globalBannedHunters = Array.isArray(data.globalBannedHunters) ? data.globalBannedHunters : []
+    state.globalBannedSurvivors = uniqueList(data.globalBannedSurvivors)
+    state.globalBannedHunters = uniqueList(data.globalBannedHunters)
     // 加载每个求生者的天赋（二维数组）
     state.survivorTalents = Array.isArray(data.survivorTalents) && data.survivorTalents.length === 4
       ? data.survivorTalents.map(t => Array.isArray(t) ? t : [])
@@ -877,8 +1295,8 @@ function applyLocalBpStateFromUpdateData(payload) {
   state.hunter = round.selectedHunter || null
   state.hunterBannedSurvivors = Array.isArray(round.hunterBannedSurvivors) ? round.hunterBannedSurvivors : []
   state.survivorBannedHunters = Array.isArray(round.survivorBannedHunters) ? round.survivorBannedHunters : []
-  state.globalBannedSurvivors = Array.isArray(payload.globalBannedSurvivors) ? payload.globalBannedSurvivors : []
-  state.globalBannedHunters = Array.isArray(payload.globalBannedHunters) ? payload.globalBannedHunters : []
+  state.globalBannedSurvivors = uniqueList(payload.globalBannedSurvivors)
+  state.globalBannedHunters = uniqueList(payload.globalBannedHunters)
   state.survivorTalents = Array.isArray(payload.survivorTalents) && payload.survivorTalents.length === 4
     ? payload.survivorTalents.map(t => Array.isArray(t) ? t : [])
     : [[], [], [], []]
@@ -1483,6 +1901,7 @@ function scheduleResetReload() {
 // 重置BP
 async function resetBp(keepGlobal) {
   if (keepGlobal) {
+    recordAutoGlobalBanRound()
     await window.electronAPI.invoke('localBp:setSurvivor', { index: 0, character: null })
     await window.electronAPI.invoke('localBp:setSurvivor', { index: 1, character: null })
     await window.electronAPI.invoke('localBp:setSurvivor', { index: 2, character: null })
@@ -1518,6 +1937,7 @@ async function resetBp(keepGlobal) {
       playerNames: ['', '', '', '', ''],
       editingSurvivorIndex: null
     }
+    clearAutoGlobalBanHistory()
     for (let i = 0; i < 5; i++) {
       const input = document.getElementById(`player-name-${i}`)
       if (input) input.value = ''
@@ -1749,52 +2169,42 @@ async function updatePlayerName(index, name) {
 // 选择求生者来设置天赋
 function selectSurvivorForTalent(index) {
   state.editingSurvivorIndex = index
-  // 更新tab样式
-  document.querySelectorAll('.survivor-tab').forEach((tab, i) => {
-    tab.classList.toggle('active', i === index)
-    // 显示是否已有天赋
-    const hasTalents = state.survivorTalents[i] && state.survivorTalents[i].length > 0
-    tab.classList.toggle('has-talents', hasTalents)
-  })
-  // 更新天赋选中状态
   updateSurvivorTalentUI()
-  // 更新当前显示
-  updateCurrentSurvivorTalentsDisplay()
 }
 
-// 切换求生者天赋（为当前选中的求生者）
-async function toggleSurvivorTalent(talent) {
-  if (state.editingSurvivorIndex === null) {
-    alert('请先选择一个求生者')
-    return
+// 切换求生者天赋（为指定求生者）
+async function toggleSurvivorTalent(index, talent) {
+  let i = index
+  let t = talent
+  if (typeof index === 'string') {
+    t = index
+    i = state.editingSurvivorIndex
   }
-  const i = state.editingSurvivorIndex
+  if (i === null || i === undefined) return
   if (!state.survivorTalents[i]) state.survivorTalents[i] = []
-
-  const idx = state.survivorTalents[i].indexOf(talent)
+  const idx = state.survivorTalents[i].indexOf(t)
   if (idx >= 0) {
     state.survivorTalents[i].splice(idx, 1)
   } else {
-    state.survivorTalents[i].push(talent)
+    state.survivorTalents[i].push(t)
   }
   await window.electronAPI.invoke('localBp:setSurvivorTalents', { index: i, talents: state.survivorTalents[i] })
   updateSurvivorTalentUI()
-  updateCurrentSurvivorTalentsDisplay()
   updateDisplay()
 }
 
-// 更新求生者天赋UI（仅当前选中的求生者）
+// 更新求生者天赋UI（所有求生者）
 function updateSurvivorTalentUI() {
-  const i = state.editingSurvivorIndex
-  document.querySelectorAll('#survivor-talent-grid .talent-item').forEach(item => {
+  document.querySelectorAll('.survivor-talent-item').forEach(item => {
+    const i = Number(item.dataset.survivorIndex)
     const talent = item.dataset.talent
-    const isSelected = i !== null && state.survivorTalents[i] && state.survivorTalents[i].includes(talent)
+    const isSelected = Number.isInteger(i) && state.survivorTalents[i] && state.survivorTalents[i].includes(talent)
     item.classList.toggle('selected', isSelected)
   })
-  // 更新tab的has-talents状态
-  document.querySelectorAll('.survivor-tab').forEach((tab, idx) => {
-    const hasTalents = state.survivorTalents[idx] && state.survivorTalents[idx].length > 0
-    tab.classList.toggle('has-talents', hasTalents)
+  document.querySelectorAll('[data-survivor-title]').forEach(el => {
+    const i = Number(el.dataset.survivorTitle)
+    const name = state.survivors[i] || `求生者${i + 1}`
+    el.textContent = name
   })
 }
 
@@ -1876,7 +2286,6 @@ function switchPage(page) {
   // 切换到天赋/技能页时刷新UI
   if (page === 'talents') {
     updateTalentSkillUI()
-    updateCurrentSurvivorTalentsDisplay()
   }
 }
 
@@ -3124,10 +3533,12 @@ Promise.allSettled([loadCharacters(), loadState()]).then(() => {
     if (window.baseManager) {
       window.baseManager.init();
     }
+    initLocalTeamManagerUI()
   });
 
   updateDisplay()
   updateCharacterStatus()
+  if (autoGlobalBan.enabled) applyAutoGlobalBans()
 })
 
 if (window.electronAPI && typeof window.electronAPI.onLocalBpStateUpdate === 'function') {
@@ -3170,9 +3581,11 @@ function getSearchScore(name, query) {
   // Pinyin match
   const entry = CHAR_PY_MAP[name];
   if (entry) {
-    if (entry[0] === q) return 90; // Exact initial
-    if (entry[0].startsWith(q)) return 80; // Prefix initial
-    if (entry[1] && entry[1].startsWith(q)) return 70; // Prefix pinyin
+    const initials = (entry.initials || '').toLowerCase();
+    const full = (entry.full || '').toLowerCase();
+    if (initials === q) return 90;
+    if (initials.startsWith(q)) return 80;
+    if (full.startsWith(q)) return 70;
   }
   return 0;
 }
@@ -3395,11 +3808,37 @@ function updateLocalTimerDisplay() {
   }
 }
 
+/**
+ * 切换区域的展开/折叠状态
+ * @param {string} id 区域ID
+ */
+function toggleCollapsible(id) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.classList.toggle('collapsed');
+    const isCollapsed = element.classList.contains('collapsed');
+    localStorage.setItem(`collapsed_${id}`, isCollapsed);
+    console.log(`✨ [${id}] ${isCollapsed ? '收起来啦 (つ´ω`)つ' : '展开啦 (ﾉ>ω<)ﾉ'}`);
+  }
+}
+
 // 页面加载初始化
 window.addEventListener('DOMContentLoaded', () => {
+  // 恢复折叠状态
+  const sections = ['bp-top-section', 'baseinfo-top-section'];
+  sections.forEach(id => {
+    const isCollapsed = localStorage.getItem(`collapsed_${id}`) === 'true';
+    const element = document.getElementById(id);
+    if (element && isCollapsed) {
+      element.classList.add('collapsed');
+    }
+  });
+
   syncDefaultImagesToMainProcess()
   updateDisplay()
   initGlobalShortcuts()
+  renderAutoGlobalBanUI()
+  initAutoGlobalBanDnD()
   if (isGuideOnly) {
     if (!matchBase) loadMatchBase()
     openBpGuide()

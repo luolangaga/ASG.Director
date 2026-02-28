@@ -2484,6 +2484,8 @@ function updateDisplay(state) {
 
 // ========= 地图图片展示（assets/map） =========
 var __mapAssetNames = null
+var __lastMapResolved = null
+var __lastMapUrl = null
 
 async function loadMapAssetsOnce() {
   if (Array.isArray(__mapAssetNames)) return __mapAssetNames
@@ -2523,6 +2525,8 @@ function updateMapImage(mapName) {
   const resolved = resolveMapAssetName(mapName)
   if (!resolved) {
     container.style.display = 'none'
+    __lastMapResolved = null
+    __lastMapUrl = null
     return
   }
 
@@ -2535,6 +2539,13 @@ function updateMapImage(mapName) {
       return `../assets/map/${encoded}`
     }
   })()
+
+  if (__lastMapResolved === resolved && __lastMapUrl === url && container.style.display !== 'none' && img.src === url) {
+    return
+  }
+
+  __lastMapResolved = resolved
+  __lastMapUrl = url
 
   img.onerror = () => {
     console.warn('[Frontend] 地图图片加载失败:', { mapName, resolved, url })

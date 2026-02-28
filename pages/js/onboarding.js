@@ -103,6 +103,27 @@ const ASGOnboarding = {
       position: 'center'
     },
     {
+      id: 'obs-browser-capture',
+      title: 'OBS 浏览器捕获推荐 📺',
+      content: `
+        <p>推荐使用<strong>浏览器源</strong>捕获本地页面，画面稳定且更省资源。</p>
+        <ul style="margin:8px 0; padding-left:20px; line-height:1.6;">
+          <li>OBS → 来源 → 浏览器</li>
+          <li>粘贴页面 URL</li>
+          <li>按页面分辨率设置宽高</li>
+        </ul>
+        <div style="margin-top:8px; font-size:12px; color:#aaa; line-height:1.6;">
+          分辨率：比分板 1280×720；角色展示 1366×768；BP前台可在设置中自定义。
+        </div>
+        <div style="margin-top:8px; font-size:12px; color:#aaa; line-height:1.6;">
+          好处：无需打开前台窗口也能录制，内存占用更低，捕获更稳定。
+        </div>
+      `,
+      target: '#localPagesCard',
+      position: 'top',
+      highlight: true
+    },
+    {
       id: 'settings',
       title: '表现设置 🎨',
       content: `
@@ -119,21 +140,21 @@ const ASGOnboarding = {
     },
     {
       id: 'store',
-      title: '组件包商店 🛒',
+      title: '设置中心 🛒',
       content: `
-        <p><strong>布局商店</strong>是获取精美导播界面的最佳方式！</p>
+        <p><strong>设置中心</strong>已经整合动画、字体、组件包与插件入口。</p>
         <div style="background:rgba(72,187,120,0.15); padding:16px; border-radius:12px; margin:12px 0; border:1px solid rgba(72,187,120,0.3);">
           <div style="display:flex; align-items:center; gap:12px;">
-            <div style="font-size:32px;">📦</div>
+          <div style="font-size:32px;">⚙️</div>
             <div>
-              <div style="font-weight:bold;">10+ 精品布局包</div>
-              <div style="font-size:12px; color:#81c784;">官方与社区共同贡献</div>
+              <div style="font-weight:bold;">资源与插件集中管理</div>
+              <div style="font-size:12px; color:#81c784;">更清爽的入口体验</div>
             </div>
           </div>
         </div>
-        <p>一键下载，即刻使用专业级导播界面！</p>
+        <p>打开设置中心，快速找到所需功能。</p>
       `,
-      target: '#nav-tools',
+      target: '#nav-settings',
       position: 'right',
       highlight: true
     },
@@ -148,7 +169,7 @@ const ASGOnboarding = {
           <li>支持自定义页面和功能</li>
         </ul>
         <div style="font-size:12px; color:#aaa; margin-top:12px;">
-          💡 提示：您可以在「工具与商店」中管理已安装的插件
+          💡 提示：您可以在「设置中心」中管理已安装的插件
         </div>
       `,
       target: '#pluginMenubar',
@@ -790,7 +811,7 @@ const ASGOnboarding = {
           break;
         case 'store':
           if (typeof switchView === 'function') {
-            switchView('tools');
+            switchView('settings');
           }
           setTimeout(() => {
             if (typeof openStore === 'function') {

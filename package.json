@@ -1,6 +1,6 @@
 {
   "name": "asg-director",
-  "version": "2.8.1",
+  "version": "2.8.3",
   "description": "第五人格赛事导播端",
   "main": "main.js",
   "scripts": {
@@ -38,6 +38,7 @@
     "archiver": "^7.0.1",
     "bilibili-live-ws": "^6.3.1",
     "form-data": "^4.0.5",
+    "pinyin-pro": "^3.27.0",
     "rcedit": "^5.0.2",
     "ws": "^8.16.0",
     "yauzl": "^3.2.0"

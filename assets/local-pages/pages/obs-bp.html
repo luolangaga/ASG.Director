@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS BP 控制</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", sans-serif;
+      background: #0f141b;
+      color: #e5e7eb;
+    }
+    .app {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .section {
+      background: #151b24;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .section h3 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: #cbd5f5;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .row:last-child { margin-bottom: 0; }
+    .label {
+      min-width: 40px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    select, input[type="text"] {
+      background: #0b0f15;
+      color: #e5e7eb;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      flex: 1;
+    }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    button.secondary { background: #334155; }
+    button.ghost { background: transparent; border: 1px solid #1f2937; color: #cbd5f5; }
+    button.active { border: 1px solid #3b82f6; color: #93c5fd; background: rgba(59, 130, 246, 0.15); }
+    .slot {
+      flex: 1;
+      background: #0b0f15;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+    }
+    .quick-input {
+      max-width: 140px;
+    }
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tag {
+      background: #1f2937;
+      color: #e5e7eb;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .tag span { color: #93c5fd; }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 999;
+    }
+    .overlay.active { display: flex; }
+    .picker {
+      width: min(520px, 100%);
+      background: #0f141b;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+    .picker-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 6px;
+      max-height: 320px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .picker-item {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      text-align: center;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .picker-item:hover { border-color: #3b82f6; color: #93c5fd; }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      background: #334155;
+      color: #e5e7eb;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .link-btn.secondary { background: #1f2937; }
+    .muted { color: #94a3b8; font-size: 11px; }
+    .auto-global-ban {
+      display: grid;
+      gap: 8px;
+    }
+    .auto-global-ban-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .auto-global-ban-pools {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .auto-global-ban-pool {
+      border: 1px dashed #1f2937;
+      border-radius: 8px;
+      padding: 8px;
+      min-height: 120px;
+      background: #0b0f15;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .auto-global-ban-pool.drag-over {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .auto-global-ban-pool-title {
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: #cbd5f5;
+    }
+    .auto-global-ban-pool-body {
+      display: grid;
+      gap: 6px;
+    }
+    .auto-global-ban-item {
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 6px;
+      background: #111827;
+      cursor: grab;
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+    }
+    .auto-global-ban-item.dragging {
+      opacity: 0.6;
+    }
+    .auto-global-ban-empty {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .auto-global-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #cbd5f5;
+    }
+    .auto-global-toggle input {
+      accent-color: #3b82f6;
+    }
+    .reset-group {
+      display: inline-flex;
+      gap: 6px;
+    }
+    .score-panel {
+      background: #0b0f15;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+    }
+    .score-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .score-field {
+      display: grid;
+      gap: 4px;
+      flex: 1;
+      min-width: 140px;
+    }
+    .score-input {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: #e5e7eb;
+      font-size: 12px;
+    }
+    .score-summary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .score-card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: center;
+      min-width: 120px;
+    }
+    .team-wins {
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .bo-item {
+      background: #0f172a;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    .bo-item.active {
+      border-color: #f59e0b;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+    }
+    .bo-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+    .bo-input {
+      width: 60px;
+      padding: 6px;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      color: #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="title">OBS BP 控制</div>
+      <div class="reset-group">
+        <button class="ghost" id="resetBtn">重置</button>
+        <button class="ghost" id="resetKeepGlobalBtn">重置(保留全局)</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>地图选择</h3>
+      <div class="row">
+        <select id="mapSelect"></select>
+        <button id="applyMapBtn">应用</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>求生者选择</h3>
+      <div class="row">
+        <div class="label">S1</div>
+        <div class="slot" id="survivorSlot0">-</div>
+        <input type="text" class="quick-input" data-quick="survivor" data-index="0" placeholder="拼音回车">
+        <button class="secondary" data-pick="survivor" data-index="0">选择</button>
+        <button class="ghost" data-clear="survivor" data-index="0">清空</button>
+      </div>
+      <div class="row">
+        <div class="label">S2</div>
+        <div class="slot" id="survivorSlot1">-</div>
+        <input type="text" class="quick-input" data-quick="survivor" data-index="1" placeholder="拼音回车">
+        <button class="secondary" data-pick="survivor" data-index="1">选择</button>
+        <button class="ghost" data-clear="survivor" data-index="1">清空</button>
+      </div>
+      <div class="row">
+        <div class="label">S3</div>
+        <div class="slot" id="survivorSlot2">-</div>
+        <input type="text" class="quick-input" data-quick="survivor" data-index="2" placeholder="拼音回车">
+        <button class="secondary" data-pick="survivor" data-index="2">选择</button>
+        <button class="ghost" data-clear="survivor" data-index="2">清空</button>
+      </div>
+      <div class="row">
+        <div class="label">S4</div>
+        <div class="slot" id="survivorSlot3">-</div>
+        <input type="text" class="quick-input" data-quick="survivor" data-index="3" placeholder="拼音回车">
+        <button class="secondary" data-pick="survivor" data-index="3">选择</button>
+        <button class="ghost" data-clear="survivor" data-index="3">清空</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>监管者选择</h3>
+      <div class="row">
+        <div class="label">H</div>
+        <div class="slot" id="hunterSlot">-</div>
+        <input type="text" class="quick-input" data-quick="hunter" placeholder="拼音回车">
+        <button class="secondary" data-pick="hunter">选择</button>
+        <button class="ghost" data-clear="hunter">清空</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>禁用角色</h3>
+      <div class="split">
+        <div>
+          <div class="row">
+            <div class="label">Ban求生</div>
+            <input type="text" class="quick-input" data-quick="ban-survivor" placeholder="回车添加">
+            <button class="secondary" data-pick="ban-survivor">添加</button>
+          </div>
+          <div class="tag-list" id="banSurvivorList"></div>
+        </div>
+        <div>
+          <div class="row">
+            <div class="label">Ban监管</div>
+            <input type="text" class="quick-input" data-quick="ban-hunter" placeholder="回车添加">
+            <button class="secondary" data-pick="ban-hunter">添加</button>
+          </div>
+          <div class="tag-list" id="banHunterList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>全局禁用</h3>
+      <div class="split">
+        <div>
+          <div class="row">
+            <div class="label">全局求生</div>
+            <input type="text" class="quick-input" data-quick="global-survivor" placeholder="回车添加">
+            <button class="secondary" data-pick="global-survivor">添加</button>
+          </div>
+          <div class="tag-list" id="globalBanSurvivorList"></div>
+        </div>
+        <div>
+          <div class="row">
+            <div class="label">全局监管</div>
+            <input type="text" class="quick-input" data-quick="global-hunter" placeholder="回车添加">
+            <button class="secondary" data-pick="global-hunter">添加</button>
+          </div>
+          <div class="tag-list" id="globalBanHunterList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>自动全局BP</h3>
+      <div class="auto-global-ban">
+        <div class="auto-global-ban-toolbar">
+          <label class="auto-global-toggle">
+            <input type="checkbox" id="autoGlobalToggle">
+            自动全局
+          </label>
+          <button class="ghost" id="autoGlobalRoleASBH">A求生/B监管</button>
+          <button class="ghost" id="autoGlobalRoleAHBS">A监管/B求生</button>
+          <button id="autoGlobalRecordBtn">记录本局</button>
+          <button class="secondary" id="autoGlobalApplyBtn">应用自动全局</button>
+          <div class="muted" id="autoGlobalCount">已记录 0 局</div>
+        </div>
+        <div class="auto-global-ban-pools">
+          <div class="auto-global-ban-pool" id="autoGlobalPoolUnassigned" data-role="">
+            <div class="auto-global-ban-pool-title">未归类</div>
+            <div class="auto-global-ban-pool-body" id="autoGlobalPoolUnassignedBody"></div>
+          </div>
+          <div class="auto-global-ban-pool" id="autoGlobalPoolASBH" data-role="asbh">
+            <div class="auto-global-ban-pool-title">A求生/B监管</div>
+            <div class="auto-global-ban-pool-body" id="autoGlobalPoolASBHBody"></div>
+          </div>
+          <div class="auto-global-ban-pool" id="autoGlobalPoolAHBS" data-role="ahbs">
+            <div class="auto-global-ban-pool-title">A监管/B求生</div>
+            <div class="auto-global-ban-pool-body" id="autoGlobalPoolAHBSBody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>比分管理</h3>
+      <div class="score-panel">
+        <div class="score-row">
+          <button id="scoreAddBoBtn">新增BO</button>
+          <button class="secondary" id="scoreSaveBtn">保存</button>
+          <button class="ghost" id="scoreResetBtn">重置</button>
+          <button class="secondary" id="scoreOpenTeamABtn">A比分</button>
+          <button class="secondary" id="scoreOpenTeamBBtn">B比分</button>
+        </div>
+        <div class="score-row">
+          <div class="score-field">
+            <label>A队</label>
+            <input type="text" id="scoreTeamAName" class="score-input" placeholder="A队">
+          </div>
+          <div class="score-field">
+            <label>B队</label>
+            <input type="text" id="scoreTeamBName" class="score-input" placeholder="B队">
+          </div>
+        </div>
+        <div class="score-row">
+          <div class="score-field">
+            <label>当前展示BO</label>
+            <select id="displayRoundSelect" class="score-input"></select>
+          </div>
+          <div class="score-field">
+            <label>前台展示模式</label>
+            <select id="displayModeSelect" class="score-input">
+              <option value="auto">自动</option>
+              <option value="upper">固定上半局</option>
+              <option value="lower">固定下半局</option>
+            </select>
+          </div>
+          <div class="score-field">
+            <label>当前局势</label>
+            <select id="displayHalfSelect" class="score-input">
+              <option value="1">上半局</option>
+              <option value="2">下半局</option>
+            </select>
+          </div>
+        </div>
+        <div class="score-summary">
+          <div class="score-card">
+            <div id="scoreTeamALabel">A队</div>
+            <div class="team-wins" style="color:#64b5f6;" id="scoreTeamAWins">0</div>
+            <div class="muted" id="scoreTeamARecord">0胜 0平 0负</div>
+          </div>
+          <div style="font-weight:800;color:#94a3b8;">VS</div>
+          <div class="score-card">
+            <div id="scoreTeamBLabel">B队</div>
+            <div class="team-wins" style="color:#ef5350;" id="scoreTeamBWins">0</div>
+            <div class="muted" id="scoreTeamBRecord">0胜 0平 0负</div>
+          </div>
+        </div>
+        <div id="boScoreList" class="score-list"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>快捷跳转</h3>
+      <div class="row">
+        <a class="link-btn" href="/pages/frontend.html" target="_blank">BP前台</a>
+        <a class="link-btn" href="/pages/character-display.html" target="_blank">角色展示</a>
+        <a class="link-btn" href="/pages/timer.html" target="_blank">局内计时</a>
+        <a class="link-btn secondary" href="/pages/scoreboard.html?team=teamA" target="_blank">比分A</a>
+        <a class="link-btn secondary" href="/pages/scoreboard.html?team=teamB" target="_blank">比分B</a>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>选手名字</h3>
+      <div class="row">
+        <div class="label">S1</div>
+        <input type="text" id="playerName0" placeholder="选手名">
+      </div>
+      <div class="row">
+        <div class="label">S2</div>
+        <input type="text" id="playerName1" placeholder="选手名">
+      </div>
+      <div class="row">
+        <div class="label">S3</div>
+        <input type="text" id="playerName2" placeholder="选手名">
+      </div>
+      <div class="row">
+        <div class="label">S4</div>
+        <input type="text" id="playerName3" placeholder="选手名">
+      </div>
+      <div class="row">
+        <div class="label">H</div>
+        <input type="text" id="playerName4" placeholder="选手名">
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="pickerOverlay">
+    <div class="picker">
+      <div class="picker-header">
+        <div id="pickerTitle">选择角色</div>
+        <button class="ghost" id="pickerClose">关闭</button>
+      </div>
+      <input type="text" id="pickerSearch" placeholder="拼音 / 首字母 / 中文">
+      <div class="picker-list" id="pickerList"></div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      survivors: [null, null, null, null],
+      hunter: null,
+      hunterBannedSurvivors: [],
+      survivorBannedHunters: [],
+      globalBannedSurvivors: [],
+      globalBannedHunters: [],
+      playerNames: ['', '', '', '', ''],
+      mapName: ''
+    }
+    const characters = { survivors: [], hunters: [], pinyinMap: {} }
+    const AUTO_GLOBAL_KEY = 'obs_auto_global_bp'
+    let autoGlobalBan = { enabled: false, currentRole: 'asbh', rounds: [] }
+    let pickerContext = null
+    const SCORE_STORAGE_KEY = 'score_local-bp'
+    const SCORE_STORAGE_FALLBACK = 'localBp_score'
+    let scoreData = {
+      bos: [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }],
+      teamAWins: 0, teamBWins: 0,
+      teamADraws: 0, teamBDraws: 0,
+      currentRound: 1,
+      currentHalf: 1,
+      scoreboardDisplay: { teamA: 'auto', teamB: 'auto' },
+      teamAName: 'A队', teamBName: 'B队',
+      teamALogo: '', teamBLogo: ''
+    }
+
+    const mapSelect = document.getElementById('mapSelect')
+    const applyMapBtn = document.getElementById('applyMapBtn')
+    const resetBtn = document.getElementById('resetBtn')
+    const resetKeepGlobalBtn = document.getElementById('resetKeepGlobalBtn')
+
+    const pickerOverlay = document.getElementById('pickerOverlay')
+    const pickerTitle = document.getElementById('pickerTitle')
+    const pickerList = document.getElementById('pickerList')
+    const pickerSearch = document.getElementById('pickerSearch')
+    const pickerClose = document.getElementById('pickerClose')
+    const autoGlobalToggle = document.getElementById('autoGlobalToggle')
+    const autoGlobalRoleASBH = document.getElementById('autoGlobalRoleASBH')
+    const autoGlobalRoleAHBS = document.getElementById('autoGlobalRoleAHBS')
+    const autoGlobalCount = document.getElementById('autoGlobalCount')
+    const autoGlobalRecordBtn = document.getElementById('autoGlobalRecordBtn')
+    const autoGlobalApplyBtn = document.getElementById('autoGlobalApplyBtn')
+    const scoreAddBoBtn = document.getElementById('scoreAddBoBtn')
+    const scoreSaveBtn = document.getElementById('scoreSaveBtn')
+    const scoreResetBtn = document.getElementById('scoreResetBtn')
+    const scoreOpenTeamABtn = document.getElementById('scoreOpenTeamABtn')
+    const scoreOpenTeamBBtn = document.getElementById('scoreOpenTeamBBtn')
+    const scoreTeamANameInput = document.getElementById('scoreTeamAName')
+    const scoreTeamBNameInput = document.getElementById('scoreTeamBName')
+    const displayRoundSelect = document.getElementById('displayRoundSelect')
+    const displayModeSelect = document.getElementById('displayModeSelect')
+    const displayHalfSelect = document.getElementById('displayHalfSelect')
+    const boScoreList = document.getElementById('boScoreList')
+
+    const survivorSlots = [
+      document.getElementById('survivorSlot0'),
+      document.getElementById('survivorSlot1'),
+      document.getElementById('survivorSlot2'),
+      document.getElementById('survivorSlot3')
+    ]
+    const hunterSlot = document.getElementById('hunterSlot')
+    const banSurvivorList = document.getElementById('banSurvivorList')
+    const banHunterList = document.getElementById('banHunterList')
+    const globalBanSurvivorList = document.getElementById('globalBanSurvivorList')
+    const globalBanHunterList = document.getElementById('globalBanHunterList')
+
+    const playerInputs = [
+      document.getElementById('playerName0'),
+      document.getElementById('playerName1'),
+      document.getElementById('playerName2'),
+      document.getElementById('playerName3'),
+      document.getElementById('playerName4')
+    ]
+
+    async function fetchJson(url, options) {
+      const res = await fetch(url, options)
+      return res.json()
+    }
+
+    function updateSlots() {
+      survivorSlots.forEach((el, i) => {
+        el.textContent = state.survivors[i] || '-'
+      })
+      hunterSlot.textContent = state.hunter || '-'
+      playerInputs.forEach((input, i) => {
+        if (!input) return
+        if (document.activeElement !== input) {
+          input.value = state.playerNames[i] || ''
+        }
+      })
+      if (state.mapName && mapSelect) {
+        mapSelect.value = state.mapName
+      }
+    }
+
+    function renderTagList(container, list, removeAction) {
+      container.innerHTML = ''
+      list.forEach(name => {
+        const tag = document.createElement('div')
+        tag.className = 'tag'
+        tag.innerHTML = `${name}<span>×</span>`
+        tag.addEventListener('click', () => sendAction(removeAction, { character: name }))
+        container.appendChild(tag)
+      })
+    }
+
+    function renderLists() {
+      renderTagList(banSurvivorList, state.hunterBannedSurvivors, 'remove-ban-survivor')
+      renderTagList(banHunterList, state.survivorBannedHunters, 'remove-ban-hunter')
+      renderTagList(globalBanSurvivorList, state.globalBannedSurvivors, 'remove-global-ban-survivor')
+      renderTagList(globalBanHunterList, state.globalBannedHunters, 'remove-global-ban-hunter')
+    }
+
+    function applyState(payload) {
+      const normalized = payload?.currentRoundData
+        ? {
+            survivors: payload.currentRoundData.selectedSurvivors || [null, null, null, null],
+            hunter: payload.currentRoundData.selectedHunter || null,
+            hunterBannedSurvivors: payload.currentRoundData.hunterBannedSurvivors || [],
+            survivorBannedHunters: payload.currentRoundData.survivorBannedHunters || [],
+            globalBannedSurvivors: payload.globalBannedSurvivors || [],
+            globalBannedHunters: payload.globalBannedHunters || [],
+            playerNames: payload.playerNames || ['', '', '', '', ''],
+            mapName: payload.mapName || payload.currentMap || ''
+          }
+        : {
+            survivors: payload?.survivors || [null, null, null, null],
+            hunter: payload?.hunter || null,
+            hunterBannedSurvivors: payload?.hunterBannedSurvivors || [],
+            survivorBannedHunters: payload?.survivorBannedHunters || [],
+            globalBannedSurvivors: payload?.globalBannedSurvivors || [],
+            globalBannedHunters: payload?.globalBannedHunters || [],
+            playerNames: payload?.playerNames || ['', '', '', '', ''],
+            mapName: payload?.mapName || ''
+          }
+
+      state.survivors = [...normalized.survivors]
+      state.hunter = normalized.hunter
+      state.hunterBannedSurvivors = [...normalized.hunterBannedSurvivors]
+      state.survivorBannedHunters = [...normalized.survivorBannedHunters]
+      state.globalBannedSurvivors = [...normalized.globalBannedSurvivors]
+      state.globalBannedHunters = [...normalized.globalBannedHunters]
+      state.playerNames = [...normalized.playerNames]
+      state.mapName = normalized.mapName || ''
+      updateSlots()
+      renderLists()
+    }
+
+    async function sendAction(action, data) {
+      try {
+        const res = await fetchJson('/api/local-bp-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, data })
+        })
+        return res
+      } catch {
+        return { success: false }
+      }
+    }
+
+    function tryParseJson(value) {
+      try {
+        return JSON.parse(value)
+      } catch {
+        return null
+      }
+    }
+
+    function normalizeScoreData(raw) {
+      const d = raw && typeof raw === 'object' ? raw : {}
+      const bos = Array.isArray(d.bos) ? d.bos : []
+      return {
+        bos: bos.length ? bos : [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }],
+        teamAWins: d.teamAWins || 0,
+        teamBWins: d.teamBWins || 0,
+        teamADraws: d.teamADraws || 0,
+        teamBDraws: d.teamBDraws || 0,
+        currentRound: d.currentRound || 1,
+        currentHalf: d.currentHalf || 1,
+        scoreboardDisplay: (d.scoreboardDisplay && typeof d.scoreboardDisplay === 'object') ? d.scoreboardDisplay : { teamA: 'auto', teamB: 'auto' },
+        teamAName: typeof d.teamAName === 'string' ? d.teamAName : 'A队',
+        teamBName: typeof d.teamBName === 'string' ? d.teamBName : 'B队',
+        teamALogo: typeof d.teamALogo === 'string' ? d.teamALogo : '',
+        teamBLogo: typeof d.teamBLogo === 'string' ? d.teamBLogo : ''
+      }
+    }
+
+    function loadScoreDataAny() {
+      const a = tryParseJson(localStorage.getItem(SCORE_STORAGE_KEY))
+      if (a) return normalizeScoreData(a)
+      const b = tryParseJson(localStorage.getItem(SCORE_STORAGE_FALLBACK))
+      if (b) return normalizeScoreData(b)
+      return normalizeScoreData(null)
+    }
+
+    async function loadScoreDataRemote() {
+      try {
+        const res = await fetchJson('/api/score-state')
+        if (res && res.success && res.data) return normalizeScoreData(res.data)
+      } catch {}
+      return null
+    }
+
+    function getBoResult(bo) {
+      const hasUpper = bo.upper.teamA > 0 || bo.upper.teamB > 0
+      const hasLower = bo.lower.teamA > 0 || bo.lower.teamB > 0
+      if (!hasUpper || !hasLower) return 'P'
+      const totalA = bo.upper.teamA + bo.lower.teamA
+      const totalB = bo.upper.teamB + bo.lower.teamB
+      if (totalA > totalB) return 'A'
+      if (totalB > totalA) return 'B'
+      return 'D'
+    }
+
+    function calculateScore() {
+      let aW = 0, bW = 0, aD = 0, bD = 0
+      scoreData.bos.forEach(bo => {
+        const r = getBoResult(bo)
+        if (r === 'A') aW++
+        else if (r === 'B') bW++
+        else if (r === 'D') { aD++; bD++ }
+      })
+      scoreData.teamAWins = aW
+      scoreData.teamBWins = bW
+      scoreData.teamADraws = aD
+      scoreData.teamBDraws = bD
+    }
+
+    function updateScoreDisplay() {
+      const aName = scoreData.teamAName || 'A队'
+      const bName = scoreData.teamBName || 'B队'
+      document.getElementById('scoreTeamALabel').textContent = aName
+      document.getElementById('scoreTeamBLabel').textContent = bName
+      document.getElementById('scoreTeamAWins').textContent = scoreData.teamAWins
+      document.getElementById('scoreTeamBWins').textContent = scoreData.teamBWins
+      const completed = scoreData.bos.filter(bo => getBoResult(bo) !== 'P').length
+      const aL = completed - scoreData.teamAWins - scoreData.teamADraws
+      const bL = completed - scoreData.teamBWins - scoreData.teamBDraws
+      document.getElementById('scoreTeamARecord').textContent = `${aName}: ${scoreData.teamAWins}胜 ${scoreData.teamADraws}平 ${aL}负`
+      document.getElementById('scoreTeamBRecord').textContent = `${bName}: ${scoreData.teamBWins}胜 ${scoreData.teamBDraws}平 ${bL}负`
+    }
+
+    function renderBoList() {
+      if (!boScoreList) return
+      const activeIdx = (scoreData.currentRound || 1) - 1
+      boScoreList.innerHTML = scoreData.bos.map((bo, i) => {
+        const isActive = (i === activeIdx)
+        const result = getBoResult(bo)
+        const badge = result === 'A' ? '<span style="color:#64b5f6;font-weight:bold;">A队胜</span>' :
+          result === 'B' ? '<span style="color:#ef5350;font-weight:bold;">B队胜</span>' :
+            result === 'D' ? '<span style="color:#ffd700;font-weight:bold;">平局</span>' : '<span style="color:#94a3b8;">待定</span>'
+        return `<div class="bo-item ${isActive ? 'active' : ''}">
+          <div class="score-row">
+            <div><strong>第${i + 1}个BO</strong> <span id="bo-badge-${i}">${badge}</span></div>
+            <button class="ghost" onclick="removeBo(${i})">删除</button>
+          </div>
+          <div class="bo-row">
+            <span style="width:60px;color:#94a3b8;">上半局</span>
+            <span style="color:#64b5f6;">A队</span>
+            <input class="bo-input" type="number" min="0" value="${bo.upper.teamA}" onchange="updateBo(${i},'upper','teamA',this.value)">
+            <span>:</span>
+            <input class="bo-input" type="number" min="0" value="${bo.upper.teamB}" onchange="updateBo(${i},'upper','teamB',this.value)">
+            <span style="color:#ef5350;">B队</span>
+          </div>
+          <div class="bo-row">
+            <span style="width:60px;color:#94a3b8;">下半局</span>
+            <span style="color:#64b5f6;">A队</span>
+            <input class="bo-input" type="number" min="0" value="${bo.lower.teamA}" onchange="updateBo(${i},'lower','teamA',this.value)">
+            <span>:</span>
+            <input class="bo-input" type="number" min="0" value="${bo.lower.teamB}" onchange="updateBo(${i},'lower','teamB',this.value)">
+            <span style="color:#ef5350;">B队</span>
+          </div>
+        </div>`
+      }).join('')
+    }
+
+    let saveScoreTimer = null
+
+    function debouncedSaveScoreData() {
+      if (saveScoreTimer) clearTimeout(saveScoreTimer)
+      saveScoreTimer = setTimeout(() => {
+        saveScoreData()
+      }, 500)
+    }
+
+    function updateBo(boIndex, half, team, value) {
+      scoreData.bos[boIndex][half][team] = parseInt(value) || 0
+      calculateScore()
+      debouncedSaveScoreData()
+      updateScoreDisplay()
+
+      const bo = scoreData.bos[boIndex]
+      const result = getBoResult(bo)
+      const badgeHtml = result === 'A' ? '<span style="color:#64b5f6;font-weight:bold;">A队胜</span>' :
+        result === 'B' ? '<span style="color:#ef5350;font-weight:bold;">B队胜</span>' :
+          result === 'D' ? '<span style="color:#ffd700;font-weight:bold;">平局</span>' : '<span style="color:#94a3b8;">待定</span>'
+      const badgeEl = document.getElementById(`bo-badge-${boIndex}`)
+      if (badgeEl) badgeEl.innerHTML = badgeHtml
+    }
+
+    function removeBo(index) {
+      if (scoreData.bos.length > 1 && confirm('确定删除此BO？')) {
+        scoreData.bos.splice(index, 1)
+        if (scoreData.currentRound > scoreData.bos.length) scoreData.currentRound = scoreData.bos.length
+        calculateScore()
+        saveScoreData()
+        renderBoList()
+        updateScoreboardDisplayUI()
+        updateScoreDisplay()
+      }
+    }
+
+    function addBo() {
+      scoreData.bos.push({ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } })
+      saveScoreData()
+      renderBoList()
+      updateScoreboardDisplayUI()
+    }
+
+    function updateScoreboardDisplayUI() {
+      if (displayRoundSelect) {
+        const current = scoreData.currentRound || 1
+        displayRoundSelect.innerHTML = scoreData.bos.map((_, i) => `<option value="${i + 1}" ${current === (i + 1) ? 'selected' : ''}>第 ${i + 1} 个BO</option>`).join('')
+      }
+      if (displayModeSelect) displayModeSelect.value = scoreData.scoreboardDisplay?.teamA || 'auto'
+      if (displayHalfSelect) displayHalfSelect.value = scoreData.currentHalf || 1
+    }
+
+    function updateScoreboardDisplayConfig() {
+      const round = parseInt(displayRoundSelect.value) || 1
+      const mode = displayModeSelect.value
+      const half = parseInt(displayHalfSelect.value) || 1
+      scoreData.currentRound = round
+      scoreData.currentHalf = half
+      scoreData.scoreboardDisplay = { teamA: mode, teamB: mode }
+      saveScoreData()
+      renderBoList()
+    }
+
+    function saveScoreData() {
+      try {
+        scoreData.__assetRev = Date.now()
+        localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(scoreData))
+        localStorage.setItem(SCORE_STORAGE_FALLBACK, JSON.stringify(scoreData))
+      } catch {}
+      fetchJson('/api/score-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scoreData)
+      }).catch(() => {})
+    }
+
+    function resetScore() {
+      if (!confirm('确定重置所有比分？')) return
+      scoreData = {
+        bos: [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }],
+        teamAWins: 0, teamBWins: 0,
+        teamADraws: 0, teamBDraws: 0,
+        currentRound: 1,
+        currentHalf: 1,
+        scoreboardDisplay: { teamA: 'auto', teamB: 'auto' },
+        teamAName: scoreTeamANameInput?.value || 'A队',
+        teamBName: scoreTeamBNameInput?.value || 'B队',
+        teamALogo: scoreData.teamALogo || '',
+        teamBLogo: scoreData.teamBLogo || ''
+      }
+      saveScoreData()
+      renderBoList()
+      updateScoreDisplay()
+      if (scoreTeamANameInput) scoreTeamANameInput.value = scoreData.teamAName
+      if (scoreTeamBNameInput) scoreTeamBNameInput.value = scoreData.teamBName
+      updateScoreboardDisplayUI()
+    }
+
+    async function initScoreSection() {
+      scoreData = loadScoreDataAny()
+      const remote = await loadScoreDataRemote()
+      if (remote) scoreData = remote
+      if (scoreTeamANameInput) scoreTeamANameInput.value = scoreData.teamAName || 'A队'
+      if (scoreTeamBNameInput) scoreTeamBNameInput.value = scoreData.teamBName || 'B队'
+      calculateScore()
+      renderBoList()
+      updateScoreboardDisplayUI()
+      updateScoreDisplay()
+      saveScoreData()
+    }
+
+    function getSearchScore(name, query) {
+      if (!query) return 0
+      const q = query.toLowerCase()
+      const nameLower = typeof name === 'string' ? name.toLowerCase() : ''
+      if (nameLower.includes(q)) return 100
+      const entry = characters.pinyinMap[name]
+      if (entry) {
+        const initials = (entry.initials || '').toLowerCase()
+        const full = (entry.full || '').toLowerCase()
+        if (initials === q) return 90
+        if (initials.startsWith(q)) return 80
+        if (full.startsWith(q)) return 70
+      }
+      return 0
+    }
+
+    function getFilteredList(list, query) {
+      if (!query) return list.slice()
+      return list
+        .map(name => ({ name, score: getSearchScore(name, query) }))
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.name)
+    }
+
+    function openPicker(mode, index) {
+      pickerContext = { mode, index }
+      const group = mode.includes('hunter') ? 'hunters' : 'survivors'
+      pickerContext.group = group
+      pickerTitle.textContent = mode
+      pickerSearch.value = ''
+      renderPicker()
+      pickerOverlay.classList.add('active')
+    }
+
+    function closePicker() {
+      pickerOverlay.classList.remove('active')
+      pickerContext = null
+    }
+
+    function renderPicker() {
+      if (!pickerContext) return
+      const list = characters[pickerContext.group] || []
+      const query = pickerSearch.value.trim()
+      const filtered = getFilteredList(list, query)
+      pickerList.innerHTML = ''
+      filtered.forEach(name => {
+        const item = document.createElement('div')
+        item.className = 'picker-item'
+        item.textContent = name
+        item.addEventListener('click', async () => {
+          if (pickerContext.mode === 'survivor') {
+            await sendAction('set-survivor', { index: pickerContext.index, character: name })
+          } else if (pickerContext.mode === 'hunter') {
+            await sendAction('set-hunter', { character: name })
+          } else if (pickerContext.mode === 'ban-survivor') {
+            await sendAction('add-ban-survivor', { character: name })
+          } else if (pickerContext.mode === 'ban-hunter') {
+            await sendAction('add-ban-hunter', { character: name })
+          } else if (pickerContext.mode === 'global-survivor') {
+            await sendAction('add-global-ban-survivor', { character: name })
+          } else if (pickerContext.mode === 'global-hunter') {
+            await sendAction('add-global-ban-hunter', { character: name })
+          }
+          closePicker()
+        })
+        pickerList.appendChild(item)
+      })
+    }
+
+    function selectByQuickInput(mode, index, query) {
+      const group = mode.includes('hunter') ? 'hunters' : 'survivors'
+      const list = characters[group] || []
+      const filtered = getFilteredList(list, query)
+      const name = filtered[0]
+      if (!name) return
+      if (mode === 'survivor') return sendAction('set-survivor', { index, character: name })
+      if (mode === 'hunter') return sendAction('set-hunter', { character: name })
+      if (mode === 'ban-survivor') return sendAction('add-ban-survivor', { character: name })
+      if (mode === 'ban-hunter') return sendAction('add-ban-hunter', { character: name })
+      if (mode === 'global-survivor') return sendAction('add-global-ban-survivor', { character: name })
+      if (mode === 'global-hunter') return sendAction('add-global-ban-hunter', { character: name })
+    }
+
+    function getDefaultAutoGlobalBanState() {
+      return { enabled: false, currentRole: 'asbh', rounds: [] }
+    }
+
+    function normalizeAutoGlobalBanState(raw) {
+      const base = getDefaultAutoGlobalBanState()
+      if (!raw || typeof raw !== 'object') return base
+      const role = raw.currentRole === 'ahbs' ? 'ahbs' : 'asbh'
+      const rounds = Array.isArray(raw.rounds) ? raw.rounds : []
+      return {
+        enabled: !!raw.enabled,
+        currentRole: role,
+        rounds: rounds.map(round => {
+          const survivors = Array.isArray(round?.survivors) ? round.survivors.filter(Boolean) : []
+          const hunter = typeof round?.hunter === 'string' ? round.hunter : ''
+          const assigned = round?.assigned === 'ahbs' ? 'ahbs' : (round?.assigned === 'asbh' ? 'asbh' : null)
+          const id = typeof round?.id === 'string' && round.id ? round.id : `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          const timestamp = typeof round?.timestamp === 'number' ? round.timestamp : Date.now()
+          return { id, survivors, hunter, assigned, timestamp }
+        })
+      }
+    }
+
+    function loadAutoGlobalBanState() {
+      try {
+        const raw = localStorage.getItem(AUTO_GLOBAL_KEY)
+        const data = raw ? JSON.parse(raw) : null
+        return normalizeAutoGlobalBanState(data)
+      } catch {
+        return getDefaultAutoGlobalBanState()
+      }
+    }
+
+    function saveAutoGlobalBanState() {
+      try {
+        localStorage.setItem(AUTO_GLOBAL_KEY, JSON.stringify(autoGlobalBan))
+      } catch {}
+    }
+
+    function buildAutoGlobalBanItem(round) {
+      const el = document.createElement('div')
+      el.className = 'auto-global-ban-item'
+      el.draggable = true
+      el.dataset.roundId = round.id
+
+      const survivorsRow = document.createElement('div')
+      survivorsRow.textContent = round.survivors.length ? round.survivors.join(' / ') : '无求生'
+      const hunterRow = document.createElement('div')
+      hunterRow.textContent = round.hunter || '无监管'
+
+      el.appendChild(survivorsRow)
+      el.appendChild(hunterRow)
+
+      el.addEventListener('dragstart', (event) => {
+        el.classList.add('dragging')
+        event.dataTransfer.setData('text/plain', round.id)
+      })
+
+      el.addEventListener('dragend', () => {
+        el.classList.remove('dragging')
+      })
+
+      return el
+    }
+
+    function renderAutoGlobalBanPool(bodyEl, rounds) {
+      if (!bodyEl) return
+      bodyEl.innerHTML = ''
+      if (!rounds.length) {
+        const empty = document.createElement('div')
+        empty.className = 'auto-global-ban-empty'
+        empty.textContent = '拖拽对局到这里'
+        bodyEl.appendChild(empty)
+        return
+      }
+      rounds.forEach(round => {
+        bodyEl.appendChild(buildAutoGlobalBanItem(round))
+      })
+    }
+
+    function renderAutoGlobalBanUI() {
+      autoGlobalToggle.checked = autoGlobalBan.enabled
+      autoGlobalRoleASBH.classList.toggle('active', autoGlobalBan.currentRole === 'asbh')
+      autoGlobalRoleAHBS.classList.toggle('active', autoGlobalBan.currentRole === 'ahbs')
+
+      const unassigned = autoGlobalBan.rounds.filter(r => !r.assigned)
+      const asbhRounds = autoGlobalBan.rounds.filter(r => r.assigned === 'asbh')
+      const ahbsRounds = autoGlobalBan.rounds.filter(r => r.assigned === 'ahbs')
+
+      renderAutoGlobalBanPool(document.getElementById('autoGlobalPoolUnassignedBody'), unassigned)
+      renderAutoGlobalBanPool(document.getElementById('autoGlobalPoolASBHBody'), asbhRounds)
+      renderAutoGlobalBanPool(document.getElementById('autoGlobalPoolAHBSBody'), ahbsRounds)
+      autoGlobalCount.textContent = `已记录 ${autoGlobalBan.rounds.length} 局`
+    }
+
+    function assignAutoGlobalBanRound(roundId, role) {
+      const targetRole = role === 'asbh' || role === 'ahbs' ? role : null
+      const round = autoGlobalBan.rounds.find(r => r.id === roundId)
+      if (!round) return
+      round.assigned = targetRole
+      saveAutoGlobalBanState()
+      renderAutoGlobalBanUI()
+      applyAutoGlobalBans(true)
+    }
+
+    function initAutoGlobalBanDnD() {
+      const pools = document.querySelectorAll('.auto-global-ban-pool')
+      pools.forEach(pool => {
+        pool.addEventListener('dragover', (event) => {
+          event.preventDefault()
+          pool.classList.add('drag-over')
+        })
+        pool.addEventListener('dragleave', () => {
+          pool.classList.remove('drag-over')
+        })
+        pool.addEventListener('drop', (event) => {
+          event.preventDefault()
+          pool.classList.remove('drag-over')
+          const roundId = event.dataTransfer.getData('text/plain')
+          const role = pool.dataset.role || ''
+          assignAutoGlobalBanRound(roundId, role)
+        })
+      })
+    }
+
+    function recordAutoGlobalRound() {
+      const survivors = state.survivors.filter(Boolean)
+      const hunter = state.hunter || ''
+      if (survivors.length === 0 && !hunter) return
+      autoGlobalBan.rounds.unshift({
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        survivors,
+        hunter,
+        assigned: null,
+        timestamp: Date.now()
+      })
+      saveAutoGlobalBanState()
+      renderAutoGlobalBanUI()
+      if (autoGlobalBan.enabled) applyAutoGlobalBans()
+    }
+
+    function computeAutoGlobalBans(role) {
+      const rounds = autoGlobalBan.rounds.filter(r => r.assigned === role)
+      const survivorSet = new Set()
+      const hunterSet = new Set()
+      rounds.forEach(round => {
+        if (Array.isArray(round.survivors)) {
+          round.survivors.forEach(name => survivorSet.add(name))
+        }
+        if (round.hunter) hunterSet.add(round.hunter)
+      })
+      return {
+        survivors: Array.from(survivorSet),
+        hunters: Array.from(hunterSet)
+      }
+    }
+
+    async function replaceGlobalBans(next) {
+      const currentSurvivors = Array.isArray(state.globalBannedSurvivors) ? state.globalBannedSurvivors : []
+      const currentHunters = Array.isArray(state.globalBannedHunters) ? state.globalBannedHunters : []
+      for (const name of currentSurvivors) {
+        await sendAction('remove-global-ban-survivor', { character: name })
+      }
+      for (const name of currentHunters) {
+        await sendAction('remove-global-ban-hunter', { character: name })
+      }
+      for (const name of next.survivors || []) {
+        await sendAction('add-global-ban-survivor', { character: name })
+      }
+      for (const name of next.hunters || []) {
+        await sendAction('add-global-ban-hunter', { character: name })
+      }
+    }
+
+    async function applyAutoGlobalBans(force) {
+      if (!force && !autoGlobalBan.enabled) return
+      const next = computeAutoGlobalBans(autoGlobalBan.currentRole)
+      await replaceGlobalBans(next)
+    }
+
+    async function resetBp(keepGlobal) {
+      if (keepGlobal) {
+        recordAutoGlobalRound()
+        await sendAction('set-survivor', { index: 0, character: null })
+        await sendAction('set-survivor', { index: 1, character: null })
+        await sendAction('set-survivor', { index: 2, character: null })
+        await sendAction('set-survivor', { index: 3, character: null })
+        await sendAction('set-hunter', { character: null })
+
+        for (const name of [...state.hunterBannedSurvivors]) {
+          await sendAction('remove-ban-survivor', { character: name })
+        }
+        for (const name of [...state.survivorBannedHunters]) {
+          await sendAction('remove-ban-hunter', { character: name })
+        }
+
+        state.survivors = [null, null, null, null]
+        state.hunter = null
+        state.hunterBannedSurvivors = []
+        state.survivorBannedHunters = []
+        updateSlots()
+        renderLists()
+        return
+      }
+      await sendAction('reset', {})
+      state.survivors = [null, null, null, null]
+      state.hunter = null
+      state.hunterBannedSurvivors = []
+      state.survivorBannedHunters = []
+      state.globalBannedSurvivors = []
+      state.globalBannedHunters = []
+      updateSlots()
+      renderLists()
+    }
+
+    async function loadMaps() {
+      try {
+        const res = await fetchJson('/api/maps')
+        if (res && res.success && Array.isArray(res.maps)) {
+          mapSelect.innerHTML = ''
+          const empty = document.createElement('option')
+          empty.value = ''
+          empty.textContent = '选择地图'
+          mapSelect.appendChild(empty)
+          res.maps.forEach(name => {
+            const opt = document.createElement('option')
+            opt.value = name
+            opt.textContent = name
+            mapSelect.appendChild(opt)
+          })
+        }
+      } catch {}
+    }
+
+    async function loadCharacters() {
+      try {
+        const res = await fetchJson('/api/local-bp-characters')
+        if (res && res.success && res.data) {
+          characters.survivors = Array.isArray(res.data.survivors) ? res.data.survivors : []
+          characters.hunters = Array.isArray(res.data.hunters) ? res.data.hunters : []
+          characters.pinyinMap = res.data.pinyinMap || {}
+        }
+      } catch {}
+    }
+
+    async function loadInitialState() {
+      try {
+        const res = await fetchJson('/api/current-state')
+        if (res && res.state) {
+          applyState(res.state)
+        }
+      } catch {}
+      try {
+        const res = await fetchJson('/api/local-bp-state')
+        if (res && res.success && res.data) {
+          applyState(res.data)
+        }
+      } catch {}
+    }
+
+    function setupSse() {
+      const es = new EventSource('/api/sse')
+      es.addEventListener('state-update', (e) => {
+        try {
+          const data = JSON.parse(e.data)
+          applyState(data.state || data)
+        } catch {}
+      })
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data)
+          if (data?.type === 'local-bp-update') {
+            applyState(data.payload)
+          }
+        } catch {}
+      }
+      window.addEventListener('beforeunload', () => es.close())
+    }
+
+    document.querySelectorAll('[data-pick]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.pick
+        const index = btn.dataset.index ? Number(btn.dataset.index) : null
+        openPicker(mode, index)
+      })
+    })
+
+    document.querySelectorAll('[data-clear]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.clear
+        const index = Number(btn.dataset.index)
+        if (type === 'survivor') sendAction('set-survivor', { index, character: null })
+        if (type === 'hunter') sendAction('set-hunter', { character: null })
+      })
+    })
+
+    applyMapBtn.addEventListener('click', () => {
+      const mapName = mapSelect.value || ''
+      sendAction('set-map-name', { mapName })
+    })
+
+    resetBtn.addEventListener('click', () => {
+      resetBp(false)
+    })
+    resetKeepGlobalBtn.addEventListener('click', () => {
+      resetBp(true)
+    })
+
+    document.querySelectorAll('[data-quick]').forEach(input => {
+      input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return
+        const mode = input.dataset.quick
+        const index = input.dataset.index ? Number(input.dataset.index) : null
+        const query = input.value.trim()
+        if (!query) return
+        selectByQuickInput(mode, index, query)
+        input.value = ''
+      })
+    })
+
+    pickerSearch.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return
+      if (!pickerContext) return
+      const list = characters[pickerContext.group] || []
+      const query = pickerSearch.value.trim()
+      const filtered = getFilteredList(list, query)
+      const name = filtered[0]
+      if (!name) return
+      if (pickerContext.mode === 'survivor') {
+        sendAction('set-survivor', { index: pickerContext.index, character: name })
+      } else if (pickerContext.mode === 'hunter') {
+        sendAction('set-hunter', { character: name })
+      } else if (pickerContext.mode === 'ban-survivor') {
+        sendAction('add-ban-survivor', { character: name })
+      } else if (pickerContext.mode === 'ban-hunter') {
+        sendAction('add-ban-hunter', { character: name })
+      } else if (pickerContext.mode === 'global-survivor') {
+        sendAction('add-global-ban-survivor', { character: name })
+      } else if (pickerContext.mode === 'global-hunter') {
+        sendAction('add-global-ban-hunter', { character: name })
+      }
+      closePicker()
+    })
+
+    pickerClose.addEventListener('click', closePicker)
+    pickerOverlay.addEventListener('click', (e) => {
+      if (e.target === pickerOverlay) closePicker()
+    })
+    pickerSearch.addEventListener('input', renderPicker)
+
+    playerInputs.forEach((input, index) => {
+      input.addEventListener('change', () => {
+        sendAction('set-player-name', { index, name: input.value || '' })
+      })
+    })
+
+    autoGlobalToggle.addEventListener('change', () => {
+      autoGlobalBan.enabled = autoGlobalToggle.checked
+      saveAutoGlobalBanState()
+      renderAutoGlobalBanUI()
+      applyAutoGlobalBans(true)
+    })
+
+    autoGlobalRoleASBH.addEventListener('click', () => {
+      autoGlobalBan.currentRole = 'asbh'
+      saveAutoGlobalBanState()
+      renderAutoGlobalBanUI()
+      applyAutoGlobalBans(true)
+    })
+
+    autoGlobalRoleAHBS.addEventListener('click', () => {
+      autoGlobalBan.currentRole = 'ahbs'
+      saveAutoGlobalBanState()
+      renderAutoGlobalBanUI()
+      applyAutoGlobalBans(true)
+    })
+
+    autoGlobalRecordBtn.addEventListener('click', recordAutoGlobalRound)
+    autoGlobalApplyBtn.addEventListener('click', () => applyAutoGlobalBans(true))
+    openScoreControlBtn.addEventListener('click', () => {
+      fetchJson('/api/open-local-backend').catch(() => {})
+    })
+    openScoreboardsBtn.addEventListener('click', () => {
+      window.open('/pages/scoreboard.html?team=teamA', '_blank')
+      window.open('/pages/scoreboard.html?team=teamB', '_blank')
+    })
+    autoGlobalBan = loadAutoGlobalBanState()
+    renderAutoGlobalBanUI()
+    initAutoGlobalBanDnD()
+
+    Promise.all([loadMaps(), loadCharacters(), loadInitialState()]).then(setupSse)
+  </script>
+</body>
+</html>

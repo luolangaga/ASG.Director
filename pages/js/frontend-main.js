@@ -444,6 +444,64 @@ function closeFontSelector() {
   activeFontContainerId = null
 }
 
+let transparentBorderBlinkTimer = null
+let transparentDragHintTimer = null
+let transparentDragHintListenerBound = false
+
+function triggerTransparentBorderBlink() {
+  const el = document.getElementById('transparentBorderBlink')
+  if (!el) return
+  if (!document.body.classList.contains('transparent-bg')) return
+
+  el.classList.add('active')
+  if (transparentBorderBlinkTimer) {
+    clearTimeout(transparentBorderBlinkTimer)
+  }
+  transparentBorderBlinkTimer = setTimeout(() => {
+    el.classList.remove('active')
+    transparentBorderBlinkTimer = null
+  }, 3000)
+}
+
+function setTransparentDragHintActive(active) {
+  const el = document.getElementById('transparentDragHint')
+  if (!el) return
+  el.classList.toggle('active', active)
+}
+
+function syncTransparentDragHintState() {
+  if (!document.body.classList.contains('transparent-bg')) {
+    if (transparentDragHintTimer) {
+      clearTimeout(transparentDragHintTimer)
+      transparentDragHintTimer = null
+    }
+    setTransparentDragHintActive(false)
+  }
+}
+
+function showTransparentDragHint(duration = 2000) {
+  if (!document.body.classList.contains('transparent-bg')) return
+  setTransparentDragHintActive(true)
+  if (transparentDragHintTimer) {
+    clearTimeout(transparentDragHintTimer)
+  }
+  transparentDragHintTimer = setTimeout(() => {
+    setTransparentDragHintActive(false)
+    transparentDragHintTimer = null
+  }, duration)
+}
+
+function setupTransparentDragHint() {
+  if (transparentDragHintListenerBound) return
+  transparentDragHintListenerBound = true
+  document.addEventListener('mousemove', (e) => {
+    if (!document.body.classList.contains('transparent-bg')) return
+    if (e.clientY <= 24) {
+      showTransparentDragHint(1500)
+    }
+  })
+}
+
 // 点击外部关闭弹窗及样式监听
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('fontSelectorModal')
@@ -642,6 +700,9 @@ async function init() {
   }
   console.log('[Frontend] 当前布局:', currentLayout)
   applyLayout()
+  triggerTransparentBorderBlink()
+  setupTransparentDragHint()
+  showTransparentDragHint(2000)
   applyGlobalBanLayoutConfig()
   applyLocalBanLayoutConfig()
 
@@ -1616,6 +1677,7 @@ function applyLayout() {
   } else {
     document.body.classList.remove('transparent-bg')
   }
+  syncTransparentDragHintState()
 
   // 需要跳过的非DOM元素配置字段
   const skipFields = [

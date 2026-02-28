@@ -149,6 +149,21 @@ function remapLayoutAssetPaths(layout) {
   return layout
 }
 
+function mergeCharacterDisplayLayout(layout) {
+  if (!layout || typeof layout !== 'object') return layout
+  if (layout.characterDisplayLayout && typeof layout.characterDisplayLayout === 'object') return layout
+  try {
+    if (fs.existsSync(layoutPath)) {
+      const raw = fs.readFileSync(layoutPath, 'utf8')
+      const existing = raw ? JSON.parse(raw) : null
+      if (existing && typeof existing.characterDisplayLayout === 'object') {
+        layout.characterDisplayLayout = existing.characterDisplayLayout
+      }
+    }
+  } catch {}
+  return layout
+}
+
 /**
  * 收集当前布局包数据
  * @param {object} windowRefs - 窗口引用对象 { frontendWindow, scoreboardWindowA, scoreboardWindowB }
@@ -440,8 +455,7 @@ async function importPack(options = {}) {
         console.log('[PackManager] 发现 V2 布局文件，大小:', content.length, '字节')
 
         if (content) {
-          const v2Layout = remapLayoutAssetPaths(JSON.parse(content))
-          // 直接保存到 layout-v2.json，并同步写入 layout.json（当前应用仍主要读取 layout.json）
+          const v2Layout = mergeCharacterDisplayLayout(remapLayoutAssetPaths(JSON.parse(content)))
           fs.writeFileSync(layoutV2Path, JSON.stringify(v2Layout, null, 2))
           fs.writeFileSync(layoutPath, JSON.stringify(v2Layout, null, 2))
           console.log('[PackManager] V2 布局文件已导入，包含页面:',
@@ -469,9 +483,10 @@ async function importPack(options = {}) {
             elements: [],
             settings: { theme: 'default' }
           }
+          layout = mergeCharacterDisplayLayout(layout)
           fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
         } else {
-          layout = remapLayoutAssetPaths(JSON.parse(trimmedContent))
+          layout = mergeCharacterDisplayLayout(remapLayoutAssetPaths(JSON.parse(trimmedContent)))
           if (!layout || typeof layout !== 'object') {
             console.warn('[PackManager] 布局格式无效，使用默认布局')
             layout = {
@@ -479,6 +494,7 @@ async function importPack(options = {}) {
               elements: [],
               settings: { theme: 'default' }
             }
+            layout = mergeCharacterDisplayLayout(layout)
           }
           fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
           console.log('[PackManager] 旧版布局文件已导入，键数量:', Object.keys(layout).length)
@@ -491,6 +507,7 @@ async function importPack(options = {}) {
           elements: [],
           settings: { theme: 'default' }
         }
+        layout = mergeCharacterDisplayLayout(layout)
         fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
       }
     } else {
@@ -500,6 +517,7 @@ async function importPack(options = {}) {
         elements: [],
         settings: { theme: 'default' }
       }
+      layout = mergeCharacterDisplayLayout(layout)
       fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
     }
 

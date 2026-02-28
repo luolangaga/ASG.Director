@@ -53,6 +53,9 @@ body {
   font-size: 16px;
   font-weight: 600;
   margin-right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .top-menu .menu-tabs {
@@ -90,6 +93,28 @@ body {
 .top-menu .menu-tab .tab-icon {
   margin-right: 6px;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.icon-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}
+
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icon-svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex: 0 0 auto;
 }
 
 .top-menu .menu-tab.menu-action {
@@ -118,9 +143,78 @@ body {
   flex-direction: column;
 }
 
+/* 可折叠区域样式 */
+.collapsible-section {
+  background: var(--fluent-surface);
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: var(--fluent-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.collapsible-header {
+  padding: 12px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  background: var(--fluent-surface);
+  transition: background 0.2s ease;
+}
+
+.collapsible-header:hover {
+  background: var(--fluent-surface-alt);
+}
+
+.collapsible-header h1 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.collapse-arrow {
+  font-size: 12px;
+  color: var(--fluent-muted);
+  transition: transform 0.3s ease;
+}
+
+.collapsible-content {
+  padding: 0 20px 20px 20px;
+  max-height: 2000px;
+  opacity: 1;
+  overflow: visible;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 折叠状态 */
+.collapsible-section.collapsed {
+  margin-bottom: 8px;
+}
+
+.collapsible-section.collapsed .collapsible-header {
+  padding: 8px 20px;
+}
+
+.collapsible-section.collapsed .collapse-arrow {
+  transform: rotate(-90deg);
+}
+
+.collapsible-section.collapsed .collapsible-content {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
 .container {
   width: 100%;
-  max-width: 100%;
+  max-width: 1200px;
   height: 100%;
   margin: 0 auto;
   background: var(--fluent-surface);
@@ -227,6 +321,12 @@ h1 {
   font-weight: 600;
   background: var(--fluent-surface-alt);
   color: var(--fluent-text);
+}
+
+.btn-operator {
+  padding: 12px 18px;
+  font-size: 15px;
+  border-radius: 8px;
 }
 
 .btn:hover {
@@ -497,6 +597,111 @@ h1 {
 
 .ban-item-remove:hover {
   color: #a80000;
+}
+
+.auto-global-ban {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--fluent-border);
+  border-radius: 8px;
+  background: var(--fluent-surface-alt);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auto-global-ban-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.auto-global-ban-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fluent-text);
+}
+
+.auto-global-ban-role {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.auto-global-ban-role .btn.active {
+  background: var(--fluent-accent);
+  color: #ffffff;
+  border-color: var(--fluent-accent);
+}
+
+.auto-global-ban-pools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auto-global-ban-pool {
+  border: 1px dashed var(--fluent-border-strong);
+  border-radius: 8px;
+  background: var(--fluent-surface);
+  padding: 8px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auto-global-ban-pool.drag-over {
+  border-color: var(--fluent-accent);
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+}
+
+.auto-global-ban-pool-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fluent-text);
+}
+
+.auto-global-ban-pool-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 36px;
+}
+
+.auto-global-ban-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(0, 120, 212, 0.08);
+  border: 1px solid rgba(0, 120, 212, 0.35);
+  font-size: 12px;
+  color: var(--fluent-text);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: grab;
+}
+
+.auto-global-ban-item.dragging {
+  opacity: 0.6;
+  cursor: grabbing;
+}
+
+.auto-global-ban-item-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.auto-global-ban-empty {
+  font-size: 12px;
+  color: var(--fluent-text-muted);
 }
 
 .tabs {
@@ -844,6 +1049,32 @@ h1 {
   gap: 12px;
 }
 
+.survivor-talent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.survivor-talent-block {
+  border: 1px solid var(--fluent-border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--fluent-surface-alt);
+}
+
+.survivor-talent-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fluent-text);
+  margin-bottom: 8px;
+}
+
+.survivor-talent-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
 .survivor-talent-tabs {
   display: flex;
   gap: 8px;
@@ -910,19 +1141,21 @@ h1 {
   align-items: center;
   justify-content: center;
   padding: 8px;
-  background: var(--fluent-surface-alt);
+  background: #666666; /* ✨ 这里改为深灰色，让白色图标更明显~ */
 }
 
 .talent-item:hover,
 .skill-item:hover {
   border-color: var(--fluent-accent);
   box-shadow: var(--fluent-shadow);
+  background: #777777; /* ✨ 悬停时稍微亮一点点 */
 }
 
 .talent-item.selected,
 .skill-item.selected {
   border-color: var(--fluent-success);
-  background: rgba(16, 124, 16, 0.08);
+  border-width: 2px;
+  background: var(--fluent-success); /* ✨ 选中时改为亮绿色，超级醒目！ */
 }
 
 .talent-icon,
@@ -937,7 +1170,7 @@ h1 {
 .skill-name {
   font-size: 11px;
   text-align: center;
-  color: var(--fluent-text);
+  color: #ffffff; /* ✨ 配合深色背景，文字也改为白色~ */
   font-weight: 600;
 }
 
@@ -1010,6 +1243,7 @@ h1 {
   font-size: 12px;
   color: var(--fluent-subtle);
   margin-top: 4px;
+  min-height: 16px;
 }
 
 /* 展示页面按钮 */

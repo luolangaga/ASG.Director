@@ -6,6 +6,7 @@ const os = require('os')
 const https = require('https')
 const http = require('http')
 const archiver = require('archiver')
+const { pinyin } = require('pinyin-pro')
 
 // 兜底：某些环境下（例如把 stdout/stderr 通过管道截断）console.log 会触发 EPIPE，
 // 进而导致主进程 Uncaught Exception 弹窗。这里仅忽略 EPIPE，不吞掉其他异常。
@@ -432,6 +433,8 @@ const layoutPath = path.join(userDataPath, 'layout.json')
 const bgImagePath = path.join(userDataPath, 'background')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
 const configPath = path.join(userDataPath, 'config.json')
+const localPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
+const localPagesConfigPath = path.join(localPagesBaseDir, 'pages.json')
 
 function readJsonFileSafe(filePath, fallback = {}) {
   try {
@@ -452,6 +455,918 @@ function writeJsonFileSafe(filePath, data) {
   } catch (e) {
     console.error('[Main] 写入 JSON 失败:', filePath, e)
     return false
+  }
+}
+
+function normalizeLocalPagesConfig(input) {
+  const base = input && typeof input === 'object' ? input : {}
+  let port = parseInt(base.port, 10)
+  if (!Number.isFinite(port) || port < 1024 || port > 65535) port = 9528
+  const pages = Array.isArray(base.pages) ? base.pages.filter(p => p && typeof p === 'object') : []
+  return { port, pages }
+}
+
+function normalizeLocalBpAutoOpenSettings(input) {
+  const base = input && typeof input === 'object' ? input : {}
+  return {
+    frontend: base.frontend !== false,
+    localBp: base.localBp !== false,
+    characterDisplay: !!base.characterDisplay,
+    scoreboardA: !!base.scoreboardA,
+    scoreboardB: !!base.scoreboardB,
+    scoreboardOverview: !!base.scoreboardOverview,
+    postMatch: !!base.postMatch
+  }
+}
+
+function normalizeFrontendResizeLockSetting(input) {
+  return !!input
+}
+
+function ensureLocalPagesStorage() {
+  const config = normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
+  if (!fs.existsSync(localPagesBaseDir)) {
+    fs.mkdirSync(localPagesBaseDir, { recursive: true })
+  }
+  const pagesDir = path.join(localPagesBaseDir, 'pages')
+  if (!fs.existsSync(pagesDir)) {
+    fs.mkdirSync(pagesDir, { recursive: true })
+  }
+  return { config, dir: pagesDir }
+}
+
+function readLocalPagesConfig() {
+  return normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
+}
+
+function listLocalPages() {
+  const storage = ensureLocalPagesStorage()
+  const config = storage.config
+  const baseDir = storage.dir
+  const configPages = Array.isArray(config.pages) ? config.pages.slice() : []
+  const pages = configPages
+    .filter(p => p && p.fileName)
+    .map(p => {
+      const fileName = String(p.fileName)
+      return {
+        fileName,
+        title: p.title || path.parse(fileName).name,
+        enabled: p.enabled !== false,
+        order: Number.isFinite(Number(p.order)) ? Number(p.order) : 0
+      }
+    })
+    .filter(p => {
+      const filePath = path.join(baseDir, p.fileName)
+      return fs.existsSync(filePath)
+    })
+  pages.sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order
+    return String(a.fileName).localeCompare(String(b.fileName), 'zh-CN')
+  })
+  return { config, pages, dir: baseDir }
+}
+
+function getLocalPagesBaseUrl(port) {
+  return `http://localhost:${port}`
+}
+
+function getLocalPagesMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext === '.html') return 'text/html; charset=utf-8'
+  if (ext === '.css') return 'text/css; charset=utf-8'
+  if (ext === '.js') return 'application/javascript; charset=utf-8'
+  if (ext === '.json') return 'application/json; charset=utf-8'
+  if (ext === '.png') return 'image/png'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.gif') return 'image/gif'
+  if (ext === '.svg') return 'image/svg+xml'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.ico') return 'image/x-icon'
+  if (ext === '.woff') return 'font/woff'
+  if (ext === '.woff2') return 'font/woff2'
+  if (ext === '.ttf') return 'font/ttf'
+  if (ext === '.otf') return 'font/otf'
+  if (ext === '.mp3') return 'audio/mpeg'
+  if (ext === '.mp4') return 'video/mp4'
+  if (ext === '.webm') return 'video/webm'
+  if (ext === '.pmx') return 'application/octet-stream'
+  if (ext === '.vmd') return 'application/octet-stream'
+  if (ext === '.gltf') return 'model/gltf+json'
+  if (ext === '.glb') return 'model/gltf-binary'
+  if (ext === '.bin') return 'application/octet-stream'
+  if (ext === '.bmp') return 'image/bmp'
+  if (ext === '.tga') return 'image/x-tga'
+  if (ext === '.dds') return 'image/vnd-ms.dds'
+  return 'application/octet-stream'
+}
+
+function buildLocalPagesIndexHtml(pages, baseUrl, baseDir) {
+  const items = pages
+    .filter(p => p.enabled)
+    .map(p => {
+      const fileName = String(p.fileName)
+      const url = `${baseUrl}/pages/${encodeURIComponent(fileName)}`
+      const title = p.title || fileName
+      if (fileName.toLowerCase() === 'scoreboard.html') {
+        const urlA = `${url}?team=teamA`
+        const urlB = `${url}?team=teamB`
+        return `<li style="margin:8px 0; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+        <span style="font-size:14px;">${title} A队</span>
+        <a href="${urlA}" style="color:#4ea1ff; text-decoration:none; font-size:13px;" target="_blank">${urlA}</a>
+      </li>
+      <li style="margin:8px 0; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+        <span style="font-size:14px;">${title} B队</span>
+        <a href="${urlB}" style="color:#4ea1ff; text-decoration:none; font-size:13px;" target="_blank">${urlB}</a>
+      </li>`
+      }
+      return `<li style="margin:8px 0; display:flex; justify-content:space-between; gap:12px; align-items:center;">
+        <span style="font-size:14px;">${title}</span>
+        <a href="${url}" style="color:#4ea1ff; text-decoration:none; font-size:13px;" target="_blank">${url}</a>
+      </li>`
+    })
+    .join('')
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ASG Local Pages</title></head><body style="font-family:Arial, sans-serif; background:#0e0e0e; color:#e6e6e6; padding:24px;"><h2 style="margin:0 0 12px 0;">本地页面列表</h2><div style="font-size:13px; margin-bottom:16px; color:#aaa;">HTML 目录: ${baseDir}</div><ul style="list-style:none; padding:0; margin:0;">${items || '<li style="color:#aaa;">暂无页面</li>'}</ul></body></html>`
+}
+
+function isPathInside(baseDir, targetPath) {
+  const base = path.resolve(baseDir)
+  const target = path.resolve(targetPath)
+  const baseLower = base.toLowerCase()
+  const targetLower = target.toLowerCase()
+  const prefix = baseLower.endsWith(path.sep) ? baseLower : baseLower + path.sep
+  return targetLower === baseLower || targetLower.startsWith(prefix)
+}
+
+function resolveLocalPagesPath(baseDir, requestPath) {
+  const clean = decodeURIComponent(requestPath || '').replace(/^\/+/, '')
+  const full = path.resolve(baseDir, clean)
+  if (!isPathInside(baseDir, full)) return null
+  return full
+}
+
+let localPagesCurrentState = null
+let localPagesCurrentRoomData = null
+let localPagesCurrentScoreData = null
+let localPagesCurrentPostMatchData = null
+const localPagesSseClients = new Set()
+
+function localPagesBroadcastSse(eventType, data) {
+  const message = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`
+  for (const client of localPagesSseClients) {
+    try {
+      client.write(message)
+    } catch (e) {
+      localPagesSseClients.delete(client)
+    }
+  }
+}
+
+function localPagesBroadcastSseMessage(data) {
+  const message = `data: ${JSON.stringify(data)}\n\n`
+  for (const client of localPagesSseClients) {
+    try {
+      client.write(message)
+    } catch (e) {
+      localPagesSseClients.delete(client)
+    }
+  }
+}
+
+function localPagesReadJsonBody(req, maxSize = 1024 * 1024) {
+  return new Promise(resolve => {
+    let body = ''
+    req.on('data', chunk => {
+      body += chunk
+      if (body.length > maxSize) {
+        try { req.destroy() } catch {}
+      }
+    })
+    req.on('end', () => {
+      if (!body) return resolve({})
+      try {
+        resolve(JSON.parse(body))
+      } catch {
+        resolve({})
+      }
+    })
+    req.on('error', () => resolve({}))
+  })
+}
+
+function localPagesGenerateInjectedScript(pageType) {
+  return `
+<script>
+(function() {
+  window.__ASG_OBS_MODE__ = true;
+  window.__ASG_PAGE_TYPE__ = '${pageType}';
+  let eventSource = null;
+  let reconnectTimer = null;
+  function connectSSE() {
+    if (eventSource) {
+      eventSource.close();
+    }
+    eventSource = new EventSource('/api/sse');
+    eventSource.onopen = function() {
+      fetch('/api/current-state').then(r => r.json()).then(data => {
+        if (data && data.state) {
+          handleStateUpdate(data);
+        }
+      }).catch(() => {});
+    };
+    eventSource.addEventListener('state-update', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        handleStateUpdate(data);
+      } catch (err) {}
+    });
+    eventSource.addEventListener('room-data', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        handleRoomData(data);
+      } catch (err) {}
+    });
+    eventSource.addEventListener('local-bp-blink', function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        if (typeof handleLocalBpBlink === 'function') {
+          handleLocalBpBlink(data.index);
+        }
+      } catch (err) {}
+    });
+    eventSource.onerror = function() {
+      try { eventSource.close(); } catch {}
+      reconnectTimer = setTimeout(connectSSE, 3000);
+    };
+  }
+  function handleStateUpdate(data) {
+    if (window.onUpdateData) {
+      window.onUpdateData(data);
+    }
+    window.dispatchEvent(new CustomEvent('asg-state-update', { detail: data }));
+    var payload = (data && data.state) ? data.state : data;
+    if (payload) {
+      window.dispatchEvent(new CustomEvent('asg-local-bp-update', { detail: payload }));
+    }
+  }
+  function handleRoomData(data) {
+    if (window.onRoomData) {
+      window.onRoomData(data);
+    }
+    window.dispatchEvent(new CustomEvent('asg-room-data', { detail: data }));
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', connectSSE);
+  } else {
+    connectSSE();
+  }
+  window.addEventListener('beforeunload', function() {
+    if (eventSource) eventSource.close();
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+  });
+})();
+</script>
+`
+}
+
+function localPagesHandleStaticFile(res, filePath) {
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' })
+      res.end('404 Not Found')
+      return
+    }
+    res.writeHead(200, {
+      'Content-Type': getLocalPagesMimeType(filePath),
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    })
+    res.end(data)
+  })
+}
+
+function localPagesHandleHtmlPage(req, res, filePath, pageType) {
+  fs.readFile(filePath, 'utf8', (err, html) => {
+    if (err) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' })
+      res.end('404 Not Found')
+      return
+    }
+    const injectedScript = localPagesGenerateInjectedScript(pageType)
+    let modifiedHtml = html
+    if (html.includes('</head>')) {
+      modifiedHtml = html.replace('</head>', injectedScript + '</head>')
+    } else if (html.includes('<body')) {
+      modifiedHtml = html.replace('<body', injectedScript + '<body')
+    } else {
+      modifiedHtml = injectedScript + html
+    }
+    modifiedHtml = modifiedHtml.replace(/(['"])\.\/(js\/)/g, '$1/$2')
+    modifiedHtml = modifiedHtml.replace(/(['"])\.\/(css\/)/g, '$1/$2')
+    modifiedHtml = modifiedHtml.replace(/(['"])\.\.\/assets\//g, '$1/assets/')
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    })
+    res.end(modifiedHtml)
+  })
+}
+
+function localPagesHandleSse(req, res) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  })
+  res.write('event: connected\ndata: {"status":"ok"}\n\n')
+  if (localPagesCurrentState) {
+    res.write(`event: state-update\ndata: ${JSON.stringify(localPagesCurrentState)}\n\n`)
+    const payload = localPagesCurrentState.state || localPagesCurrentState
+    res.write(`data: ${JSON.stringify({ type: 'local-bp-update', payload })}\n\n`)
+  }
+  if (localPagesCurrentScoreData) {
+    res.write(`event: state-update\ndata: ${JSON.stringify({ type: 'score', scoreData: localPagesCurrentScoreData })}\n\n`)
+  }
+  if (localPagesCurrentPostMatchData) {
+    res.write(`event: state-update\ndata: ${JSON.stringify({ type: 'postmatch', postMatchData: localPagesCurrentPostMatchData })}\n\n`)
+  }
+  if (localPagesCurrentRoomData) {
+    res.write(`event: room-data\ndata: ${JSON.stringify(localPagesCurrentRoomData)}\n\n`)
+  }
+  localPagesSseClients.add(res)
+  req.on('close', () => {
+    localPagesSseClients.delete(res)
+  })
+}
+
+function localPagesHandleApi(req, res, pathname) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
+  if (pathname === '/api/current-state') {
+    res.writeHead(200)
+    res.end(JSON.stringify({
+      state: localPagesCurrentState ? (localPagesCurrentState.state || localPagesCurrentState) : null,
+      roomData: localPagesCurrentRoomData,
+      scoreData: localPagesCurrentScoreData || localBpScoreData || null,
+      postMatchData: localPagesCurrentPostMatchData
+    }))
+    return
+  }
+
+  if (pathname === '/api/frontend-layout') {
+    try {
+      const root = __readLayoutJsonSafe__()
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, layout: root || null }))
+      return
+    } catch {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, layout: null }))
+      return
+    }
+  }
+
+  if (pathname === '/api/scoreboard-layout' && req.method === 'GET') {
+    const url = new URL(req.url, `http://localhost:${localPagesServerPort || 9528}`)
+    const team = url.searchParams.get('team') || 'teamA'
+    try {
+      const root = __readLayoutJsonSafe__()
+      if (root.scoreboardLayouts && root.scoreboardLayouts[team]) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true, layout: root.scoreboardLayouts[team] }))
+        return
+      }
+    } catch {}
+    res.writeHead(200)
+    res.end(JSON.stringify({ success: true, layout: null }))
+    return
+  }
+
+  if (pathname === '/api/scoreboard-layout' && req.method === 'POST') {
+    const url = new URL(req.url, `http://localhost:${localPagesServerPort || 9528}`)
+    const team = url.searchParams.get('team') || 'teamA'
+    if (team !== 'teamA' && team !== 'teamB') {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: 'Invalid team' }))
+      return
+    }
+    localPagesReadJsonBody(req).then(payload => {
+      try {
+        const layout = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'layout')) ? payload.layout : payload
+        const root = __readLayoutJsonSafe__()
+        if (!root.scoreboardLayouts || typeof root.scoreboardLayouts !== 'object') root.scoreboardLayouts = {}
+        root.scoreboardLayouts[team] = layout || null
+        __writeLayoutJsonSafe__(root)
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e.message }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/local-bp-state') {
+    res.writeHead(200)
+    res.end(JSON.stringify({ success: true, data: localBpState || null }))
+    return
+  }
+
+  if (pathname === '/api/local-bp-characters') {
+    try {
+      const idx = loadCharacterIndex()
+      const survivors = Array.isArray(idx.survivors)
+        ? idx.survivors.map(item => typeof item === 'string' ? item : item?.name).filter(Boolean)
+        : []
+      const hunters = Array.isArray(idx.hunters)
+        ? idx.hunters.map(item => typeof item === 'string' ? item : item?.name).filter(Boolean)
+        : []
+      const pinyinMap = buildPinyinMap([...survivors, ...hunters])
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, data: { survivors, hunters, pinyinMap } }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
+  if (pathname === '/api/local-bp-action' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then(payload => {
+      try {
+        const action = typeof payload?.action === 'string' ? payload.action : ''
+        const data = payload?.data || {}
+        if (!localBpState || typeof localBpState !== 'object') localBpState = {}
+        if (!Array.isArray(localBpState.survivors)) localBpState.survivors = [null, null, null, null]
+        if (!Array.isArray(localBpState.hunterBannedSurvivors)) localBpState.hunterBannedSurvivors = []
+        if (!Array.isArray(localBpState.survivorBannedHunters)) localBpState.survivorBannedHunters = []
+        if (!Array.isArray(localBpState.globalBannedSurvivors)) localBpState.globalBannedSurvivors = []
+        if (!Array.isArray(localBpState.globalBannedHunters)) localBpState.globalBannedHunters = []
+        if (!Array.isArray(localBpState.playerNames)) localBpState.playerNames = ['', '', '', '', '']
+        if (!Array.isArray(localBpState.survivorTalents)) localBpState.survivorTalents = [[], [], [], []]
+        if (!Array.isArray(localBpState.hunterTalents)) localBpState.hunterTalents = []
+        if (!Array.isArray(localBpState.hunterSkills)) localBpState.hunterSkills = []
+
+        const normalizeName = (name) => typeof name === 'string' ? __normalizeLocalBpName__(name) : null
+        const pushUnique = (list, name) => {
+          if (!name) return
+          if (!list.includes(name)) list.push(name)
+        }
+        const removeItem = (list, name) => list.filter(n => n !== name)
+
+        if (action === 'set-survivor') {
+          const index = Number(data?.index)
+          if (Number.isFinite(index) && index >= 0 && index < 4) {
+            localBpState.survivors[index] = normalizeName(data?.character) || null
+          }
+        } else if (action === 'set-hunter') {
+          localBpState.hunter = normalizeName(data?.character) || null
+        } else if (action === 'add-ban-survivor') {
+          const name = normalizeName(data?.character)
+          pushUnique(localBpState.hunterBannedSurvivors, name)
+        } else if (action === 'remove-ban-survivor') {
+          const name = normalizeName(data?.character)
+          localBpState.hunterBannedSurvivors = removeItem(localBpState.hunterBannedSurvivors, name)
+        } else if (action === 'add-ban-hunter') {
+          const name = normalizeName(data?.character)
+          pushUnique(localBpState.survivorBannedHunters, name)
+        } else if (action === 'remove-ban-hunter') {
+          const name = normalizeName(data?.character)
+          localBpState.survivorBannedHunters = removeItem(localBpState.survivorBannedHunters, name)
+        } else if (action === 'add-global-ban-survivor') {
+          const name = normalizeName(data?.character)
+          pushUnique(localBpState.globalBannedSurvivors, name)
+        } else if (action === 'remove-global-ban-survivor') {
+          const name = normalizeName(data?.character)
+          localBpState.globalBannedSurvivors = removeItem(localBpState.globalBannedSurvivors, name)
+        } else if (action === 'add-global-ban-hunter') {
+          const name = normalizeName(data?.character)
+          pushUnique(localBpState.globalBannedHunters, name)
+        } else if (action === 'remove-global-ban-hunter') {
+          const name = normalizeName(data?.character)
+          localBpState.globalBannedHunters = removeItem(localBpState.globalBannedHunters, name)
+        } else if (action === 'set-map-name') {
+          const mapName = typeof data?.mapName === 'string' ? data.mapName : ''
+          localBpState.mapName = mapName
+        } else if (action === 'set-player-name') {
+          const index = Number(data?.index)
+          if (Number.isFinite(index) && index >= 0 && index < localBpState.playerNames.length) {
+            localBpState.playerNames[index] = typeof data?.name === 'string' ? data.name : ''
+          }
+        } else if (action === 'set-survivor-talents') {
+          const index = Number(data?.index)
+          if (Number.isFinite(index) && index >= 0 && index < 4) {
+            localBpState.survivorTalents[index] = __normalizeLocalBpArray__(data?.talents)
+          }
+        } else if (action === 'set-hunter-talents') {
+          localBpState.hunterTalents = __normalizeLocalBpArray__(data?.talents)
+        } else if (action === 'set-hunter-skills') {
+          localBpState.hunterSkills = __normalizeLocalBpArray__(data?.skills)
+        } else if (action === 'reset') {
+          const preservedLayout = localBpState.characterDisplayLayout
+          localBpState = {
+            enabled: true,
+            survivors: [null, null, null, null],
+            hunter: null,
+            hunterBannedSurvivors: [],
+            survivorBannedHunters: [],
+            globalBannedSurvivors: [],
+            globalBannedHunters: [],
+            survivorTalents: [[], [], [], []],
+            hunterTalents: [],
+            hunterSkills: [],
+            playerNames: ['', '', '', '', ''],
+            teamA: localBpState?.teamA || { name: '求生者队', logo: '', meta: '' },
+            teamB: localBpState?.teamB || { name: '监管者队', logo: '', meta: '' },
+            mapName: '',
+            characterDisplayLayout: preservedLayout || { positions: {} }
+          }
+        }
+
+        broadcastLocalBpState()
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/open-local-backend') {
+    try {
+      ensureLocalBackendWindow()
+      if (backendWindow && !backendWindow.isDestroyed()) {
+        backendWindow.show()
+        backendWindow.focus()
+      }
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
+  if (pathname === '/api/local-bp-character-display-layout' && req.method === 'POST') {
+    let body = ''
+    req.on('data', chunk => {
+      body += chunk
+      if (body.length > 1024 * 1024) {
+        try { req.destroy() } catch {}
+      }
+    })
+    req.on('end', () => {
+      let payload = {}
+      try { payload = body ? JSON.parse(body) : {} } catch { payload = {} }
+      const positions = (payload && typeof payload === 'object' && payload.positions && typeof payload.positions === 'object') ? payload.positions : payload
+      if (!localBpState.characterDisplayLayout) {
+        localBpState.characterDisplayLayout = { backgroundImage: null, positions: {}, transparentBackground: false }
+      }
+      if (!localBpState.characterDisplayLayout.positions) localBpState.characterDisplayLayout.positions = {}
+      Object.assign(localBpState.characterDisplayLayout.positions, positions || {})
+      __persistCharacterDisplayLayoutToDisk__()
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true }))
+    })
+    return
+  }
+
+  if (pathname === '/api/score-state' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then(payload => {
+      try {
+        if (payload && typeof payload === 'object') {
+          localPagesCurrentScoreData = payload
+          localPagesBroadcastSse('state-update', { type: 'score', scoreData: localPagesCurrentScoreData })
+        }
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true }))
+      } catch {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/score-state') {
+    res.writeHead(200)
+    res.end(JSON.stringify({ success: true, data: localPagesCurrentScoreData || localBpScoreData || null }))
+    return
+  }
+
+  if (pathname === '/api/postmatch-state' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then(payload => {
+      try {
+        if (payload && typeof payload === 'object') {
+          localPagesCurrentPostMatchData = payload
+          localPagesBroadcastSse('state-update', { type: 'postmatch', postMatchData: localPagesCurrentPostMatchData })
+        }
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true }))
+      } catch {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/postmatch-state') {
+    res.writeHead(200)
+    res.end(JSON.stringify({ success: true, data: localPagesCurrentPostMatchData }))
+    return
+  }
+
+  if (pathname === '/api/character-index') {
+    try {
+      const index = loadCharacterIndex()
+      const data = index && index.fullData ? index.fullData : { survivors: [], hunters: [] }
+      res.writeHead(200)
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          survivors: index ? index.survivors : [],
+          hunters: index ? index.hunters : [],
+          survivorTalents: Array.isArray(data.survivorTalents) ? data.survivorTalents : [],
+          hunterTalents: Array.isArray(data.hunterTalents) ? data.hunterTalents : [],
+          hunterSkills: Array.isArray(data.hunterSkills) ? data.hunterSkills : []
+        }
+      }))
+      return
+    } catch {}
+    res.writeHead(200)
+    res.end(JSON.stringify({ success: false, data: null }))
+    return
+  }
+
+  if (pathname === '/api/maps') {
+    try {
+      const assetsPath = path.join(app.getAppPath(), 'assets')
+      const mapDir = path.join(assetsPath, 'map')
+      let names = []
+      if (fs.existsSync(mapDir)) {
+        const files = fs.readdirSync(mapDir)
+        names = files
+          .filter(f => typeof f === 'string')
+          .filter(f => /(.png|.jpg|.jpeg|.webp)$/i.test(f))
+          .map(f => path.parse(f).name)
+          .filter(n => n && typeof n === 'string')
+      }
+      const unique = Array.from(new Set(names)).sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, maps: unique }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e && e.message ? e.message : String(e), maps: [] }))
+      return
+    }
+  }
+
+  if (pathname === '/api/official-model-map') {
+    try {
+      const modelsDir = path.join(userDataPath, 'official-models')
+      const map = {}
+      if (fs.existsSync(modelsDir)) {
+        const files = fs.readdirSync(modelsDir)
+        for (const file of files) {
+          const fullPath = path.join(modelsDir, file)
+          let stat = null
+          try { stat = fs.statSync(fullPath) } catch { continue }
+          if (stat.isDirectory()) {
+            const potentialFiles = [file + '.gltf', file + '.glb', file + '.pmx']
+            for (const p of potentialFiles) {
+              if (fs.existsSync(path.join(fullPath, p))) {
+                map[file] = `/official-models/${file}/${p}`
+                break
+              }
+            }
+          } else if (/(.gltf|.glb|.pmx)$/i.test(file)) {
+            const name = path.basename(file, path.extname(file))
+            map[name] = `/official-models/${file}`
+          }
+        }
+      }
+      res.writeHead(200)
+      res.end(JSON.stringify(map))
+    } catch {
+      res.writeHead(200)
+      res.end('{}')
+    }
+    return
+  }
+
+  res.writeHead(404)
+  res.end(JSON.stringify({ error: 'Not Found' }))
+}
+
+function handleLocalPagesRequest(req, res) {
+  const { config, pages, dir } = listLocalPages()
+  const baseUrl = getLocalPagesBaseUrl(config.port)
+  const urlObj = new URL(req.url || '/', baseUrl)
+  const pathname = decodeURIComponent(urlObj.pathname)
+  if (pathname === '/sse' || pathname === '/api/sse') {
+    localPagesHandleSse(req, res)
+    return
+  }
+  if (pathname.startsWith('/api/')) {
+    localPagesHandleApi(req, res, pathname)
+    return
+  }
+  if (urlObj.pathname === '/' || urlObj.pathname === '/index.html') {
+    const html = buildLocalPagesIndexHtml(pages, baseUrl, dir)
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(html)
+    return
+  }
+  if (pathname === '/frontend' || pathname === '/frontend.html') {
+    const filePath = path.join(dir, 'frontend.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'frontend')
+    return
+  }
+  if (pathname === '/scoreboard' || pathname === '/scoreboard.html') {
+    const filePath = path.join(dir, 'scoreboard.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'scoreboard')
+    return
+  }
+  if (pathname === '/character-display' || pathname === '/character-display.html') {
+    const filePath = path.join(dir, 'character-display.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'character-display')
+    return
+  }
+  if (urlObj.pathname === '/api/pages') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ success: true, pages, baseUrl }))
+    return
+  }
+  if (urlObj.pathname.startsWith('/pages/')) {
+    const relativePath = decodeURIComponent(urlObj.pathname.slice('/pages/'.length))
+    const filePath = resolveLocalPagesPath(dir, relativePath)
+    if (!filePath || !fs.existsSync(filePath)) {
+      res.writeHead(404)
+      res.end('Not Found')
+      return
+    }
+    const ext = path.extname(filePath).toLowerCase()
+    if (ext === '.html') {
+      const page = pages.find(p => p.fileName === relativePath && p.enabled)
+      if (!page) {
+        res.writeHead(404)
+        res.end('Not Found')
+        return
+      }
+      const pageType = path.parse(filePath).name
+      localPagesHandleHtmlPage(req, res, filePath, pageType)
+      return
+    }
+    res.writeHead(200, { 'Content-Type': getLocalPagesMimeType(filePath) })
+    fs.createReadStream(filePath).pipe(res)
+    return
+  }
+  if (pathname.startsWith('/official-models/')) {
+    const modelPath = pathname.replace('/official-models/', '')
+    const filePath = path.join(userDataPath, 'official-models', decodeURIComponent(modelPath))
+    if (fs.existsSync(filePath)) {
+      localPagesHandleStaticFile(res, filePath)
+      return
+    }
+  }
+  if (pathname.startsWith('/js/') || pathname.startsWith('/pages/js/')) {
+    const cleanPath = pathname.split('?')[0]
+    const jsPath = cleanPath.replace('/pages/', '/').replace(/^\/js\//, '')
+    const filePath = path.join(dir, 'js', jsPath)
+    if (fs.existsSync(filePath)) {
+      localPagesHandleStaticFile(res, filePath)
+      return
+    }
+  }
+  if (pathname.startsWith('/css/') || pathname.startsWith('/pages/css/')) {
+    const cleanPath = pathname.split('?')[0]
+    const cssPath = cleanPath.replace('/pages/', '/').replace(/^\/css\//, '')
+    const filePath = path.join(dir, 'css', cssPath)
+    if (fs.existsSync(filePath)) {
+      localPagesHandleStaticFile(res, filePath)
+      return
+    }
+  }
+  if (pathname.startsWith('/assets/')) {
+    const assetPath = pathname.replace('/assets/', '')
+    const filePath = path.join(app.getAppPath(), 'assets', assetPath)
+    if (fs.existsSync(filePath)) {
+      localPagesHandleStaticFile(res, filePath)
+      return
+    }
+  }
+  if (pathname.startsWith('/background/')) {
+    const bgPath = pathname.replace('/background/', '')
+    const filePath = path.join(userDataPath, 'background', bgPath)
+    if (fs.existsSync(filePath)) {
+      localPagesHandleStaticFile(res, filePath)
+      return
+    }
+  }
+  if (pathname.startsWith('/userdata/')) {
+    const relativePath = pathname.replace('/userdata/', '')
+    const filePath = path.join(userDataPath, relativePath)
+    if (fs.existsSync(filePath)) {
+      localPagesHandleStaticFile(res, filePath)
+      return
+    }
+  }
+  const assetPath = resolveLocalPagesPath(dir, urlObj.pathname)
+  if (assetPath && fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+    res.writeHead(200, { 'Content-Type': getLocalPagesMimeType(assetPath) })
+    fs.createReadStream(assetPath).pipe(res)
+    return
+  }
+  res.writeHead(404)
+  res.end('Not Found')
+}
+
+let localPagesServer = null
+let localPagesServerPort = null
+
+function startLocalPagesServer() {
+  ensureLocalPagesStorage()
+  const config = readLocalPagesConfig()
+  const port = config.port
+  if (localPagesServer && localPagesServerPort === port) {
+    return Promise.resolve({ success: true, port, running: true })
+  }
+  if (localPagesServer) {
+    return stopLocalPagesServer().then(() => startLocalPagesServer())
+  }
+  return new Promise(resolve => {
+    const server = http.createServer(handleLocalPagesRequest)
+    server.on('error', err => {
+      resolve({ success: false, error: err.message })
+    })
+    server.listen(port, '127.0.0.1', () => {
+      localPagesServer = server
+      localPagesServerPort = port
+      try {
+        const baseState = (typeof buildLocalBpFrontendState === 'function') ? buildLocalBpFrontendState() : localBpState
+        if (baseState) {
+          localPagesCurrentState = { type: 'state', state: baseState }
+          localPagesCurrentRoomData = localPagesCurrentState
+        }
+        if (localBpScoreData) {
+          localPagesCurrentScoreData = localBpScoreData
+        }
+      } catch {}
+      if (!global.__localPageServerHooks) {
+        global.__localPageServerHooks = {}
+      }
+      global.__localPageServerHooks.onDataUpdate = data => {
+        if (data) {
+          if (data.type === 'score' && data.scoreData) {
+            localPagesCurrentScoreData = data.scoreData
+          }
+          if (data.type === 'state' || data.state) {
+            localPagesCurrentState = data
+          }
+          localPagesCurrentRoomData = data
+          localPagesBroadcastSse('state-update', data)
+          if (data.type === 'state' || data.state) {
+            const payload = data.state || data
+            localPagesBroadcastSseMessage({ type: 'local-bp-update', payload })
+          }
+        }
+      }
+      global.__localPageServerHooks.onLocalBpBlink = index => {
+        localPagesBroadcastSse('local-bp-blink', { index })
+      }
+      resolve({ success: true, port, running: true })
+    })
+  })
+}
+
+function stopLocalPagesServer() {
+  if (!localPagesServer) return Promise.resolve({ success: true, running: false })
+  return new Promise(resolve => {
+    localPagesServer.close(() => {
+      localPagesServer = null
+      localPagesServerPort = null
+      if (global.__localPageServerHooks) {
+        delete global.__localPageServerHooks
+      }
+      resolve({ success: true, running: false })
+    })
+  })
+}
+
+function getLocalPagesStatus() {
+  return {
+    running: !!localPagesServer,
+    port: localPagesServerPort
   }
 }
 
@@ -518,7 +1433,53 @@ function ensureDirectories() {
   if (!fs.existsSync(bgImagePath)) {
     fs.mkdirSync(bgImagePath, { recursive: true })
   }
+  ensureLocalPagesStorage()
 }
+
+ipcMain.handle('local-pages:get-pages', () => {
+  const { config, pages, dir } = listLocalPages()
+  const baseUrl = getLocalPagesBaseUrl(config.port)
+  return { success: true, config, pages, dir, baseUrl }
+})
+
+ipcMain.handle('local-pages:get-status', () => {
+  return { success: true, status: getLocalPagesStatus() }
+})
+
+ipcMain.handle('local-bp:auto-open:get', () => {
+  const config = readJsonFileSafe(configPath, {})
+  const settings = normalizeLocalBpAutoOpenSettings(config.localBpAutoOpen)
+  return { success: true, settings }
+})
+
+ipcMain.handle('local-bp:auto-open:set', (event, settings) => {
+  const config = readJsonFileSafe(configPath, {})
+  const next = normalizeLocalBpAutoOpenSettings({ ...(config.localBpAutoOpen || {}), ...(settings || {}) })
+  config.localBpAutoOpen = next
+  writeJsonFileSafe(configPath, config)
+  return { success: true, settings: next }
+})
+
+ipcMain.handle('frontend-resize-lock:get', () => {
+  const config = readJsonFileSafe(configPath, {})
+  const locked = normalizeFrontendResizeLockSetting(config.frontendResizeLock)
+  return { success: true, locked }
+})
+
+ipcMain.handle('frontend-resize-lock:set', (event, locked) => {
+  const config = readJsonFileSafe(configPath, {})
+  const next = normalizeFrontendResizeLockSetting(locked)
+  config.frontendResizeLock = next
+  writeJsonFileSafe(configPath, config)
+  if (frontendWindow && !frontendWindow.isDestroyed()) {
+    try {
+      frontendWindow.setResizable(!next)
+    } catch (e) {
+      console.warn('[Frontend] setResizable failed:', e.message)
+    }
+  }
+  return { success: true, locked: next }
+})
 
 // 获取当前环境信息
 ipcMain.handle('get-environment', () => {
@@ -684,6 +1645,7 @@ function createFrontendWindow(roomData) {
   const finalHeight = Number(savedContentSize.height) || 720
   const finalX = windowBounds.x
   const finalY = windowBounds.y
+  const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
 
   console.log('[Frontend] 恢复内容尺寸:', { width: finalWidth, height: finalHeight }, '位置:', { x: finalX, y: finalY })
 
@@ -697,6 +1659,7 @@ function createFrontendWindow(roomData) {
     frame: false,
     transparent: true,
     titleBarStyle: 'hidden',
+    resizable: !resizeLocked,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -729,6 +1692,8 @@ function createFrontendWindow(roomData) {
     if (resizeTimer) clearTimeout(resizeTimer)
     resizeTimer = setTimeout(() => {
       if (!frontendWindow || frontendWindow.isDestroyed()) return
+      const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
+      if (resizeLocked) return
 
       try {
         const bounds = frontendWindow.getBounds()
@@ -1088,7 +2053,8 @@ ipcMain.handle('save-layout', async (event, layout) => {
 
     // 保存窗口大小配置（合并旧值，避免窗口未打开时丢失上次尺寸）
     const windowBounds = { ...(existingLayout.windowBounds || {}) }
-    if (frontendWindow && !frontendWindow.isDestroyed()) {
+    const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
+    if (!resizeLocked && frontendWindow && !frontendWindow.isDestroyed()) {
       windowBounds.frontendBounds = frontendWindow.getBounds()
       const [cw, ch] = frontendWindow.getContentSize()
       windowBounds.frontendContentSize = { width: cw, height: ch }
@@ -1887,11 +2853,14 @@ ipcMain.handle('send-to-frontend', async (event, data) => {
   // 注意：不同入口传入的 data 形状不一致，这里做宽松判断
   const shouldSyncRoomDataToPlugins = !!data && (
     data.type === 'state' ||
+    data.type === 'score' ||
     !!data.state ||
+    !!data.scoreData ||
     !!data.currentRoundData ||
     !!data.state?.currentRoundData ||
     !!data.data?.currentRoundData ||
-    !!data.data?.state?.currentRoundData
+    !!data.data?.state?.currentRoundData ||
+    !!data.data?.scoreData
   )
 
   if (shouldSyncRoomDataToPlugins) {
@@ -3526,6 +4495,24 @@ function loadCharacterIndex() {
   return characterIndexCache
 }
 
+function buildPinyinMap(list) {
+  const map = {}
+  if (!Array.isArray(list)) return map
+  list.forEach(name => {
+    if (!name || map[name]) return
+    try {
+      const arr = pinyin(name, { toneType: 'none', type: 'array' })
+      if (!Array.isArray(arr) || arr.length === 0) return
+      const full = arr.join('')
+      const initials = arr.map(p => (p && p[0]) ? p[0] : '').join('')
+      map[name] = { full, initials }
+    } catch (e) {
+      return
+    }
+  })
+  return map
+}
+
 // 刷新角色索引缓存
 function refreshCharacterIndex() {
   characterIndexCache = null
@@ -3890,11 +4877,14 @@ function broadcastUpdateData(data) {
   // 同时更新插件系统的房间数据
   const shouldSyncRoomDataToPlugins = !!data && (
     data.type === 'state' ||
+    data.type === 'score' ||
     !!data.state ||
+    !!data.scoreData ||
     !!data.currentRoundData ||
     !!data.state?.currentRoundData ||
     !!data.data?.currentRoundData ||
-    !!data.data?.state?.currentRoundData
+    !!data.data?.state?.currentRoundData ||
+    !!data.data?.scoreData
   )
 
   if (shouldSyncRoomDataToPlugins) {
@@ -4072,9 +5062,20 @@ ipcMain.handle('open-local-bp', () => {
     localBpState.enabled = true
     __loadCharacterDisplayLayoutFromDiskIntoState__()
     __normalizeLocalBpStateInPlace__()
-    ensureLocalFrontendWindow()
-    // ensureLocalBackendWindow()
-    createLocalBpWindow()
+    const config = readJsonFileSafe(configPath, {})
+    const autoOpen = normalizeLocalBpAutoOpenSettings(config.localBpAutoOpen)
+    if (autoOpen.frontend) ensureLocalFrontendWindow()
+    if (autoOpen.localBp) createLocalBpWindow()
+    if (autoOpen.characterDisplay) openCharacterDisplayWindow()
+    if (autoOpen.scoreboardA) createScoreboardWindow('local-bp', 'teamA')
+    if (autoOpen.scoreboardB) createScoreboardWindow('local-bp', 'teamB')
+    if (autoOpen.scoreboardOverview) {
+      const boCount = Array.isArray(localBpScoreData?.bos) && localBpScoreData.bos.length
+        ? localBpScoreData.bos.length
+        : (Number.isFinite(Number(localBpScoreData?.boType)) ? Number(localBpScoreData.boType) : 5)
+      createScoreboardOverviewWindow('local-bp', boCount)
+    }
+    if (autoOpen.postMatch) createPostMatchWindow('local-bp')
     broadcastLocalBpState()
     return { success: true }
   } catch (error) {
@@ -4471,6 +5472,19 @@ ipcMain.handle('localBp:removeGlobalBanHunter', (event, character) => {
 
 ipcMain.handle('localBp:reset', () => {
   try {
+    const preservedLayout = (() => {
+      const stateLayout = (localBpState && typeof localBpState.characterDisplayLayout === 'object')
+        ? localBpState.characterDisplayLayout
+        : null
+      if (stateLayout) return JSON.parse(JSON.stringify(stateLayout))
+      try {
+        const root = __readLayoutJsonSafe__()
+        const diskLayout = (root && typeof root.characterDisplayLayout === 'object') ? root.characterDisplayLayout : null
+        if (diskLayout) return JSON.parse(JSON.stringify(diskLayout))
+      } catch {}
+      return null
+    })()
+
     localBpState = {
       enabled: true,
       survivors: [null, null, null, null],
@@ -4493,6 +5507,9 @@ ipcMain.handle('localBp:reset', () => {
         positions: {},
         transparentBackground: false
       }
+    }
+    if (preservedLayout && typeof preservedLayout === 'object') {
+      localBpState.characterDisplayLayout = preservedLayout
     }
     __persistCharacterDisplayLayoutToDisk__()
     broadcastLocalBpState()
@@ -4695,35 +5712,39 @@ ipcMain.handle('localBp:setCharacterDisplayTransparentBackground', (event, enabl
   }
 })
 
+function openCharacterDisplayWindow() {
+  if (characterDisplayWindow && !characterDisplayWindow.isDestroyed()) {
+    characterDisplayWindow.focus()
+    return { success: true }
+  }
+
+  characterDisplayWindow = new BrowserWindow({
+    width: 1366,
+    height: 768,
+    title: '角色展示',
+    resizable: true,
+    transparent: true,
+    frame: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  })
+
+  characterDisplayWindow.loadFile(path.join(__dirname, 'pages', 'character-display.html'))
+
+  characterDisplayWindow.on('closed', () => {
+    characterDisplayWindow = null
+  })
+
+  return { success: true }
+}
+
 // 打开角色展示窗口
 ipcMain.handle('localBp:openCharacterDisplay', () => {
   try {
-    if (characterDisplayWindow && !characterDisplayWindow.isDestroyed()) {
-      characterDisplayWindow.focus()
-      return { success: true }
-    }
-
-    characterDisplayWindow = new BrowserWindow({
-      width: 1366,
-      height: 768,
-      title: '角色展示',
-      resizable: true,
-      transparent: true,
-      frame: false,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        preload: path.join(__dirname, 'preload.js')
-      }
-    })
-
-    characterDisplayWindow.loadFile(path.join(__dirname, 'pages', 'character-display.html'))
-
-    characterDisplayWindow.on('closed', () => {
-      characterDisplayWindow = null
-    })
-
-    return { success: true }
+    return openCharacterDisplayWindow()
   } catch (error) {
     return { success: false, error: error.message }
   }
@@ -4732,12 +5753,13 @@ ipcMain.handle('localBp:openCharacterDisplay', () => {
 ipcMain.handle('localBp:getCharacters', () => {
   try {
     const idx = loadCharacterIndex()
+    const pinyinMap = buildPinyinMap([...(idx.survivors || []), ...(idx.hunters || [])])
     return {
       success: true,
       data: {
         survivors: idx.survivors,
         hunters: idx.hunters,
-        fullData: idx.fullData
+        pinyinMap
       }
     }
   } catch (error) {
@@ -4749,6 +5771,11 @@ app.whenReady().then(async () => {
   ensureDirectories()
   packManager.ensureDirectories()
   loadAuthState()
+  try {
+    await startLocalPagesServer()
+  } catch (e) {
+    console.error('[App] 启动本地页面服务器失败:', e?.message || e)
+  }
 
   // 检查是否首次运行
   const config = readJsonFileSafe(configPath, {})
@@ -4801,6 +5828,11 @@ app.on('before-quit', async () => {
     await shutdownPlugins()
   } catch (e) {
     console.error('[App] 关闭插件系统失败:', e?.message || e)
+  }
+  try {
+    await stopLocalPagesServer()
+  } catch (e) {
+    console.error('[App] 关闭本地页面服务器失败:', e?.message || e)
   }
 })
 

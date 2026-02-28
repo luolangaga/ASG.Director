@@ -9,31 +9,86 @@
 </head>
 
 <body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="icon-movie" viewBox="0 0 24 24">
+      <rect x="3" y="6" width="18" height="12" rx="2"></rect>
+      <polygon points="10,9 16,12 10,15"></polygon>
+    </symbol>
+    <symbol id="icon-game" viewBox="0 0 24 24">
+      <rect x="4" y="9" width="16" height="8" rx="4"></rect>
+      <rect x="8" y="11" width="4" height="2"></rect>
+      <rect x="9" y="10" width="2" height="4"></rect>
+      <circle cx="16" cy="12" r="1.2"></circle>
+      <circle cx="18" cy="12" r="1.2"></circle>
+    </symbol>
+    <symbol id="icon-map" viewBox="0 0 24 24">
+      <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"></path>
+    </symbol>
+    <symbol id="icon-psychology" viewBox="0 0 24 24">
+      <circle cx="12" cy="10" r="5"></circle>
+      <rect x="9" y="15" width="6" height="4"></rect>
+      <rect x="10" y="19" width="4" height="2"></rect>
+    </symbol>
+    <symbol id="icon-bar-chart" viewBox="0 0 24 24">
+      <rect x="4" y="12" width="3" height="8"></rect>
+      <rect x="10" y="9" width="3" height="11"></rect>
+      <rect x="16" y="6" width="3" height="14"></rect>
+    </symbol>
+    <symbol id="icon-insights" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+      <polygon points="7,15 10,12 13,14 17,9 19,10 13,17 10,15"></polygon>
+    </symbol>
+    <symbol id="icon-explore" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <polygon points="12,7 15,12 12,17 9,12"></polygon>
+    </symbol>
+    <symbol id="icon-help" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <rect x="11" y="16" width="2" height="2"></rect>
+      <path d="M9 9a3 3 0 1 1 4 2.6c-.9.4-1.2.8-1.2 1.4v1h-2v-1c0-1.3.7-2.2 2-2.7.7-.3 1.2-.8 1.2-1.6a1.8 1.8 0 0 0-3.6 0H9z"></path>
+    </symbol>
+    <symbol id="icon-schedule" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <rect x="11" y="7" width="2" height="6"></rect>
+      <rect x="12" y="12" width="5" height="2"></rect>
+    </symbol>
+    <symbol id="icon-security" viewBox="0 0 24 24">
+      <path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"></path>
+    </symbol>
+    <symbol id="icon-sync" viewBox="0 0 24 24">
+      <path d="M7 7h6V4l4 4-4 4V9H7z"></path>
+      <path d="M17 17H11v3l-4-4 4-4v3h6z"></path>
+    </symbol>
+    <symbol id="icon-check-circle" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M8 12l3 3 5-6"></path>
+    </symbol>
+  </svg>
   <!-- 顶部菜单栏 -->
   <div class="top-menu">
-    <div class="logo">🎬 本地BP控制台</div>
+    <div class="logo"><svg class="icon-svg" aria-hidden="true"><use href="#icon-movie"></use></svg>本地BP控制台</div>
     <div class="menu-tabs">
       <button class="menu-tab active" data-page="bp" onclick="switchPage('bp')">
-        <span class="tab-icon">🎮</span>BP控制
+        <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-game"></use></svg>BP控制
       </button>
       <button class="menu-tab" data-page="baseinfo" onclick="switchPage('baseinfo')">
-        <span class="tab-icon">🗺️</span>对局基础信息
+        <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-map"></use></svg>对局基础信息
       </button>
       <button class="menu-tab" data-page="talents" onclick="switchPage('talents')">
-        <span class="tab-icon">🧠</span>天赋与技能
+        <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-psychology"></use></svg>天赋与技能
       </button>
       <button class="menu-tab" data-page="score" onclick="switchPage('score')">
-        <span class="tab-icon">📊</span>比分管理
+        <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-bar-chart"></use></svg>比分管理
       </button>
       <button class="menu-tab" data-page="postmatch" onclick="switchPage('postmatch')">
-        <span class="tab-icon">📈</span>赛后数据
+        <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-insights"></use></svg>赛后数据
       </button>
     </div>
     <button class="menu-tab menu-action menu-action-first" onclick="openBpGuideWindow()" title="BP引导">
-      <span class="tab-icon">🧭</span>BP引导
+      <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-explore"></use></svg>BP引导
     </button>
     <button class="menu-tab menu-action" onclick="LocalBPOnboarding.forceStart()" title="新手引导">
-      <span class="tab-icon">❓</span>帮助
+      <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-help"></use></svg>帮助
     </button>
   </div>
 
@@ -41,33 +96,40 @@
     <!-- ========== BP控制页 ========== -->
     <div id="page-bp" class="page-content active">
       <div class="container">
-        <h1>BP控制</h1>
-
-        <div class="controls">
-          <button class="btn btn-primary" onclick="updateFrontend()">更新前端显示</button>
-          <button class="btn btn-success" onclick="openCharacterDisplay()">角色展示</button>
-          <button class="btn btn-danger" onclick="resetBp()">重置BP</button>
-          <button class="btn btn-secondary" onclick="resetBp(true)">重置BP (保留全局禁用)</button>
-          <button class="btn btn-warning" onclick="openAllFrontendWindows()">一键打开所有窗口</button>
-        </div>
-
-        <!-- 倒计时控制 (新增) -->
-        <div class="controls timer-controls">
-          <div class="timer-label">⏱️ 倒计时</div>
-          <div id="localTimerDisplay" class="timer-display">
-            0:00</div>
-          <div class="timer-actions">
-            <button class="btn btn-success" onclick="startLocalTimer()">开始</button>
-            <button class="btn btn-warning" onclick="pauseLocalTimer()">暂停</button>
-            <button class="btn btn-danger" onclick="resetLocalTimer()">重置</button>
+        <div class="collapsible-section" id="bp-top-section">
+          <div class="collapsible-header" onclick="toggleCollapsible('bp-top-section')">
+            <h1>BP控制 <span class="collapse-arrow">▼</span></h1>
           </div>
-          <div class="timer-options">
-            <label class="timer-option-label">
-              <input type="checkbox" id="localTimerIndeterminate" onchange="toggleTimerIndeterminate()"> 无进度模式
-            </label>
-            <label class="timer-duration-label">时长(秒)</label>
-            <input type="number" id="localTimerDuration" value="60" min="1"
-              class="player-name-input timer-duration-input">
+          <div class="collapsible-content">
+            <div class="controls">
+              <button class="btn btn-primary btn-operator" onclick="updateFrontend()">更新前端显示</button>
+              <button class="btn btn-success btn-operator" onclick="openCharacterDisplay()">角色展示</button>
+              <button class="btn btn-danger btn-operator" onclick="resetBp()">重置BP</button>
+              <button class="btn btn-secondary btn-operator" onclick="resetBp(true)">重置BP (保留全局禁用)</button>
+              <button class="btn btn-warning btn-operator" onclick="openAllFrontendWindows()">一键打开所有窗口</button>
+            </div>
+
+            <!-- 倒计时控制 (新增) -->
+            <div class="controls timer-controls">
+              <div class="timer-label"><svg class="icon-inline icon-svg" aria-hidden="true">
+                  <use href="#icon-schedule"></use>
+                </svg>倒计时</div>
+              <div id="localTimerDisplay" class="timer-display">
+                0:00</div>
+              <div class="timer-actions">
+                <button class="btn btn-success btn-operator" onclick="startLocalTimer()">开始</button>
+                <button class="btn btn-warning btn-operator" onclick="pauseLocalTimer()">暂停</button>
+                <button class="btn btn-danger btn-operator" onclick="resetLocalTimer()">重置</button>
+              </div>
+              <div class="timer-options">
+                <label class="timer-option-label">
+                  <input type="checkbox" id="localTimerIndeterminate" onchange="toggleTimerIndeterminate()"> 无进度模式
+                </label>
+                <label class="timer-duration-label">时长(秒)</label>
+                <input type="number" id="localTimerDuration" value="60" min="1"
+                  class="player-name-input timer-duration-input">
+              </div>
+            </div>
           </div>
         </div>
 
@@ -152,11 +214,6 @@
                   </div>
                 </div>
               </div>
-            </div>
-
-            <!-- 右侧：Ban位与天赋快捷 -->
-            <div class="bp-col-right">
-              <!-- Ban位 -->
               <div class="section">
                 <div class="section-title">Ban位</div>
                 <div class="ban-panels">
@@ -181,10 +238,36 @@
                   </div>
                 </div>
               </div>
+            </div>
 
+            <!-- 右侧：Ban位与天赋快捷 -->
+            <div class="bp-col-right">
               <!-- 全局禁选 -->
               <div class="section">
                 <div class="section-title">全局禁选</div>
+                <div class="auto-global-ban" id="autoGlobalBanSection">
+                  <div class="auto-global-ban-header">
+                 
+                    <div class="auto-global-ban-role">
+                      <button class="btn btn-small" id="autoGlobalRoleASBH" onclick="setAutoGlobalRole('asbh')">A求生 / B监管</button>
+                      <button class="btn btn-small" id="autoGlobalRoleAHBS" onclick="setAutoGlobalRole('ahbs')">A监管 / B求生</button>
+                    </div>
+                  </div>
+                  <div class="auto-global-ban-pools">
+                    <div class="auto-global-ban-pool" id="autoGlobalPoolUnassigned" data-role="">
+                      <div class="auto-global-ban-pool-title">未归类</div>
+                      <div class="auto-global-ban-pool-body" id="autoGlobalPoolUnassignedBody"></div>
+                    </div>
+                    <div class="auto-global-ban-pool" id="autoGlobalPoolASBH" data-role="asbh">
+                      <div class="auto-global-ban-pool-title">A求生 / B监管</div>
+                      <div class="auto-global-ban-pool-body" id="autoGlobalPoolASBHBody"></div>
+                    </div>
+                    <div class="auto-global-ban-pool" id="autoGlobalPoolAHBS" data-role="ahbs">
+                      <div class="auto-global-ban-pool-title">A监管 / B求生</div>
+                      <div class="auto-global-ban-pool-body" id="autoGlobalPoolAHBSBody"></div>
+                    </div>
+                  </div>
+                </div>
                 <div class="ban-panels">
                   <div class="ban-panel">
                     <div class="ban-panel-header">
@@ -223,31 +306,92 @@
           <div id="talent-skill-section" class="talent-skill-section">
             <!-- 求生者天赋 -->
             <div class="talent-panel">
-              <div class="talent-panel-title">🧠 求生者天赋设置</div>
+              <div class="talent-panel-title"><svg class="icon-inline icon-svg" aria-hidden="true"><use href="#icon-psychology"></use></svg>求生者天赋设置</div>
               <div class="survivor-talent-selector">
-                <div class="survivor-talent-tabs">
-                  <div class="survivor-tab active" onclick="selectSurvivorForTalent(0)">求生1</div>
-                  <div class="survivor-tab" onclick="selectSurvivorForTalent(1)">求生2</div>
-                  <div class="survivor-tab" onclick="selectSurvivorForTalent(2)">求生3</div>
-                  <div class="survivor-tab" onclick="selectSurvivorForTalent(3)">求生4</div>
-                </div>
-                <div id="current-survivor-talents" class="current-survivor-talents">请先选择一个求生者</div>
-                <div class="talent-grid" id="survivor-talent-grid">
-                  <div class="talent-item" data-talent="回光返照" onclick="toggleSurvivorTalent('回光返照')">
-                    <img src="../assets/talents/回光返照.png" class="talent-icon" onerror="this.style.display='none'">
-                    <div class="talent-name">回光返照</div>
+                <div class="survivor-talent-list">
+                  <div class="survivor-talent-block" data-survivor-index="0">
+                    <div class="survivor-talent-title" data-survivor-title="0">求生者1</div>
+                    <div class="survivor-talent-grid" data-survivor-grid="0">
+                      <div class="talent-item survivor-talent-item" data-survivor-index="0" data-talent="回光返照" onclick="toggleSurvivorTalent(0, '回光返照')">
+                        <img src="../assets/talents/回光返照.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">回光返照</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="0" data-talent="化险为夷" onclick="toggleSurvivorTalent(0, '化险为夷')">
+                        <img src="../assets/talents/化险为夷.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">化险为夷</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="0" data-talent="膝跳反射" onclick="toggleSurvivorTalent(0, '膝跳反射')">
+                        <img src="../assets/talents/膝跳反射.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">膝跳反射</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="0" data-talent="飞轮效应" onclick="toggleSurvivorTalent(0, '飞轮效应')">
+                        <img src="../assets/talents/飞轮效应.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">飞轮效应</div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="talent-item" data-talent="化险为夷" onclick="toggleSurvivorTalent('化险为夷')">
-                    <img src="../assets/talents/化险为夷.png" class="talent-icon" onerror="this.style.display='none'">
-                    <div class="talent-name">化险为夷</div>
+                  <div class="survivor-talent-block" data-survivor-index="1">
+                    <div class="survivor-talent-title" data-survivor-title="1">求生者2</div>
+                    <div class="survivor-talent-grid" data-survivor-grid="1">
+                      <div class="talent-item survivor-talent-item" data-survivor-index="1" data-talent="回光返照" onclick="toggleSurvivorTalent(1, '回光返照')">
+                        <img src="../assets/talents/回光返照.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">回光返照</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="1" data-talent="化险为夷" onclick="toggleSurvivorTalent(1, '化险为夷')">
+                        <img src="../assets/talents/化险为夷.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">化险为夷</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="1" data-talent="膝跳反射" onclick="toggleSurvivorTalent(1, '膝跳反射')">
+                        <img src="../assets/talents/膝跳反射.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">膝跳反射</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="1" data-talent="飞轮效应" onclick="toggleSurvivorTalent(1, '飞轮效应')">
+                        <img src="../assets/talents/飞轮效应.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">飞轮效应</div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="talent-item" data-talent="膝跳反射" onclick="toggleSurvivorTalent('膝跳反射')">
-                    <img src="../assets/talents/膝跳反射.png" class="talent-icon" onerror="this.style.display='none'">
-                    <div class="talent-name">膝跳反射</div>
+                  <div class="survivor-talent-block" data-survivor-index="2">
+                    <div class="survivor-talent-title" data-survivor-title="2">求生者3</div>
+                    <div class="survivor-talent-grid" data-survivor-grid="2">
+                      <div class="talent-item survivor-talent-item" data-survivor-index="2" data-talent="回光返照" onclick="toggleSurvivorTalent(2, '回光返照')">
+                        <img src="../assets/talents/回光返照.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">回光返照</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="2" data-talent="化险为夷" onclick="toggleSurvivorTalent(2, '化险为夷')">
+                        <img src="../assets/talents/化险为夷.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">化险为夷</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="2" data-talent="膝跳反射" onclick="toggleSurvivorTalent(2, '膝跳反射')">
+                        <img src="../assets/talents/膝跳反射.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">膝跳反射</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="2" data-talent="飞轮效应" onclick="toggleSurvivorTalent(2, '飞轮效应')">
+                        <img src="../assets/talents/飞轮效应.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">飞轮效应</div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="talent-item" data-talent="飞轮效应" onclick="toggleSurvivorTalent('飞轮效应')">
-                    <img src="../assets/talents/飞轮效应.png" class="talent-icon" onerror="this.style.display='none'">
-                    <div class="talent-name">飞轮效应</div>
+                  <div class="survivor-talent-block" data-survivor-index="3">
+                    <div class="survivor-talent-title" data-survivor-title="3">求生者4</div>
+                    <div class="survivor-talent-grid" data-survivor-grid="3">
+                      <div class="talent-item survivor-talent-item" data-survivor-index="3" data-talent="回光返照" onclick="toggleSurvivorTalent(3, '回光返照')">
+                        <img src="../assets/talents/回光返照.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">回光返照</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="3" data-talent="化险为夷" onclick="toggleSurvivorTalent(3, '化险为夷')">
+                        <img src="../assets/talents/化险为夷.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">化险为夷</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="3" data-talent="膝跳反射" onclick="toggleSurvivorTalent(3, '膝跳反射')">
+                        <img src="../assets/talents/膝跳反射.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">膝跳反射</div>
+                      </div>
+                      <div class="talent-item survivor-talent-item" data-survivor-index="3" data-talent="飞轮效应" onclick="toggleSurvivorTalent(3, '飞轮效应')">
+                        <img src="../assets/talents/飞轮效应.png" class="talent-icon" onerror="this.style.display='none'">
+                        <div class="talent-name">飞轮效应</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -255,7 +399,7 @@
 
             <!-- 监管者天赋与技能 -->
             <div class="skill-panel">
-              <div class="talent-panel-title">👹 监管者设置</div>
+              <div class="talent-panel-title"><svg class="icon-inline icon-svg" aria-hidden="true"><use href="#icon-security"></use></svg>监管者设置</div>
               <div style="margin-bottom: 15px;">
                 <div class="skill-panel-title">天赋</div>
                 <div class="talent-grid" id="hunter-talent-grid">
@@ -315,12 +459,43 @@
     <!-- ========== 对局基础信息页 ========== -->
     <div id="page-baseinfo" class="page-content">
       <div class="container">
-        <h1>对局基础信息</h1>
+        <div class="collapsible-section" id="baseinfo-top-section">
+          <div class="collapsible-header" onclick="toggleCollapsible('baseinfo-top-section')">
+            <h1>对局基础信息 <span class="collapse-arrow">▼</span></h1>
+          </div>
+          <div class="collapsible-content">
+            <div class="controls" style="margin-bottom: 20px;">
+              <button class="btn btn-primary" onclick="baseManager.save()">保存</button>
+              <button class="btn btn-danger" onclick="baseManager.reset()">重置</button>
+            </div>
 
-        <div class="controls" style="margin-bottom: 20px;">
-          <button class="btn btn-primary" onclick="baseManager.save()">保存</button>
-          <button class="btn btn-danger" onclick="baseManager.reset()">重置</button>
-          <button class="btn btn-primary" onclick="applyTeamsToLocalBpFromManager()">应用主页队伍到本地BP</button>
+            <div class="section" style="margin-bottom:16px;">
+              <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>队伍管理器</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span id="localTeamManagerCount" style="font-size:12px; color:#6b7280;">未导入</span>
+                  <button class="btn btn-ghost btn-small" id="localTeamManagerClearBtn">清空</button>
+                </div>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <input type="file" id="localTeamCsvInput" class="player-name-input" accept=".csv">
+                <button class="btn btn-secondary" id="localImportTeamCsvBtn">导入</button>
+                <button class="btn btn-primary btn-operator" id="localApplyTeamManagerBtn">应用到对局基础信息</button>
+              </div>
+              <div class="baseinfo-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                  <label>A队</label>
+                  <select id="localTeamManagerTeamA" class="player-name-input"></select>
+                  <div id="localTeamManagerPreviewA" style="margin-top:6px; font-size:12px; color:#6b7280;"></div>
+                </div>
+                <div>
+                  <label>B队</label>
+                  <select id="localTeamManagerTeamB" class="player-name-input"></select>
+                  <div id="localTeamManagerPreviewB" style="margin-top:6px; font-size:12px; color:#6b7280;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="scroll-container">
@@ -336,10 +511,29 @@
           <div class="section">
             <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
               <span>队伍信息</span>
-              <button class="btn btn-warning btn-small" onclick="baseManager.swapTeams()"
-                style="background:#f59e0b;border-color:#f59e0b;">
-                🔄 快速轮换AB队
-              </button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-warning btn-operator" onclick="baseManager.swapTeams()"
+                  style="background:#f59e0b;border-color:#f59e0b;">
+                  <svg class="icon-inline icon-svg" aria-hidden="true"><use href="#icon-sync"></use></svg>快速轮换AB队
+                </button>
+                <button class="btn btn-success btn-operator" onclick="baseManager.applyLineupToPostMatch()"
+                  style="background:#10b981;border-color:#10b981;">
+                  <svg class="icon-inline icon-svg" aria-hidden="true"><use href="#icon-check-circle"></use></svg>应用阵容到赛后
+                </button>
+              </div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin:10px 0 12px;">
+              <div id="lineup-mode-container"></div>
+              <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;">
+                <div>
+                  <span style="color:#6b7280;font-size:12px;">求生者：</span>
+                  <span id="currentSurvivorsDisplay" style="font-weight:600;color:#059669;">未选择</span>
+                </div>
+                <div>
+                  <span style="color:#6b7280;font-size:12px;">监管者：</span>
+                  <span id="currentHunterDisplay" style="font-weight:600;color:#dc2626;">未选择</span>
+                </div>
+              </div>
             </div>
             <div class="baseinfo-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
               <div style="background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:10px;">
@@ -394,33 +588,6 @@
             </div>
           </div>
 
-          <!-- 上场阵容选择 -->
-          <div class="section">
-            <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
-              <span>上场阵容</span>
-              <button class="btn btn-success btn-small" onclick="baseManager.applyLineupToPostMatch()"
-                style="background:#10b981;border-color:#10b981;">
-                ✓ 应用到赛后数据
-              </button>
-            </div>
-            <div style="background:#f7fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;">
-              <div id="lineup-config-container"></div>
-
-              <div style="margin-top:16px;padding:12px;background:#ecfdf5;border:1px solid #10b981;border-radius:8px;">
-                <div style="font-weight:700;color:#065f46;margin-bottom:8px;">当前上场阵容：</div>
-                <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                  <div>
-                    <span style="color:#6b7280;font-size:12px;">求生者：</span>
-                    <span id="currentSurvivorsDisplay" style="font-weight:600;color:#059669;">未选择</span>
-                  </div>
-                  <div>
-                    <span style="color:#6b7280;font-size:12px;">监管者：</span>
-                    <span id="currentHunterDisplay" style="font-weight:600;color:#dc2626;">未选择</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -438,8 +605,8 @@
         <button class="btn btn-success" onclick="openScoreboardWindow('teamA')">A比分</button>
         <button class="btn btn-success" onclick="openScoreboardWindow('teamB')">B比分</button>
         <button class="btn btn-success" onclick="openScoreboardOverview()"
-          style="background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); border-color: #9c27b0;">📊
-          总览比分板</button>
+          style="background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); border-color: #9c27b0;">
+          <svg class="icon-inline icon-svg" aria-hidden="true"><use href="#icon-insights"></use></svg>总览比分板</button>
       </div>
 
       <div class="scroll-container">

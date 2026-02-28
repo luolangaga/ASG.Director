@@ -1,0 +1,35 @@
+{
+  "port": 9528,
+  "pages": [
+      {
+      "fileName": "timer.html",
+      "title": "局内正计时",
+      "enabled": true,
+      "order": 0
+    },
+    {
+      "fileName": "frontend.html",
+      "title": "BP前台",
+      "enabled": true,
+      "order": 0
+    },
+    {
+      "fileName": "scoreboard.html",
+      "title": "比分板",
+      "enabled": true,
+      "order": 1
+    },
+    {
+      "fileName": "character-display.html",
+      "title": "角色展示",
+      "enabled": true,
+      "order": 2
+    },
+    {
+      "fileName": "obs-bp.html",
+      "title": "OBS BP控制",
+      "enabled": true,
+      "order": 3
+    }
+  ]
+}

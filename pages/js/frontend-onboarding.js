@@ -73,7 +73,7 @@ const FrontendOnboarding = {
         <div style="background:rgba(66, 153, 225, 0.1); padding:12px; border-radius:8px; border:1px solid rgba(66, 153, 225, 0.3); margin-top:10px;">
           <div style="font-weight:bold; margin-bottom:4px;">💡 布局管理</div>
           <p style="font-size:13px; margin:0;">
-            如需<strong>导出当前布局</strong>（分享给朋友）或<strong>导入新布局</strong>，请前往主页的 <span style="color:#00E5FF">"工具与商店"</span> 页面操作。
+            如需<strong>导出当前布局</strong>（分享给朋友）或<strong>导入新布局</strong>，请前往主页的 <span style="color:#00E5FF">"设置中心"</span> 页面操作。
           </p>
         </div>
       `,

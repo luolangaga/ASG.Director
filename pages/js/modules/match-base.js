@@ -210,13 +210,12 @@ class MatchBaseManager {
     // --- Matches / Lineup ---
 
     setMatchMode(mode) {
-        // mode: 'AvsB_Surv_Hunter'  (A=Surv, B=Hunt)  
-        //       'BvsA_Surv_Hunter'  (B=Surv, A=Hunt)
         this.state.matchConfig.mode = mode;
-        // Clear selection on mode change? Maybe safer.
         this.state.matchConfig.survivors = [];
         this.state.matchConfig.hunter = null;
         this.save();
+        this.renderRoster('A');
+        this.renderRoster('B');
         this.renderLineupSection();
     }
 
@@ -312,6 +311,10 @@ class MatchBaseManager {
 
         container.innerHTML = '';
 
+        const mode = this.state.matchConfig?.mode || 'AvsB_Surv_Hunter';
+        const isSurvTeam = mode.startsWith('A') ? teamKey === 'A' : teamKey === 'B';
+        const isHuntTeam = !isSurvTeam;
+
         team.roster.forEach((name, index) => {
             const div = document.createElement('div');
             div.className = 'member-compact-row';
@@ -327,12 +330,41 @@ class MatchBaseManager {
             // 使用 onblur 而不是 onchange，避免干扰中文输入法
             input.onblur = (e) => this.updateMemberName(teamKey, index, e.target.value);
 
+            const pick = document.createElement('label');
+            pick.style.display = 'flex';
+            pick.style.alignItems = 'center';
+            pick.style.gap = '4px';
+            pick.style.fontSize = '12px';
+            pick.style.color = isSurvTeam ? '#059669' : '#dc2626';
+
+            const pickInput = document.createElement('input');
+            pickInput.type = isSurvTeam ? 'checkbox' : 'radio';
+            if (isHuntTeam) pickInput.name = 'lineup_hunter';
+            const trimmed = (name || '').trim();
+            if (!trimmed) pickInput.disabled = true;
+            if (isSurvTeam) {
+                pickInput.checked = this.state.matchConfig.survivors.includes(name);
+                pickInput.onclick = () => {
+                    if (!trimmed) return;
+                    this.toggleLineupSurvivor(name);
+                };
+            } else {
+                pickInput.checked = this.state.matchConfig.hunter === name;
+                pickInput.onclick = () => {
+                    if (!trimmed) return;
+                    this.setLineupHunter(name);
+                };
+            }
+            const pickText = document.createElement('span');
+            pickText.textContent = '上场';
+            pick.append(pickInput, pickText);
+
             const delBtn = document.createElement('button');
             delBtn.className = 'btn btn-danger btn-small';
             delBtn.textContent = '×';
             delBtn.onclick = () => this.removeMember(teamKey, index);
 
-            div.append(input, delBtn);
+            div.append(input, pick, delBtn);
             container.appendChild(div);
         });
 
@@ -348,90 +380,46 @@ class MatchBaseManager {
     }
 
     renderLineupSection() {
-        const mode = this.state.matchConfig.mode; // 'AvsB_Surv_Hunter'
-        const container = document.getElementById('lineup-config-container');
-        if (!container) return; // Need to create this in HTML
-
-        // Render Mode Selection
-        const renderModeSelector = () => {
-            const div = document.createElement('div');
-            div.style.marginBottom = '15px';
-            div.innerHTML = `
-                <div style="font-weight:bold;margin-bottom:5px;">对阵模式</div>
-                <div style="display:flex;gap:10px;">
+        const mode = this.state.matchConfig.mode;
+        const container = document.getElementById('lineup-mode-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="font-weight:bold;margin-bottom:6px;">对阵模式</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     <label class="mode-card ${mode === 'AvsB_Surv_Hunter' ? 'active' : ''}" 
                            onclick="baseManager.setMatchMode('AvsB_Surv_Hunter')"
-                           style="padding:10px;border:2px solid ${mode === 'AvsB_Surv_Hunter' ? '#667eea' : '#e2e8f0'};border-radius:8px;cursor:pointer;background:${mode === 'AvsB_Surv_Hunter' ? '#eff6ff' : '#fff'};flex:1;">
-                        <span style="color:#2563eb;font-weight:bold;">${this.state.teamA.name}</span> (人) <br> vs <br> <span style="color:#dc2626;font-weight:bold;">${this.state.teamB.name}</span> (屠)
+                           style="padding:8px;border:2px solid ${mode === 'AvsB_Surv_Hunter' ? '#667eea' : '#e2e8f0'};border-radius:8px;cursor:pointer;background:${mode === 'AvsB_Surv_Hunter' ? '#eff6ff' : '#fff'};flex:1;min-width:180px;">
+                        <span style="color:#2563eb;font-weight:bold;">${this.state.teamA.name}</span> (人) vs <span style="color:#dc2626;font-weight:bold;">${this.state.teamB.name}</span> (屠)
                     </label>
                     <label class="mode-card ${mode === 'BvsA_Surv_Hunter' ? 'active' : ''}" 
                            onclick="baseManager.setMatchMode('BvsA_Surv_Hunter')"
-                           style="padding:10px;border:2px solid ${mode === 'BvsA_Surv_Hunter' ? '#667eea' : '#e2e8f0'};border-radius:8px;cursor:pointer;background:${mode === 'BvsA_Surv_Hunter' ? '#eff6ff' : '#fff'};flex:1;">
-                        <span style="color:#2563eb;font-weight:bold;">${this.state.teamB.name}</span> (人) <br> vs <br> <span style="color:#dc2626;font-weight:bold;">${this.state.teamA.name}</span> (屠)
+                           style="padding:8px;border:2px solid ${mode === 'BvsA_Surv_Hunter' ? '#667eea' : '#e2e8f0'};border-radius:8px;cursor:pointer;background:${mode === 'BvsA_Surv_Hunter' ? '#eff6ff' : '#fff'};flex:1;min-width:180px;">
+                        <span style="color:#2563eb;font-weight:bold;">${this.state.teamB.name}</span> (人) vs <span style="color:#dc2626;font-weight:bold;">${this.state.teamA.name}</span> (屠)
                     </label>
                 </div>
-             `;
-            return div;
-        };
+            `;
+        }
 
-        container.innerHTML = '';
-        container.appendChild(renderModeSelector());
-
-        // Determine which team is Surv, which is Hunter
-        const survTeam = mode.startsWith('A') ? this.state.teamA : this.state.teamB;
-        const huntTeam = mode.startsWith('A') ? this.state.teamB : this.state.teamA;
-
-        // Render Selector Columns
-        const grid = document.createElement('div');
-        grid.style.display = 'grid';
-        grid.style.gridTemplateColumns = '1fr 1fr';
-        grid.style.gap = '15px';
-
-        // Survivor Column
-        const sCol = document.createElement('div');
-        sCol.innerHTML = `<div style="font-weight:bold;color:#10b981;margin-bottom:8px;">选择 4 名求生者 (${survTeam.name})</div>`;
-        const sList = document.createElement('div');
-        sList.style.display = 'flex';
-        sList.style.flexDirection = 'column';
-        sList.style.gap = '5px';
-
-        survTeam.roster.forEach(name => {
-            const isChecked = this.state.matchConfig.survivors.includes(name);
-            const lbl = document.createElement('label');
-            lbl.style.cssText = `display:flex;align-items:center;gap:8px;padding:6px;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;background:${isChecked ? '#f0fdf4' : '#fff'};border-color:${isChecked ? '#48bb78' : '#e2e8f0'}`;
-            lbl.innerHTML = `<input type="checkbox" ${isChecked ? 'checked' : ''}> ${name}`;
-            lbl.querySelector('input').onclick = () => this.toggleLineupSurvivor(name);
-            sList.appendChild(lbl);
-        });
-        sCol.appendChild(sList);
-
-        // Hunter Column
-        const hCol = document.createElement('div');
-        hCol.innerHTML = `<div style="font-weight:bold;color:#ef4444;margin-bottom:8px;">选择 1 名监管者 (${huntTeam.name})</div>`;
-        const hList = document.createElement('div');
-        hList.style.display = 'flex';
-        hList.style.flexDirection = 'column';
-        hList.style.gap = '5px';
-
-        huntTeam.roster.forEach(name => {
-            const isChecked = this.state.matchConfig.hunter === name;
-            const lbl = document.createElement('label');
-            lbl.style.cssText = `display:flex;align-items:center;gap:8px;padding:6px;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;background:${isChecked ? '#fef2f2' : '#fff'};border-color:${isChecked ? '#f87171' : '#e2e8f0'}`;
-            lbl.innerHTML = `<input type="radio" name="hunter_select" ${isChecked ? 'checked' : ''}> ${name}`;
-            lbl.querySelector('input').onclick = () => this.setLineupHunter(name);
-            hList.appendChild(lbl);
-        });
-        hCol.appendChild(hList);
-
-        grid.appendChild(sCol);
-        grid.appendChild(hCol);
-        container.appendChild(grid);
-
-        // Update Summary
         const sDisplay = document.getElementById('currentSurvivorsDisplay');
         const hDisplay = document.getElementById('currentHunterDisplay');
-        if (sDisplay) sDisplay.textContent = this.state.matchConfig.survivors.join(', ') || '未选择';
-        if (hDisplay) hDisplay.textContent = this.state.matchConfig.hunter || '未选择';
+        if (sDisplay) {
+            if (this.state.matchConfig.survivors.length === 0) {
+                sDisplay.textContent = '未选择';
+                sDisplay.style.color = '#9ca3af';
+            } else {
+                sDisplay.textContent = this.state.matchConfig.survivors.join(', ');
+                sDisplay.style.color = '#059669';
+            }
+        }
+        if (hDisplay) {
+            if (!this.state.matchConfig.hunter) {
+                hDisplay.textContent = '未选择';
+                hDisplay.style.color = '#9ca3af';
+            } else {
+                hDisplay.textContent = this.state.matchConfig.hunter;
+                hDisplay.style.color = '#dc2626';
+            }
+        }
     }
 }
 

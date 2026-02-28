@@ -1,11 +1,11 @@
 /* 全局变量与重置 */
     :root {
-      --primary-gradient: linear-gradient(135deg, #FFD700 0%, #FF8C00 100%);
-      --surface-color: rgba(255, 255, 255, 0.05);
-      --surface-hover: rgba(255, 255, 255, 0.1);
-      --border-color: rgba(255, 255, 255, 0.1);
-      --text-main: #FFFFFF;
-      --text-secondary: #AAAAAA;
+      --primary-color: #bdbdbd;
+      --surface-color: #2a2a2a;
+      --surface-hover: #333333;
+      --border-color: #3a3a3a;
+      --text-main: #f2f2f2;
+      --text-secondary: #b0b0b0;
       --sidebar-width: 260px;
     }
 
@@ -33,13 +33,7 @@
 
     body {
       font-family: 'Outfit', 'Microsoft YaHei', sans-serif;
-      background: #0f0c29;
-      background-image:
-        radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-        radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-        radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
-      background-attachment: fixed;
-      background-size: cover;
+      background: #1e1e1e;
       color: var(--text-main);
       height: 100vh;
       overflow: hidden;
@@ -48,33 +42,29 @@
 
     /* Light Theme Overrides */
     body.light-theme {
-      background: #f0f2f5;
-      background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      color: #333;
-      --text-main: #333;
-      --text-secondary: #666;
-      --surface-color: #ffffff;
-      --surface-hover: #f8f9fa;
-      --border-color: rgba(0, 0, 0, 0.1);
+      background: #e0e0e0;
+      color: #222;
+      --text-main: #222;
+      --text-secondary: #555;
+      --surface-color: #f4f4f4;
+      --surface-hover: #ededed;
+      --border-color: #d2d2d2;
     }
 
     body.light-theme .app-sidebar {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(20px);
+      background: #f2f2f2;
       border-right: 1px solid var(--border-color);
     }
 
     body.light-theme .feature-card,
     body.light-theme .plugin-card {
-      background: #ffffff;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      background: #f6f6f6;
       border-color: var(--border-color);
     }
     
     body.light-theme .feature-card:hover,
     body.light-theme .plugin-card:hover {
-      background: #ffffff;
-      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+      background: #ededed;
     }
 
     body.light-theme .section-title {
@@ -91,7 +81,7 @@
     body.light-theme .form-input:focus,
     body.light-theme .form-select:focus {
       background: #fff;
-      border-color: #FFD700;
+      border-color: #bdbdbd;
     }
 
     body.light-theme .nav-item,
@@ -117,8 +107,7 @@
     /* 侧边栏 */
     .app-sidebar {
       width: var(--sidebar-width);
-      background: rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(20px);
+      background: #252525;
       border-right: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
@@ -135,9 +124,7 @@
 
     .app-logo {
       font-size: 24px;
-      background: var(--primary-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: var(--primary-color);
       font-weight: 800;
       letter-spacing: -0.5px;
     }
@@ -159,7 +146,7 @@
       padding: 12px 16px;
       color: var(--text-secondary);
       text-decoration: none;
-      border-radius: 12px;
+      border-radius: 6px;
       transition: all 0.2s ease;
       cursor: pointer;
       font-weight: 500;
@@ -172,15 +159,15 @@
 
     .nav-item:hover,
     .plugin-menu-item:hover {
-      background: rgba(255, 255, 255, 0.05);
+      background: #303030;
       color: var(--text-main);
     }
 
     .nav-item.active,
     .plugin-menu-item.active {
-      background: rgba(255, 215, 0, 0.15);
-      color: #FFD700;
-      border-color: rgba(255, 215, 0, 0.2);
+      background: #3a3a3a;
+      color: #f0f0f0;
+      border-color: #4a4a4a;
     }
 
     .nav-icon,
@@ -265,24 +252,22 @@
     .feature-card {
       background: var(--surface-color);
       border: 1px solid var(--border-color);
-      border-radius: 16px;
+      border-radius: 6px;
       padding: 24px;
-      transition: all 0.3s ease;
+      transition: background 0.2s ease, border-color 0.2s ease;
       position: relative;
       overflow: hidden;
     }
 
     .feature-card:hover {
       background: var(--surface-hover);
-      transform: translateY(-4px);
-      border-color: rgba(255, 215, 0, 0.3);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border-color: #4a4a4a;
     }
 
     .hero-card {
       grid-column: span 2;
-      background: linear-gradient(135deg, rgba(72, 187, 120, 0.15) 0%, rgba(26, 26, 46, 0.6) 100%);
-      border-color: rgba(72, 187, 120, 0.3);
+      background: #2f2f2f;
+      border-color: #3a3a3a;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -297,7 +282,7 @@
 
     .btn {
       padding: 10px 20px;
-      border-radius: 10px;
+      border-radius: 4px;
       border: none;
       font-weight: 600;
       font-size: 14px;
@@ -306,7 +291,7 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: all 0.2s;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
     }
 
     .btn-lg {
@@ -315,34 +300,33 @@
     }
 
     .btn-primary {
-      background: var(--primary-gradient);
-      color: #1a1a2e;
-      box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+      background: #5a5a5a;
+      color: #f2f2f2;
     }
 
     .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+      background: #6a6a6a;
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #3a3a3a;
+      color: #f2f2f2;
+      border: 1px solid #4a4a4a;
     }
 
     .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: #444444;
     }
 
     .btn-ghost {
-      background: transparent;
+      background: #2b2b2b;
       color: var(--text-secondary);
+      border: 1px solid #3a3a3a;
     }
 
     .btn-ghost:hover {
       color: #fff;
-      background: rgba(255, 255, 255, 0.05);
+      background: #353535;
     }
 
     .control-group {
@@ -360,19 +344,19 @@
     .form-select {
       width: 100%;
       padding: 12px;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
+      background: #222222;
+      border: 1px solid #3a3a3a;
+      border-radius: 4px;
       color: #fff;
       font-family: inherit;
-      transition: all 0.2s;
+      transition: background 0.2s, border-color 0.2s;
     }
 
     .form-input:focus,
     .form-select:focus {
       outline: none;
-      border-color: #FFD700;
-      background: rgba(0, 0, 0, 0.5);
+      border-color: #5a5a5a;
+      background: #1f1f1f;
     }
 
     .user-pill {
@@ -380,31 +364,28 @@
       align-items: center;
       gap: 10px;
       padding: 6px 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #2b2b2b;
+      border-radius: 6px;
+      border: 1px solid #3a3a3a;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.2s, border-color 0.2s;
     }
 
     .user-pill:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: #333333;
     }
 
     .status-badge {
       font-size: 10px;
       padding: 2px 8px;
-      border-radius: 10px;
-      background: rgba(100, 255, 100, 0.2);
-      color: #81c784;
+      border-radius: 4px;
+      background: #3a3a3a;
+      color: #cfcfcf;
     }
 
     .tab-nav {
-      display: flex;
-      gap: 5px;
-      border-bottom: 1px solid var(--border-color);
-      margin-bottom: 24px;
+      display: none;
     }
 
     .tab-btn {
@@ -448,7 +429,6 @@
       z-index: 1000;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(5px);
     }
 
     .modal.show {
@@ -456,9 +436,9 @@
     }
 
     .modal-content {
-      background: #1a1a2e;
-      border: 1px solid rgba(255, 215, 0, 0.2);
-      border-radius: 16px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
       padding: 30px;
       width: 400px;
       max-width: 90%;
@@ -484,9 +464,9 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: #3a3a3a;
       transition: .3s;
-      border-radius: 24px;
+      border-radius: 6px;
     }
 
     .slider:before {
@@ -496,13 +476,13 @@
       width: 18px;
       left: 3px;
       bottom: 3px;
-      background-color: white;
+      background-color: #e6e6e6;
       transition: .3s;
-      border-radius: 50%;
+      border-radius: 4px;
     }
 
     input:checked+.slider {
-      background: #FFD700;
+      background: #6a6a6a;
     }
 
     input:checked+.slider:before {
@@ -515,11 +495,10 @@
       left: 50%;
       transform: translateX(-50%) translateY(100px);
       padding: 12px 24px;
-      border-radius: 30px;
+      border-radius: 6px;
       background: #333;
       color: #fff;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid #444;
       z-index: 2000;
       opacity: 0;
       transition: all 0.3s;
@@ -531,37 +510,36 @@
     }
 
     .status-toast.success {
-      background: linear-gradient(90deg, #56ab2f, #a8e063);
-      color: #000;
+      background: #4a4a4a;
+      color: #f0f0f0;
       font-weight: 600;
     }
 
     .status-toast.error {
-      background: linear-gradient(90deg, #ee0979, #ff6a00);
+      background: #5a5a5a;
     }
 
     .status-toast.warning {
-      background: linear-gradient(90deg, #f8d800, #fdeb71);
-      color: #000;
+      background: #6a6a6a;
+      color: #f0f0f0;
       font-weight: 600;
     }
 
     .status-toast.info {
-      background: linear-gradient(90deg, #2193b0, #6dd5ed);
+      background: #424242;
     }
 
     .plugin-card {
       background: var(--surface-color);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 20px;
-      transition: all 0.3s;
+      transition: background 0.2s ease, border-color 0.2s ease;
       margin-bottom: 20px;
     }
 
     .plugin-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(255, 215, 0, 0.3);
+      border-color: #4a4a4a;
     }
 
     .plugin-card-header {
@@ -574,11 +552,11 @@
     .plugin-card-icon {
       width: 40px;
       height: 40px;
-      border-radius: 10px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.1);
+      background: #3a3a3a;
       font-size: 20px;
     }
 
@@ -589,18 +567,17 @@
 
     /* Idvevent赛程列表样式 */
     .schedule-item {
-      background: rgba(255, 255, 255, 0.03);
+      background: #262626;
       border: 1px solid var(--border-color);
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 16px;
       margin-bottom: 12px;
-      transition: all 0.3s ease;
+      transition: background 0.2s ease, border-color 0.2s ease;
     }
 
     .schedule-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 215, 0, 0.3);
-      transform: translateY(-2px);
+      background: #2f2f2f;
+      border-color: #4a4a4a;
     }
 
     .schedule-item-header {
@@ -643,6 +620,10 @@
     .plugin-menu-divider {
       width: 100%;
       height: 1px;
-      background: rgba(255, 255, 255, 0.1);
+      background: #3a3a3a;
       margin: 8px 0;
+    }
+
+    .settings-section {
+      margin-top: 24px;
     }

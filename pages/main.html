@@ -26,10 +26,7 @@
         <span class="nav-icon">🌐</span> 联网 BP
       </button>
       <button class="nav-item" id="nav-settings" onclick="switchView('settings')">
-        <span class="nav-icon">🎨</span> MMD,字体和组件包
-      </button>
-      <button class="nav-item" id="nav-tools" onclick="switchView('tools')">
-        <span class="nav-icon">🛠️</span> 插件和布局包
+        <span class="nav-icon">⚙️</span> 设置中心
       </button>
 
       <div style="height:1px; background:var(--border-color); margin: 8px 16px;"></div>
@@ -68,82 +65,76 @@
             <p class="section-desc">快速开始一场专业的赛事导播</p>
           </div>
 
-          <div class="grid-2">
-            <div class="feature-card hero-card">
-              <div class="hero-content">
-                <h3 style="font-size: 32px; margin-bottom: 12px;">本地 BP 模式</h3>
-                <p style="font-size: 16px; margin-bottom: 24px;">单机导播，快速启动，无需联网连接。</p>
-                <button class="btn btn-primary btn-lg" id="localBpBtn">立即开始</button>
-              </div>
-              <div style="font-size:100px; opacity:0.8;">📋</div>
+          <div class="feature-card hero-card" style="margin-bottom: 24px;">
+            <div class="hero-content">
+              <h3 style="font-size: 32px; margin-bottom: 12px;">本地 BP 模式</h3>
+              <p style="font-size: 16px; margin-bottom: 24px;">单机导播，快速启动，无需联网连接。</p>
+              <button class="btn btn-primary btn-lg" id="localBpBtn">立即开始</button>
             </div>
+            <div style="font-size:100px; opacity:0.8;">📋</div>
+          </div>
 
-
-
-
+          <div class="grid-2">
+            <div class="feature-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+                <div>
+                  <h3>设置中心</h3>
+                  <p>动画、字体、组件包、插件、MMD 等都在这里</p>
+                </div>
+                <button class="btn btn-primary" onclick="switchView('settings')">打开设置</button>
+              </div>
+              <div style="font-size:60px; opacity:0.15; margin-top:10px; text-align:right;">⚙️</div>
+            </div>
 
             <div class="feature-card">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <h3>赛程（Idvevent对接功能）</h3>
+                <h3>赛程管理</h3>
                 <button class="btn btn-secondary" id="refreshScheduleBtn" onclick="loadIdveventSchedules()">
                   🔄 刷新
                 </button>
               </div>
 
               <div class="control-group" style="margin-bottom:16px;">
-                <label class="control-label">赛事ID (可选，留空获取所有)</label>
+                <label class="control-label">赛事ID (可选)</label>
                 <input type="text" id="idveventEventId" class="form-input"
-                  placeholder="例如: 550e8400-e29b-41d4-a716-446655440000">
+                  placeholder="留空获取所有">
               </div>
 
-              <div id="idveventScheduleList" style="max-height:400px; overflow-y:auto;">
-                <div style="text-align:center; padding:20px; color:var(--text-secondary);">
-                  点击"刷新"按钮加载赛程
+              <div id="idveventScheduleList" style="max-height:200px; overflow-y:auto;">
+                <div style="text-align:center; padding:10px; color:var(--text-secondary); font-size:13px;">
+                  点击"刷新"加载赛程
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="feature-card" id="teamManagerCard" style="margin-top:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-              <h3>队伍管理器</h3>
-              <div style="display:flex; align-items:center; gap:10px;">
-                <span id="teamManagerCount" style="font-size:12px; color:var(--text-secondary);">未导入</span>
-                <button class="btn btn-ghost" id="teamManagerClearBtn" style="font-size:12px;">清空</button>
-              </div>
-            </div>
-
-            <div class="control-group" style="margin-bottom:16px;">
-              <label class="control-label">导入赛事队伍 CSV</label>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <input type="file" id="teamCsvInput" class="form-input" accept=".csv">
-                <button class="btn btn-secondary" id="importTeamCsvBtn">导入</button>
-              </div>
-            </div>
-
-            <div class="grid-2" style="margin-bottom:16px;">
+          <div class="feature-card" id="localPagesCard" style="margin-top:24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
               <div>
-                <label class="control-label">A队</label>
-                <select id="teamManagerTeamA" class="form-select"></select>
-                <div id="teamManagerPreviewA" style="margin-top:8px; font-size:12px; color:var(--text-secondary);"></div>
+                <h3>自定义页面（OBS）</h3>
+                <p>把本地 HTML 逐个映射为 HTTP 地址，方便 OBS 录制。</p>
               </div>
-              <div>
-                <label class="control-label">B队</label>
-                <select id="teamManagerTeamB" class="form-select"></select>
-                <div id="teamManagerPreviewB" style="margin-top:8px; font-size:12px; color:var(--text-secondary);"></div>
-              </div>
+              <span id="localPagesStatus" class="status-badge">未启动</span>
             </div>
 
-            <div style="display:flex; gap:10px; flex-wrap:wrap;"></div>
-          </div>
-
-          <div id="pluginCardsSection"
-            style="margin-top:40px; display:none; border-top: 1px solid var(--border-color); padding-top: 30px;">
-            <div class="section-header" style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
-              <h2 class="section-title" style="font-size:20px; margin:0;">🧩 插件</h2>
-              <span class="section-desc">来自已安装的插件</span>
+            <div class="control-group" style="margin-top:12px;">
+              <label class="control-label">HTML 目录</label>
+              <div id="localPagesFolder" class="form-input" style="user-select:text; overflow:hidden; text-overflow:ellipsis;"></div>
             </div>
-            <div id="pluginCardsGrid" class="grid-2"></div>
+
+            <div class="control-group" style="margin-top:12px;">
+              <label class="control-label">访问地址</label>
+              <div id="localPagesBaseUrl" class="form-input" style="user-select:text; overflow:hidden; text-overflow:ellipsis;"></div>
+            </div>
+
+            <div style="margin-top:12px; font-size:12px; color:var(--text-secondary); line-height:1.6;">
+              <div style="font-weight:600; color:var(--text-primary); margin-bottom:6px;">推荐使用 OBS 浏览器源</div>
+              <div>添加方式：OBS → 来源 → 浏览器 → 粘贴 URL → 设置宽高。</div>
+              <div>推荐分辨率：比分板 1280×720；角色展示 1366×768；BP前台按需求自定义。</div>
+              <div>优势：无需打开前台窗口也能录制，资源占用更低，捕获更稳定。</div>
+            </div>
+
+            <div id="localPagesList" style="margin-top:12px;"></div>
           </div>
         </div>
 
@@ -222,17 +213,170 @@
         <!-- View: Settings -->
         <div id="view-settings" class="view-section">
           <div class="section-header">
-            <h1 class="section-title">表现设置</h1>
-            <p class="section-desc">配置 3D 模型渲染、前台分辨率与全局样式。</p>
+            <h1 class="section-title">设置中心</h1>
+            <p class="section-desc">配置插件、布局、字体、动画、渲染分辨率与 MMD 模型。</p>
           </div>
 
-          <div class="tab-nav">
-            <button class="tab-btn active" onclick="switchSettingTab('3d', event)">3D 模型</button>
-            <button class="tab-btn" onclick="switchSettingTab('render', event)">渲染分辨率</button>
-            <button class="tab-btn" onclick="switchSettingTab('assets', event)">字体与资源</button>
+          <div id="setting-tab-plugins" class="settings-section">
+            <div class="grid-2">
+              <div class="feature-card">
+                <h3>插件中心</h3>
+                <p>扩展导播端功能。</p>
+                <button class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="openPluginStore()">插件商店</button>
+                <button class="btn btn-ghost" style="width:100%; margin-top:5px;" onclick="openPluginManager()">管理已安装</button>
+              </div>
+
+              <div class="feature-card" id="storeCard">
+                <h3>布局商店</h3>
+                <p>下载精美的官方/社区布局包。</p>
+                <p id="packCount" style="color:#FFD700; font-weight:bold;">10+</p>
+                <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="openStore()">打开布局商店</button>
+              </div>
+            </div>
+
+            <div class="feature-card" style="margin-top:20px;">
+              <h3>布局管理</h3>
+              <p>导入或导出您的 BP 布局包，或重置为默认值。</p>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
+                <button class="btn btn-secondary" onclick="importBpPack()">📥 导入</button>
+                <button class="btn btn-secondary" onclick="exportBpPack()">📤 导出</button>
+                <button class="btn btn-ghost" onclick="resetLayout()" style="width:100%; border: 1px solid rgba(255,255,255,0.1); margin-top:10px;">🔄 重置为默认</button>
+              </div>
+            </div>
+
+            <div id="pluginCardsSection" style="margin-top:30px; display:none; border-top: 1px solid var(--border-color); padding-top: 30px;">
+              <div class="section-header" style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
+                <h2 class="section-title" style="font-size:20px; margin:0;">🧩 插件</h2>
+                <span class="section-desc">来自已安装的插件</span>
+              </div>
+              <div id="pluginCardsGrid" class="grid-2"></div>
+            </div>
+
+            <div id="pluginSettingsSection" style="margin-top:30px; display:none; border-top: 1px solid var(--border-color); padding-top: 30px;">
+              <div class="section-header" style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
+                <h2 class="section-title" style="font-size:20px; margin:0;">🔌 插件页面</h2>
+                <span class="section-desc">插件注册的设置入口</span>
+              </div>
+              <div id="pluginSettingsMenu" class="grid-2"></div>
+            </div>
           </div>
 
-          <div id="setting-tab-3d">
+          <div id="setting-tab-assets" class="settings-section">
+            <div class="feature-card">
+              <h3>资源管理</h3>
+              <div class="grid-2">
+                <button class="btn btn-secondary" onclick="openCharacterManager()">🎭 角色图片管理</button>
+                <button class="btn btn-secondary" onclick="openFontSettings()">🔤 全局字体设置</button>
+                <button class="btn btn-primary" onclick="openComponentEditor()">🎨 自定义组件设计器</button>
+                <button class="btn btn-primary" onclick="openAnimationEditor()">🎬 动画编辑器</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="setting-tab-render" class="settings-section">
+            <div class="feature-card">
+              <h3>OBS 前台输出</h3>
+              <div class="control-group">
+                <label class="control-label">输出分辨率</label>
+                <select id="frontendResolutionPreset" class="form-select" onchange="onFrontendResPresetChange()">
+                  <option value="1920x1080">1080p</option>
+                  <option value="2560x1440">1440p</option>
+                  <option value="3840x2160">4K</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </div>
+              <div class="grid-2">
+                <input type="number" id="frontendResWidth" class="form-input" placeholder="W">
+                <input type="number" id="frontendResHeight" class="form-input" placeholder="H">
+              </div>
+              <p id="frontendResHint" style="font-size:12px; color:var(--text-secondary); margin:10px 0;">...</p>
+              <button class="btn btn-primary" onclick="applyFrontendResolution()">应用分辨率</button>
+
+              <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <h4>锁定前台窗口大小</h4>
+                    <p style="font-size:12px; color:var(--text-secondary);">防止误触调整，尺寸跟随布局包或分辨率设置</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="frontendResizeLockToggle" onchange="toggleFrontendResizeLock()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="margin-top:30px; border-top:1px solid var(--border-color); padding-top:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <h4>透明背景模式</h4>
+                    <p style="font-size:12px; color:var(--text-secondary);">OBS 推流时背景透明</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="transparentBackgroundToggle" onchange="toggleTransparentBackground()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="feature-card" style="margin-top:20px;">
+              <h3>本地BP自动打开</h3>
+              <p style="font-size:12px; color:var(--text-secondary);">进入本地BP时按需自动打开窗口</p>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>BP前台窗口</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenFrontend" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>本地BP控制台</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenConsole" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>角色展示</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenCharacterDisplay" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>比分板 A队</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenScoreboardA" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>比分板 B队</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenScoreboardB" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>总比分板</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenScoreboardOverview" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>赛后数据</span>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpAutoOpenPostMatch" onchange="onLocalBpAutoOpenChange()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="setting-tab-3d" class="settings-section">
             <div class="feature-card" id="model3dSettingsCard">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <label
@@ -325,90 +469,6 @@
               </div>
             </div>
           </div>
-
-          <div id="setting-tab-render" style="display:none;">
-            <div class="feature-card">
-              <h3>OBS 前台输出</h3>
-              <div class="control-group">
-                <label class="control-label">输出分辨率</label>
-                <select id="frontendResolutionPreset" class="form-select" onchange="onFrontendResPresetChange()">
-                  <option value="1920x1080">1080p</option>
-                  <option value="2560x1440">1440p</option>
-                  <option value="3840x2160">4K</option>
-                  <option value="custom">自定义</option>
-                </select>
-              </div>
-              <div class="grid-2">
-                <input type="number" id="frontendResWidth" class="form-input" placeholder="W">
-                <input type="number" id="frontendResHeight" class="form-input" placeholder="H">
-              </div>
-              <p id="frontendResHint" style="font-size:12px; color:var(--text-secondary); margin:10px 0;">...</p>
-              <button class="btn btn-primary" onclick="applyFrontendResolution()">应用分辨率</button>
-
-              <div style="margin-top:30px; border-top:1px solid var(--border-color); padding-top:20px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <div>
-                    <h4>透明背景模式</h4>
-                    <p style="font-size:12px; color:var(--text-secondary);">OBS 推流时背景透明</p>
-                  </div>
-                  <label class="switch">
-                    <input type="checkbox" id="transparentBackgroundToggle" onchange="toggleTransparentBackground()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div id="setting-tab-assets" style="display:none;">
-            <div class="feature-card">
-              <h3>资源管理</h3>
-              <div class="grid-2">
-                <button class="btn btn-secondary" onclick="openCharacterManager()">🎭 角色图片管理</button>
-                <button class="btn btn-secondary" onclick="openFontSettings()">🔤 全局字体设置</button>
-                <button class="btn btn-primary" onclick="openComponentEditor()">🎨 自定义组件设计器</button>
-                <button class="btn btn-primary" onclick="openAnimationEditor()">🎬 动画编辑器</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- View: Tools/Store -->
-        <div id="view-tools" class="view-section">
-          <div class="section-header">
-            <h1 class="section-title">工具与商店</h1>
-          </div>
-
-          <div class="grid-3">
-            <div class="feature-card" id="storeCard">
-              <h3>布局商店</h3>
-              <p>下载精美的官方/社区布局包。</p>
-              <p id="packCount" style="color:#FFD700; font-weight:bold;">10+</p>
-              <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="openStore()">打开布局商店</button>
-            </div>
-
-            <div class="feature-card">
-              <h3>插件中心</h3>
-              <p>扩展导播端功能。</p>
-              <button class="btn btn-secondary" style="width:100%; margin-top:10px;"
-                onclick="openPluginStore()">插件商店</button>
-              <button class="btn btn-ghost" style="width:100%; margin-top:5px;"
-                onclick="openPluginManager()">管理已安装</button>
-            </div>
-
-            <div class="feature-card">
-              <h3>布局管理</h3>
-              <p>导入或导出您的 BP 布局包，或重置为默认值。</p>
-              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
-                <button class="btn btn-secondary" onclick="importBpPack()">📥 导入</button>
-                <button class="btn btn-secondary" onclick="exportBpPack()">📤 导出</button>
-                <button class="btn btn-ghost" onclick="resetLayout()"
-                  style="width:100%; border: 1px solid rgba(255,255,255,0.1); margin-top:10px;">🔄 重置为默认</button>
-              </div>
-            </div>
-          </div>
-
-
         </div>
 
       </div>
@@ -1124,6 +1184,38 @@
       }
     }
 
+    async function loadFrontendResizeLockSetting() {
+      try {
+        const result = await window.electronAPI.getFrontendResizeLock()
+        if (result && result.success) {
+          const toggle = document.getElementById('frontendResizeLockToggle')
+          if (toggle) {
+            toggle.checked = !!result.locked
+          }
+        }
+      } catch (e) {
+        console.warn('加载前台窗口锁定设置失败:', e)
+      }
+    }
+
+    async function toggleFrontendResizeLock() {
+      const toggle = document.getElementById('frontendResizeLockToggle')
+      const locked = toggle ? toggle.checked : false
+
+      try {
+        const result = await window.electronAPI.setFrontendResizeLock(locked)
+        if (result && result.success) {
+          showStatus(locked ? '✅ 已锁定前台窗口大小' : '✅ 已允许调整前台窗口大小', 'success')
+        } else {
+          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
+          if (toggle) toggle.checked = !locked
+        }
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+        if (toggle) toggle.checked = !locked
+      }
+    }
+
     // ==================== 透明背景设置 ====================
     async function loadTransparentBackgroundSetting() {
       try {
@@ -1296,242 +1388,6 @@
         showStatus(`打开失败: ${error.message}`, 'error')
       }
     })
-
-    const TEAM_MANAGER_KEY = 'asg_team_manager_teams'
-    const TEAM_MANAGER_SELECTION_KEY = 'asg_team_manager_selection'
-    let teamManagerTeams = []
-
-    const teamCsvInput = document.getElementById('teamCsvInput')
-    const importTeamCsvBtn = document.getElementById('importTeamCsvBtn')
-    const teamManagerClearBtn = document.getElementById('teamManagerClearBtn')
-    const teamManagerCount = document.getElementById('teamManagerCount')
-    const teamManagerTeamA = document.getElementById('teamManagerTeamA')
-    const teamManagerTeamB = document.getElementById('teamManagerTeamB')
-    const teamManagerPreviewA = document.getElementById('teamManagerPreviewA')
-    const teamManagerPreviewB = document.getElementById('teamManagerPreviewB')
-    const applyTeamsToLocalBpBtn = document.getElementById('applyTeamsToLocalBpBtn')
-
-    function loadTeamManagerData() {
-      try {
-        const raw = localStorage.getItem(TEAM_MANAGER_KEY)
-        teamManagerTeams = raw ? JSON.parse(raw) : []
-      } catch (e) {
-        teamManagerTeams = []
-      }
-    }
-
-    function saveTeamManagerData() {
-      localStorage.setItem(TEAM_MANAGER_KEY, JSON.stringify(teamManagerTeams))
-    }
-
-    function loadTeamManagerSelection() {
-      try {
-        const raw = localStorage.getItem(TEAM_MANAGER_SELECTION_KEY)
-        return raw ? JSON.parse(raw) : {}
-      } catch {
-        return {}
-      }
-    }
-
-    function saveTeamManagerSelection(sel) {
-      localStorage.setItem(TEAM_MANAGER_SELECTION_KEY, JSON.stringify(sel || {}))
-    }
-
-    function parseCsvRows(text) {
-      const rows = []
-      let row = []
-      let field = ''
-      let inQuotes = false
-      for (let i = 0; i < text.length; i++) {
-        const ch = text[i]
-        const next = text[i + 1]
-        if (ch === '"') {
-          if (inQuotes && next === '"') {
-            field += '"'
-            i++
-          } else {
-            inQuotes = !inQuotes
-          }
-          continue
-        }
-        if (!inQuotes && (ch === '\n' || ch === '\r')) {
-          if (ch === '\r' && next === '\n') i++
-          row.push(field)
-          rows.push(row)
-          row = []
-          field = ''
-          continue
-        }
-        if (!inQuotes && ch === ',') {
-          row.push(field)
-          field = ''
-          continue
-        }
-        field += ch
-      }
-      if (field.length > 0 || row.length > 0) {
-        row.push(field)
-        rows.push(row)
-      }
-      return rows.map(r => r.map(v => (v || '').trim())).filter(r => r.some(v => v !== ''))
-    }
-
-    function normalizeHeader(h) {
-      return (h || '').replace('\uFEFF', '').trim().toLowerCase()
-    }
-
-    function parseTeamsFromCsv(text) {
-      const rows = parseCsvRows(text)
-      if (rows.length <= 1) return []
-      const header = rows[0].map(normalizeHeader)
-      const idx = {
-        teamName: header.findIndex(h => h === 'teamname'),
-        teamId: header.findIndex(h => h === 'teamid'),
-        qq: header.findIndex(h => h === 'qqnumber'),
-        playerName: header.findIndex(h => h === 'playername'),
-        gameId: header.findIndex(h => h === 'gameid'),
-        gameRank: header.findIndex(h => h === 'gamerank'),
-        playerDesc: header.findIndex(h => h === 'playerdescription')
-      }
-      const map = new Map()
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i]
-        const teamName = idx.teamName >= 0 ? row[idx.teamName] : ''
-        const teamId = idx.teamId >= 0 ? row[idx.teamId] : ''
-        if (!teamName && !teamId) continue
-        const key = teamId || teamName
-        if (!map.has(key)) {
-          map.set(key, {
-            id: teamId,
-            name: teamName || teamId,
-            qq: idx.qq >= 0 ? row[idx.qq] : '',
-            players: []
-          })
-        }
-        const team = map.get(key)
-        const playerName = idx.playerName >= 0 ? row[idx.playerName] : ''
-        const gameId = idx.gameId >= 0 ? row[idx.gameId] : ''
-        const gameRank = idx.gameRank >= 0 ? row[idx.gameRank] : ''
-        const playerDescription = idx.playerDesc >= 0 ? row[idx.playerDesc] : ''
-        if (playerName || gameId) {
-          const exists = team.players.some(p => (p.name || '') === playerName && (p.gameId || '') === gameId)
-          if (!exists) {
-            team.players.push({ name: playerName, gameId, gameRank, description: playerDescription })
-          }
-        }
-      }
-      return Array.from(map.values()).sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'))
-    }
-
-    function renderTeamManager() {
-      if (teamManagerCount) {
-        teamManagerCount.textContent = teamManagerTeams.length ? `已导入 ${teamManagerTeams.length} 支队伍` : '未导入'
-      }
-      const selection = loadTeamManagerSelection()
-      const buildOptions = (selectEl, selectedId) => {
-        if (!selectEl) return
-        const options = ['<option value="">请选择</option>'].concat(teamManagerTeams.map(t => {
-          const val = t.id || t.name
-          const label = t.name + (t.id ? ` (${t.id.slice(0, 6)}...)` : '')
-          return `<option value="${val}">${label}</option>`
-        }))
-        selectEl.innerHTML = options.join('')
-        if (selectedId) selectEl.value = selectedId
-      }
-      buildOptions(teamManagerTeamA, selection.teamA || '')
-      buildOptions(teamManagerTeamB, selection.teamB || '')
-      updateTeamPreview()
-    }
-
-    function findTeamById(val) {
-      if (!val) return null
-      return teamManagerTeams.find(t => (t.id || t.name) === val) || null
-    }
-
-    function renderPreview(el, team) {
-      if (!el) return
-      if (!team) {
-        el.textContent = ''
-        return
-      }
-      const players = team.players || []
-      const list = players.map(p => p.name || p.gameId).filter(Boolean)
-      el.textContent = list.length ? `阵容：${list.join('、')}` : '未识别选手'
-    }
-
-    function updateTeamPreview() {
-      const teamA = findTeamById(teamManagerTeamA?.value)
-      const teamB = findTeamById(teamManagerTeamB?.value)
-      renderPreview(teamManagerPreviewA, teamA)
-      renderPreview(teamManagerPreviewB, teamB)
-      saveTeamManagerSelection({ teamA: teamManagerTeamA?.value || '', teamB: teamManagerTeamB?.value || '' })
-    }
-
-    async function importTeamCsv() {
-      const file = teamCsvInput?.files?.[0]
-      if (!file) {
-        showStatus('请选择CSV文件', 'warning')
-        return
-      }
-      try {
-        const text = await file.text()
-        const teams = parseTeamsFromCsv(text)
-        if (!teams.length) {
-          showStatus('CSV未解析到队伍数据', 'warning')
-          return
-        }
-        teamManagerTeams = teams
-        saveTeamManagerData()
-        renderTeamManager()
-        showStatus(`已导入 ${teams.length} 支队伍`, 'success')
-      } catch (e) {
-        showStatus('导入失败: ' + (e?.message || e), 'error')
-      }
-    }
-
-    function applyTeamsToLocalBp() {
-      const teamA = findTeamById(teamManagerTeamA?.value)
-      const teamB = findTeamById(teamManagerTeamB?.value)
-      if (!teamA && !teamB) {
-        showStatus('请选择至少一支队伍', 'warning')
-        return
-      }
-      let matchBase = {}
-      try {
-        matchBase = JSON.parse(localStorage.getItem('localBp_matchBase') || '{}')
-      } catch { }
-      if (!matchBase.teamA) matchBase.teamA = { name: '', roster: [] }
-      if (!matchBase.teamB) matchBase.teamB = { name: '', roster: [] }
-      if (teamA) {
-        matchBase.teamA.name = teamA.name || matchBase.teamA.name
-        const rosterA = (teamA.players || []).map(p => p.name || p.gameId).filter(Boolean)
-        if (rosterA.length) matchBase.teamA.roster = rosterA
-      }
-      if (teamB) {
-        matchBase.teamB.name = teamB.name || matchBase.teamB.name
-        const rosterB = (teamB.players || []).map(p => p.name || p.gameId).filter(Boolean)
-        if (rosterB.length) matchBase.teamB.roster = rosterB
-      }
-      localStorage.setItem('localBp_matchBase', JSON.stringify(matchBase))
-      window.dispatchEvent(new Event('storage'))
-      window.dispatchEvent(new CustomEvent('local-bp-update'))
-      showStatus('已应用到本地BP', 'success')
-    }
-
-    function clearTeamManager() {
-      teamManagerTeams = []
-      saveTeamManagerData()
-      renderTeamManager()
-    }
-
-    importTeamCsvBtn?.addEventListener('click', importTeamCsv)
-    teamManagerClearBtn?.addEventListener('click', clearTeamManager)
-    teamManagerTeamA?.addEventListener('change', updateTeamPreview)
-    teamManagerTeamB?.addEventListener('change', updateTeamPreview)
-    applyTeamsToLocalBpBtn?.addEventListener('click', applyTeamsToLocalBp)
-
-    loadTeamManagerData()
-    renderTeamManager()
 
     // 前台 3D 模型设置快捷入口
     const openModelSettingsBtn = document.getElementById('openModelSettingsBtn')
@@ -1979,6 +1835,7 @@
     loadRoomHistory()
     initVersionDisplay()
     loadFrontendResolution()
+    loadFrontendResizeLockSetting()
     loadTransparentBackgroundSetting()
 
     // 加载插件组件
@@ -2138,38 +1995,62 @@
     // 渲染插件菜单项
     function renderPluginMenuItems(menuItems) {
       const menubar = document.getElementById('pluginMenubar')
+      const settingsMenu = document.getElementById('pluginSettingsMenu')
+      const settingsSection = document.getElementById('pluginSettingsSection')
+      const hasItems = Array.isArray(menuItems) && menuItems.length > 0
 
-      if (!menubar) return
+      if (menubar) {
+        menubar.querySelectorAll('[data-plugin-menu-item], .plugin-menu-divider').forEach(el => el.remove())
 
-      // 移除旧的插件菜单项和分隔线
-      menubar.querySelectorAll('[data-plugin-menu-item], .plugin-menu-divider').forEach(el => el.remove())
+        if (hasItems) {
+          const divider = document.createElement('div')
+          divider.className = 'plugin-menu-divider'
+          menubar.appendChild(divider)
 
-      if (!menuItems || menuItems.length === 0) return
-
-      // 添加分隔线
-      const divider = document.createElement('div')
-      divider.className = 'plugin-menu-divider'
-      menubar.appendChild(divider)
-
-      // 添加菜单项
-      menuItems.forEach(item => {
-        const btn = document.createElement('button')
-        btn.className = 'plugin-menu-item'
-        btn.dataset.page = item.pageId || item.id
-        btn.dataset.pluginMenuItem = 'true'
-        btn.innerHTML = `
-          <span class="plugin-menu-icon">${item.icon || '📄'}</span>
-          <span>${item.label}</span>
-        `
-        btn.onclick = () => {
-          if (item.command) {
-            window.plugins.executeCommand(item.command)
-          } else if (item.pageId) {
-            showPage(item.pageId)
-          }
+          menuItems.forEach(item => {
+            const btn = document.createElement('button')
+            btn.className = 'plugin-menu-item'
+            btn.dataset.page = item.pageId || item.id
+            btn.dataset.pluginMenuItem = 'true'
+            btn.innerHTML = `
+              <span class="plugin-menu-icon">${item.icon || '📄'}</span>
+              <span>${item.label}</span>
+            `
+            btn.onclick = () => {
+              if (item.command) {
+                window.plugins.executeCommand(item.command)
+              } else if (item.pageId) {
+                showPage(item.pageId)
+              }
+            }
+            menubar.appendChild(btn)
+          })
         }
-        menubar.appendChild(btn)
-      })
+      }
+
+      if (settingsMenu) {
+        settingsMenu.innerHTML = ''
+        if (!hasItems) {
+          if (settingsSection) settingsSection.style.display = 'none'
+          return
+        }
+        if (settingsSection) settingsSection.style.display = 'block'
+
+        menuItems.forEach(item => {
+          const btn = document.createElement('button')
+          btn.className = 'btn btn-secondary'
+          btn.style.width = '100%'
+          btn.innerHTML = `${item.icon || '📄'} ${item.label}`
+          btn.onclick = () => {
+            if (item.command) {
+              window.plugins.executeCommand(item.command)
+            } else if (item.pageId) {
+              showPage(item.pageId)
+            }
+          }
+          settingsMenu.appendChild(btn)
+        })
+      }
     }
 
     // 渲染插件页面
