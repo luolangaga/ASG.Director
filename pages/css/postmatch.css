@@ -15,7 +15,7 @@
       overflow: hidden;
       position: relative;
       color: #fff;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      background: transparent;
     }
 
     body.has-background {
@@ -44,12 +44,12 @@
       height: 28px;
       z-index: 10000;
       -webkit-app-region: drag;
-      background: rgba(255, 215, 0, 0.08);
-      border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+      background: transparent;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.12);
     }
 
     body.edit-mode .drag-bar {
-      background: rgba(255, 215, 0, 0.25);
+      background: rgba(255, 215, 0, 0.08);
     }
 
     #backgroundImage {
@@ -85,17 +85,39 @@
       position: absolute;
       cursor: move;
       user-select: none;
-      padding: 10px;
-      background: rgba(0, 0, 0, 0.28);
-      border-radius: 10px;
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
       border: 2px solid transparent;
-      backdrop-filter: blur(2px);
+      backdrop-filter: none;
+    }
+
+    .draggable[data-component-name]::before {
+      content: attr(data-component-name);
+      position: absolute;
+      left: 0;
+      top: -20px;
+      display: none;
+      font-size: 11px;
+      line-height: 1;
+      padding: 4px 6px;
+      border-radius: 4px;
+      color: #111;
+      background: rgba(255, 215, 0, 0.92);
+      border: 1px solid rgba(255, 215, 0, 0.95);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    body.edit-mode .draggable[data-component-name]::before {
+      display: block;
     }
 
     body.edit-mode .draggable {
       border-width: 1px;
-      border-color: rgba(255, 215, 0, 0.55);
-      background: rgba(0, 0, 0, 0.45);
+      border-color: rgba(255, 215, 0, 0.5);
+      background: rgba(255, 215, 0, 0.03);
       border-radius: 0;
     }
 
@@ -214,10 +236,10 @@
       grid-template-columns: 90px 1fr 90px;
       align-items: center;
       gap: 14px;
-      padding: 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(0, 0, 0, 0.35);
+      padding: 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
     }
 
     .team-logo {
@@ -248,8 +270,20 @@
       text-shadow: 0 3px 12px rgba(0, 0, 0, 0.85);
     }
 
+    .team-score-left {
+      justify-self: start;
+    }
+
+    .team-a-color {
+      color: #64b5f6;
+    }
+
+    .team-b-color {
+      color: #ef5350;
+    }
+
     .team-card.team-a {
-      border-left: 4px solid rgba(100, 181, 246, 0.9);
+      border-left: none;
     }
 
     .team-card.team-a .team-name,
@@ -258,7 +292,7 @@
     }
 
     .team-card.team-b {
-      border-right: 4px solid rgba(239, 83, 80, 0.9);
+      border-right: none;
     }
 
     .team-card.team-b .team-name,
@@ -267,10 +301,10 @@
     }
 
     .center-card {
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(0, 0, 0, 0.35);
-      padding: 14px;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      padding: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -298,6 +332,30 @@
       align-items: start;
     }
 
+    .survivor-row {
+      display: grid;
+      grid-template-columns: 220px repeat(5, minmax(0, 1fr));
+      align-items: center;
+      gap: 0;
+      width: 100%;
+    }
+
+    .survivor-row>div {
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .survivor-row.survivor-header>div {
+      text-align: left;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 800;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
     .table {
       width: 100%;
       border-collapse: collapse;
@@ -310,13 +368,13 @@
       color: rgba(255, 255, 255, 0.7);
       font-weight: 800;
       padding: 10px 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.18);
       white-space: nowrap;
     }
 
     .table td {
       padding: 12px 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
       vertical-align: middle;
     }
 
@@ -332,18 +390,18 @@
     }
 
     .hunter-card {
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(0, 0, 0, 0.35);
+      border-radius: 0;
+      border: none;
+      background: transparent;
       overflow: hidden;
     }
 
     .hunter-header {
-      padding: 14px;
+      padding: 0;
       display: flex;
       align-items: center;
       gap: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      border-bottom: none;
     }
 
     .hunter-name {
@@ -359,7 +417,7 @@
     }
 
     .hunter-stats {
-      padding: 12px 14px 14px 14px;
+      padding: 12px 0 0 0;
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
@@ -376,6 +434,13 @@
       color: rgba(255, 255, 255, 0.75);
       font-size: 13px;
       font-weight: 700;
+    }
+
+    #teamAContainer .team-card,
+    #teamBContainer .team-card,
+    #centerInfoContainer .center-card,
+    #hunterContainer .hunter-card {
+      width: 100%;
     }
 
     .kv .v {
@@ -572,4 +637,3 @@
       background: rgba(13, 71, 161, 0.1);
       border: 1px dashed rgba(13, 71, 161, 0.5);
     }
-

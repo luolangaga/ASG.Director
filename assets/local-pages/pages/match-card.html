@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>对阵信息卡</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --accent: #f97316;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+        font-family: "Manrope", "Microsoft YaHei", sans-serif;
+        color: #f8fafc;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .card {
+        width: 520px;
+        padding: 22px 26px;
+        border-radius: 20px;
+        background: rgba(10, 14, 24, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 24px 40px rgba(0, 0, 0, 0.4);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .meta .tag {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .teams {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 16px;
+      }
+      .team {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .team-name {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .team-tagline {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .score {
+        font-family: "Orbitron", sans-serif;
+        font-size: 42px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-align: center;
+        min-width: 90px;
+        color: var(--accent);
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.65);
+      }
+      .footer span {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .controls {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 280px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(12, 16, 26, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+      }
+      .controls.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-8px);
+      }
+      input {
+        background: rgba(5, 8, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: #e2e8f0;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        flex: 1;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: white;
+        background: var(--accent);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .toggle {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="card" id="card">
+        <div class="meta">
+          <div id="eventText">ASG 决胜舞台</div>
+          <div class="tag" id="roundText">BO5 · R2</div>
+        </div>
+        <div class="teams">
+          <div class="team">
+            <div class="team-name" id="teamAText">队伍 A</div>
+            <div class="team-tagline" id="teamASub">主队</div>
+          </div>
+          <div class="score" id="scoreText">2 : 1</div>
+          <div class="team">
+            <div class="team-name" id="teamBText">队伍 B</div>
+            <div class="team-tagline" id="teamBSub">客队</div>
+          </div>
+        </div>
+        <div class="footer">
+          <span id="mapText">湖心村</span>
+          <span id="timeText">20:30 开始</span>
+        </div>
+      </div>
+      <button class="toggle" id="toggleControls">控件</button>
+      <div class="controls" id="controls">
+        <label>赛事标题</label>
+        <input id="eventInput" type="text" />
+        <label>回合信息</label>
+        <input id="roundInput" type="text" />
+        <label>队伍A/标签</label>
+        <input id="teamAInput" type="text" />
+        <input id="teamASubInput" type="text" />
+        <label>队伍B/标签</label>
+        <input id="teamBInput" type="text" />
+        <input id="teamBSubInput" type="text" />
+        <label>比分</label>
+        <input id="scoreInput" type="text" />
+        <label>地图/时间</label>
+        <input id="mapInput" type="text" />
+        <input id="timeInput" type="text" />
+        <label>主色</label>
+        <input id="accentInput" type="color" />
+        <div class="btn-row">
+          <button class="secondary" id="resetBtn">重置</button>
+          <button class="secondary" id="hideBtn">隐藏</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const query = new URLSearchParams(window.location.search);
+      const instanceId = (query.get("id") || "default").trim() || "default";
+      const storageKey = `match_card_widget_v2_${instanceId}`;
+      const defaults = {
+        event: "ASG 决胜舞台",
+        round: "BO5 · R2",
+        teamA: "队伍 A",
+        teamASub: "主队",
+        teamB: "队伍 B",
+        teamBSub: "客队",
+        score: "2 : 1",
+        map: "湖心村",
+        time: "20:30 开始",
+        accent: "#f97316",
+        hidden: false,
+        controlsHidden: false
+      };
+      function safeReadState() {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey)) || {};
+        } catch {
+          return {};
+        }
+      }
+      function parseBool(value) {
+        if (value === null || value === undefined) return null;
+        const normalized = String(value).trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) return true;
+        if (["0", "false", "no", "off"].includes(normalized)) return false;
+        return null;
+      }
+      function parseColor(value) {
+        if (typeof value !== "string") return null;
+        const normalized = value.trim();
+        if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) return normalized;
+        return null;
+      }
+      const state = { ...defaults, ...safeReadState() };
+      const queryState = {};
+      const eventParam = query.get("event");
+      if (eventParam !== null) queryState.event = eventParam;
+      const roundParam = query.get("round");
+      if (roundParam !== null) queryState.round = roundParam;
+      const teamAParam = query.get("teamA");
+      if (teamAParam !== null) queryState.teamA = teamAParam;
+      const teamASubParam = query.get("teamASub");
+      if (teamASubParam !== null) queryState.teamASub = teamASubParam;
+      const teamBParam = query.get("teamB");
+      if (teamBParam !== null) queryState.teamB = teamBParam;
+      const teamBSubParam = query.get("teamBSub");
+      if (teamBSubParam !== null) queryState.teamBSub = teamBSubParam;
+      const scoreParam = query.get("score");
+      if (scoreParam !== null) queryState.score = scoreParam;
+      const mapParam = query.get("map");
+      if (mapParam !== null) queryState.map = mapParam;
+      const timeParam = query.get("time");
+      if (timeParam !== null) queryState.time = timeParam;
+      const accentParam = parseColor(query.get("accent"));
+      if (accentParam) queryState.accent = accentParam;
+      const hiddenParam = parseBool(query.get("hidden"));
+      if (hiddenParam !== null) queryState.hidden = hiddenParam;
+      const controlsHiddenParam = parseBool(query.get("controlsHidden"));
+      if (controlsHiddenParam !== null) queryState.controlsHidden = controlsHiddenParam;
+      Object.assign(state, queryState);
+      const eventText = document.getElementById("eventText");
+      const roundText = document.getElementById("roundText");
+      const teamAText = document.getElementById("teamAText");
+      const teamASub = document.getElementById("teamASub");
+      const teamBText = document.getElementById("teamBText");
+      const teamBSub = document.getElementById("teamBSub");
+      const scoreText = document.getElementById("scoreText");
+      const mapText = document.getElementById("mapText");
+      const timeText = document.getElementById("timeText");
+      const eventInput = document.getElementById("eventInput");
+      const roundInput = document.getElementById("roundInput");
+      const teamAInput = document.getElementById("teamAInput");
+      const teamASubInput = document.getElementById("teamASubInput");
+      const teamBInput = document.getElementById("teamBInput");
+      const teamBSubInput = document.getElementById("teamBSubInput");
+      const scoreInput = document.getElementById("scoreInput");
+      const mapInput = document.getElementById("mapInput");
+      const timeInput = document.getElementById("timeInput");
+      const accentInput = document.getElementById("accentInput");
+      const resetBtn = document.getElementById("resetBtn");
+      const hideBtn = document.getElementById("hideBtn");
+      const controls = document.getElementById("controls");
+      const toggleControls = document.getElementById("toggleControls");
+      function persist() {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      }
+      function apply() {
+        eventText.textContent = state.event;
+        roundText.textContent = state.round;
+        teamAText.textContent = state.teamA;
+        teamASub.textContent = state.teamASub;
+        teamBText.textContent = state.teamB;
+        teamBSub.textContent = state.teamBSub;
+        scoreText.textContent = state.score;
+        mapText.textContent = state.map;
+        timeText.textContent = state.time;
+        eventInput.value = state.event;
+        roundInput.value = state.round;
+        teamAInput.value = state.teamA;
+        teamASubInput.value = state.teamASub;
+        teamBInput.value = state.teamB;
+        teamBSubInput.value = state.teamBSub;
+        scoreInput.value = state.score;
+        mapInput.value = state.map;
+        timeInput.value = state.time;
+        accentInput.value = state.accent;
+        document.documentElement.style.setProperty("--accent", state.accent);
+        document.getElementById("card").style.display = state.hidden ? "none" : "flex";
+        hideBtn.textContent = state.hidden ? "显示" : "隐藏";
+        controls.classList.toggle("hidden", state.controlsHidden);
+      }
+      function bindInput(input, key) {
+        input.addEventListener("input", (e) => {
+          state[key] = e.target.value;
+          persist();
+          apply();
+        });
+      }
+      bindInput(eventInput, "event");
+      bindInput(roundInput, "round");
+      bindInput(teamAInput, "teamA");
+      bindInput(teamASubInput, "teamASub");
+      bindInput(teamBInput, "teamB");
+      bindInput(teamBSubInput, "teamBSub");
+      bindInput(scoreInput, "score");
+      bindInput(mapInput, "map");
+      bindInput(timeInput, "time");
+      accentInput.addEventListener("input", (e) => {
+        state.accent = e.target.value;
+        persist();
+        apply();
+      });
+      resetBtn.addEventListener("click", () => {
+        Object.assign(state, defaults);
+        persist();
+        apply();
+      });
+      hideBtn.addEventListener("click", () => {
+        state.hidden = !state.hidden;
+        persist();
+        apply();
+      });
+      toggleControls.addEventListener("click", () => {
+        state.controlsHidden = !state.controlsHidden;
+        persist();
+        apply();
+      });
+      if (Object.keys(queryState).length > 0) {
+        persist();
+      }
+      apply();
+    </script>
+  </body>
+</html>

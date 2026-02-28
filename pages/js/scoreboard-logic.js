@@ -2,17 +2,45 @@
 if (!window.electronAPI) {
   console.log('[Scoreboard] OBS模式：创建兼容API层')
   window.__ASG_OBS_MODE__ = true
+  function encodePathSegments(pathValue) {
+    return String(pathValue || '')
+      .split('/')
+      .map(seg => encodeURIComponent(seg))
+      .join('/')
+  }
   window.__rewriteAssetPath__ = function (src) {
     if (!src) return src
-    if (src.startsWith('../assets/')) return src.replace('../assets/', '/assets/')
-    if (src.startsWith('./assets/')) return src.replace('./assets/', '/assets/')
-    if (src.startsWith('./js/')) return src.replace('./js/', '/js/')
-    if (src.startsWith('file:///')) {
-      const bgMatch = src.match(/asg-director[\/\\]background[\/\\](.+)$/i)
-      if (bgMatch) return '/background/' + bgMatch[1].replace(/\\/g, '/')
-      const match = src.match(/asg-director[\/\\](.+)$/i)
-      if (match) return '/userdata/' + match[1].replace(/\\/g, '/')
+    const raw = String(src).trim()
+    if (raw.startsWith('../assets/')) return raw.replace('../assets/', '/assets/')
+    if (raw.startsWith('./assets/')) return raw.replace('./assets/', '/assets/')
+    if (raw.startsWith('./js/')) return raw.replace('./js/', '/js/')
+    if (/^(https?:|data:|blob:)/i.test(raw)) return raw
+
+    let normalized = raw
+    if (/^file:\/\//i.test(normalized)) {
+      normalized = normalized.replace(/^file:\/\/\/?/i, '')
+      try { normalized = decodeURIComponent(normalized) } catch {}
     }
+    normalized = normalized.replace(/^\/([a-zA-Z]:[\\/])/, '$1')
+    normalized = normalized.replace(/\//g, '\\')
+
+    const bgMatch = normalized.match(/[\\/]background[\\/](.+)$/i)
+    if (bgMatch && bgMatch[1]) {
+      const relative = bgMatch[1].replace(/\\/g, '/')
+      return '/background/' + encodePathSegments(relative)
+    }
+
+    const userDataMatch = normalized.match(/[\\/](asg[.-]director)[\\/](.+)$/i)
+    if (userDataMatch && userDataMatch[2]) {
+      const relative = userDataMatch[2].replace(/\\/g, '/')
+      return '/userdata/' + encodePathSegments(relative)
+    }
+
+    if (/^[a-zA-Z]:[\\/]/.test(normalized) || normalized.startsWith('\\')) {
+      const fileStyle = normalized.replace(/\\/g, '/')
+      return fileStyle.startsWith('/') ? `file://${encodeURI(fileStyle)}` : `file:///${encodeURI(fileStyle)}`
+    }
+
     return src
   }
   const originalImageSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')
@@ -39,6 +67,27 @@ if (!window.electronAPI) {
 }
 
 let team = 'teamA', roomId = '', scoreData = { bos: [] }, editMode = false, layout = {}, availableFonts = [], activeFontContainerId = null
+const DEFAULT_LAYOUT_BASE_SIZE = { width: 1280, height: 720 }
+
+function getLayoutBaseSize() {
+  const base = layout?.baseResolution || layout?.canvasSize || layout?.baseSize || {}
+  const width = Number(base.width)
+  const height = Number(base.height)
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+    return { width, height }
+  }
+  return { ...DEFAULT_LAYOUT_BASE_SIZE }
+}
+
+function getRenderScale() {
+  if (!window.__ASG_OBS_MODE__ || editMode) {
+    return { x: 1, y: 1, font: 1 }
+  }
+  const base = getLayoutBaseSize()
+  const x = Math.max(0.01, window.innerWidth / base.width)
+  const y = Math.max(0.01, window.innerHeight / base.height)
+  return { x, y, font: Math.min(x, y) }
+}
 
 async function init() {
   const urlParams = new URLSearchParams(window.location.search)
@@ -64,6 +113,14 @@ async function init() {
     })
   }
 
+  // 监听自定义字体文件导入/删除（全局字体）
+  if (window.electronAPI && window.electronAPI.onCustomFontsChanged) {
+    window.electronAPI.onCustomFontsChanged(async () => {
+      await loadCustomFonts()
+      applyLayout()
+    })
+  }
+
   // 监听字体文件变更
   if (window.electronAPI && window.electronAPI.onFontFilesChanged) {
     window.electronAPI.onFontFilesChanged(async () => {
@@ -74,6 +131,11 @@ async function init() {
   window.addEventListener('keydown', e => {
     if (e.key === 'F2') toggleEditMode()
     if (e.key === 'F3' && editMode && !window.__ASG_OBS_MODE__) selectBackground()
+  })
+  window.addEventListener('resize', () => {
+    if (window.__ASG_OBS_MODE__ && !editMode) {
+      applyLayout()
+    }
   })
 
   // 样式监听
@@ -311,29 +373,38 @@ async function loadCustomFonts() {
   try {
     if (!window.electronAPI || !window.electronAPI.getCustomFonts) return
     const res = await window.electronAPI.getCustomFonts()
-    if (res.success && res.fonts.length) {
-      availableFonts = res.fonts
-      for (const f of res.fonts) {
+    if (!res || !res.success || !Array.isArray(res.fonts)) {
+      availableFonts = []
+      return
+    }
+
+    availableFonts = res.fonts
+    if (!availableFonts.length) return
+
+    for (const f of availableFonts) {
+      try {
         const u = await window.electronAPI.getFontUrl(f.fileName)
-        if (u.success) {
-          const ff = new FontFace(f.fontFamily, `url(${u.url})`)
-          await ff.load()
-          document.fonts.add(ff)
-        }
+        if (!u || !u.success || !u.url) continue
+        const ff = new FontFace(f.fontFamily, `url(${u.url})`)
+        await ff.load()
+        document.fonts.add(ff)
+      } catch (e) {
+        console.warn('[Scoreboard] Load one custom font failed:', f?.fileName, e?.message || e)
       }
     }
   } catch (e) { console.warn('Load fonts failed', e) }
 }
 
 function applyLayout() {
-  if (!layout.elements) return
-  layout.elements.forEach(el => {
+  const elements = Array.isArray(layout.elements) ? layout.elements : []
+  const scale = getRenderScale()
+  elements.forEach(el => {
     const container = document.getElementById(el.id)
     if (container) {
-      container.style.left = el.left + 'px'
-      container.style.top = el.top + 'px'
-      container.style.width = el.width + 'px'
-      if (el.height) container.style.height = el.height + 'px'
+      container.style.left = Math.round(el.left * scale.x) + 'px'
+      container.style.top = Math.round(el.top * scale.y) + 'px'
+      container.style.width = Math.round(el.width * scale.x) + 'px'
+      if (el.height) container.style.height = Math.round(el.height * scale.y) + 'px'
       container.style.display = (el.hidden && !editMode) ? 'none' : 'block'
       container.classList.toggle('layout-hidden', !!el.hidden)
       if (el.fontFamily) container.style.fontFamily = `"${el.fontFamily}", sans-serif`
@@ -341,7 +412,7 @@ function applyLayout() {
 
       if (el.fontSize) {
         const inner = container.querySelector('#bigScore, #record, #teamName')
-        if (inner) inner.style.fontSize = el.fontSize + 'px'
+        if (inner) inner.style.fontSize = Math.max(8, Math.round(el.fontSize * scale.font)) + 'px'
       }
       if (el.textColor) {
         const inner = container.querySelector('#bigScore, #record, #teamName')
@@ -356,7 +427,9 @@ function applyLayout() {
   if (layout.backgroundImage) {
     const bg = document.getElementById('backgroundImage')
     let src = layout.backgroundImage
-    if (!src.startsWith('file:') && !window.__ASG_OBS_MODE__) {
+    if (window.__ASG_OBS_MODE__ && typeof window.__rewriteAssetPath__ === 'function') {
+      src = window.__rewriteAssetPath__(src)
+    } else if (!src.startsWith('file:')) {
       const normalized = src.replace(/\\/g, '/')
       src = normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : `file:///${encodeURI(normalized)}`
     }
@@ -378,12 +451,15 @@ async function saveLayout() {
       fontSize: fontSize ? parseInt(fontSize) : null,
       textColor: el.querySelector('#bigScore, #record, #teamName')?.style.color || null,
       fontFamily: el.style.fontFamily ? el.style.fontFamily.replace(/"/g, '').split(',')[0].trim() : null,
-      fontFamily: el.style.fontFamily ? el.style.fontFamily.replace(/"/g, '').split(',')[0].trim() : null,
       hidden: el.classList.contains('layout-hidden'),
       zIndex: parseInt(el.style.zIndex) || 0
     })
   })
   layout.elements = elements
+  layout.baseResolution = {
+    width: Math.max(1, Math.round(window.innerWidth || DEFAULT_LAYOUT_BASE_SIZE.width)),
+    height: Math.max(1, Math.round(window.innerHeight || DEFAULT_LAYOUT_BASE_SIZE.height))
+  }
   await window.electronAPI.saveScoreboardLayout(team, layout)
 }
 
@@ -405,6 +481,8 @@ async function selectBackground() {
 
 // Font selection
 async function openFontSelector(containerId) {
+  // 每次打开字体面板都刷新一次字体列表，避免“导入后不显示”
+  await loadCustomFonts()
   activeFontContainerId = containerId
   const list = document.getElementById('fontSelectorList')
   let html = '<div class="font-selector-item" onclick="selectFont(\'\')">系统默认</div>'
@@ -691,45 +769,53 @@ function handleUpdateData(data) {
   }
 }
 function loadScoreData() { if (roomId) { const s = localStorage.getItem('score_' + roomId); if (s) { scoreData = JSON.parse(s); updateDisplay() } } }
-function updateDisplay() {
-  const isA = team === 'teamA'
-  const mode = (scoreData.scoreboardDisplay && scoreData.scoreboardDisplay[team]) || 'auto'
 
-  let s = 0;
-  let targetBo = null
-  let targetHalf = 'upper'
+function normalizeDisplayHalf(value) {
+  return value === 'lower' ? 'lower' : 'upper'
+}
 
-  if (mode === 'auto') {
-    // 自动逻辑：从最后一个BO开始往前找，找到第一个有数据的上半局或下半局
-    for (let i = scoreData.bos.length - 1; i >= 0; i--) {
-      const bo = scoreData.bos[i]
-      const hasLower = bo.lower.teamA > 0 || bo.lower.teamB > 0
-      const hasUpper = bo.upper.teamA > 0 || bo.upper.teamB > 0
+function resolveDisplayConfig(raw) {
+  const modeLegacy = raw?.scoreboardDisplay?.[team] || raw?.scoreboardDisplay?.teamA || 'auto'
+  const cfg = (raw?.displayConfig && typeof raw.displayConfig === 'object') ? raw.displayConfig : null
+  const auto = (typeof cfg?.auto === 'boolean') ? cfg.auto : (modeLegacy === 'auto')
+  const round = parseInt(cfg?.round, 10) || parseInt(raw?.currentRound, 10) || 1
+  const halfFromLegacy = modeLegacy === 'upper' || modeLegacy === 'lower'
+    ? modeLegacy
+    : ((parseInt(raw?.currentHalf, 10) || 1) === 2 ? 'lower' : 'upper')
+  const half = normalizeDisplayHalf(cfg?.half || halfFromLegacy)
+  return { auto, round, half }
+}
 
-      if (hasLower) {
-        targetBo = bo
-        targetHalf = 'lower'
-        break
-      } else if (hasUpper) {
-        targetBo = bo
-        targetHalf = 'upper'
-        break
-      }
+function resolveTargetBoAndHalf(raw) {
+  const bos = Array.isArray(raw?.bos) ? raw.bos : []
+  if (!bos.length) return { bo: null, half: 'upper' }
+  const cfg = resolveDisplayConfig(raw)
+
+  if (cfg.auto) {
+    for (let i = bos.length - 1; i >= 0; i--) {
+      const bo = bos[i]
+      const hasLower = (parseInt(bo?.lower?.teamA, 10) || 0) > 0 || (parseInt(bo?.lower?.teamB, 10) || 0) > 0
+      const hasUpper = (parseInt(bo?.upper?.teamA, 10) || 0) > 0 || (parseInt(bo?.upper?.teamB, 10) || 0) > 0
+      if (hasLower) return { bo, half: 'lower' }
+      if (hasUpper) return { bo, half: 'upper' }
     }
-    // 如果都没数据，默认显示第1个BO上半局
-    if (!targetBo && scoreData.bos.length > 0) {
-      targetBo = scoreData.bos[0]
-      targetHalf = 'upper'
-    }
-  } else {
-    // 固定模式
-    const idx = (scoreData.currentRound || 1) - 1
-    targetBo = scoreData.bos[idx]
-    targetHalf = mode // 'upper' or 'lower'
+    return { bo: bos[0], half: 'upper' }
   }
 
+  const idx = Math.min(bos.length - 1, Math.max(0, cfg.round - 1))
+  return { bo: bos[idx], half: cfg.half }
+}
+
+function updateDisplay() {
+  const isA = team === 'teamA'
+  let s = 0
+  const target = resolveTargetBoAndHalf(scoreData)
+  const targetBo = target.bo
+  const targetHalf = target.half
+
   if (targetBo) {
-    s = isA ? targetBo[targetHalf].teamA : targetBo[targetHalf].teamB
+    const halfData = targetBo[targetHalf] || {}
+    s = isA ? (parseInt(halfData.teamA, 10) || 0) : (parseInt(halfData.teamB, 10) || 0)
   }
 
   document.getElementById('bigScore').textContent = s

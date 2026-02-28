@@ -1,6 +1,6 @@
 {
   "name": "asg-director",
-  "version": "2.8.3",
+  "version": "3.0.4",
   "description": "第五人格赛事导播端",
   "main": "main.js",
   "scripts": {
@@ -10,6 +10,8 @@
     "postinstall:mirror": "cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron node postinstall.js",
     "plugin:pack": "node plugins/tools/package-plugin.js",
     "optimize:images": "node scripts/optimize-images.js",
+    "optimize:images:lossless": "node scripts/optimize-images-lossless.js",
+    "optimize:images:png:lossy": "node scripts/optimize-images-png-lossy.js",
     "clean:bundle": "node -e \"const fs=require('fs');['ASG.Director.7z','vuepress-docs','docs'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('删除:',p)}catch(e){}})\"",
     "prebuild": "npm run clean:bundle",
     "postbuild": "npm run analyze:bundle",
@@ -37,6 +39,7 @@
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
     "bilibili-live-ws": "^6.3.1",
+    "blockly": "^12.4.1",
     "form-data": "^4.0.5",
     "pinyin-pro": "^3.27.0",
     "rcedit": "^5.0.2",
@@ -44,7 +47,7 @@
     "yauzl": "^3.2.0"
   },
   "build": {
-    "appId": "com.asg.director",
+    "appId": "DA3D64F4.BPidvevent",
     "productName": "Idvevent导播端",
     "directories": {
       "output": "dist",
@@ -58,11 +61,17 @@
       ],
       "icon": "assets/icon.ico"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "unicode": true,
+      "license": "license_zh_CN.html"
+    },
     "appx": {
-      "displayName": "Idvevent导播端",
-      "identityName": "com.asg.director",
-      "publisher": "CN=ASG",
-      "publisherDisplayName": "ASG",
+      "displayName": "BPidvevent",
+      "identityName": "DA3D64F4.BPidvevent",
+      "publisher": "CN=CC2339A5-C760-46C3-91D8-130408AF3528",
+      "publisherDisplayName": "罗澜嘎嘎",
       "backgroundColor": "#FFFFFF"
     },
     "mac": {
@@ -79,6 +88,7 @@
       "extracted_roles.json",
       "assets/**/*",
       "pages/**/*",
+      "internal/**/*",
       "plugins/**/*",
       "scripts/**/*",
       "utils/**/*",

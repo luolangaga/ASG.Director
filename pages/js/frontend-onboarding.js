@@ -1,5 +1,5 @@
 /**
- * ASG Frontend 编辑模式引导系统
+ * Idvevent Frontend 编辑模式引导系统
  * 指导用户如何使用 F2 编辑模式和布局调整功能
  */
 

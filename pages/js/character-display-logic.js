@@ -7,6 +7,27 @@ if (!window.electronAPI) {
     if (!src) return src
     if (src.startsWith('../assets/')) return src.replace('../assets/', '/assets/')
     if (src.startsWith('./assets/')) return src.replace('./assets/', '/assets/')
+    if (src.startsWith('/assets/') || src.startsWith('/background/') || src.startsWith('/userdata/') || src.startsWith('/official-models/')) return src
+
+    const normalizeLocalPath = (value) => value.replace(/^file:\/*/i, '').replace(/\\/g, '/')
+    const rewriteLocalPath = (normalized) => {
+      const bgMatch = normalized.match(/\/asg[-.]director\/background\/(.+)$/i)
+      if (bgMatch) return '/background/' + bgMatch[1]
+      const userMatch = normalized.match(/\/asg[-.]director\/(.+)$/i)
+      if (userMatch) return '/userdata/' + userMatch[1]
+      const legacyMatch = normalized.match(/\/idvevent导播端\/(.+)$/i)
+      if (legacyMatch) return '/userdata/' + legacyMatch[1]
+      return null
+    }
+
+    if (src.startsWith('file:')) {
+      const rewritten = rewriteLocalPath(normalizeLocalPath(src))
+      if (rewritten) return rewritten
+    }
+    if (/^[a-zA-Z]:[\\/]/.test(src)) {
+      const rewritten = rewriteLocalPath(src.replace(/\\/g, '/'))
+      if (rewritten) return rewritten
+    }
     return src
   }
 
@@ -46,6 +67,25 @@ if (!window.electronAPI) {
       }
       return { success: false }
     },
+    characterGetIndex: async () => {
+      try {
+        const resp = await fetch('/api/local-bp-characters')
+        const payload = await resp.json()
+        if (payload && payload.success) {
+          return {
+            success: true,
+            data: {
+              survivors: payload.data?.survivors || [],
+              hunters: payload.data?.hunters || [],
+              assetOverrides: payload.data?.assetOverrides || {}
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[CharacterDisplay][OBS] 获取角色索引失败:', e)
+      }
+      return { success: false, error: '获取角色索引失败' }
+    },
     onLocalBpStateUpdate: (callback) => {
       // SSE 更新
       window.addEventListener('asg-local-bp-update', (e) => {
@@ -72,6 +112,51 @@ let state = {
 let editMode = false
 let layoutPositions = {}
 let saveLayoutTimer = null
+let characterAssetOverrides = {}
+let characterAssetOverridesLoadedAt = 0
+
+function getCharacterAssetFolder(roleType, variant) {
+  const table = roleType === 'survivor'
+    ? { header: 'surHeader', half: 'surHalf', big: 'surBig' }
+    : { header: 'hunHeader', half: 'hunHalf', big: 'hunBig' }
+  return table[variant] || null
+}
+
+function getCharacterDefaultAssetSrc(roleType, variant, name) {
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder || !name) return ''
+  return `../assets/${folder}/${name}.png`
+}
+
+function getCharacterAssetSrc(roleType, variant, name) {
+  if (!name) return ''
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder) return ''
+  const override = characterAssetOverrides && characterAssetOverrides[folder] && characterAssetOverrides[folder][name]
+  return override || getCharacterDefaultAssetSrc(roleType, variant, name)
+}
+
+async function ensureCharacterAssetOverrides(force = false) {
+  const now = Date.now()
+  if (!force && characterAssetOverrides && (now - characterAssetOverridesLoadedAt) < 5000) {
+    return characterAssetOverrides
+  }
+  try {
+    if (window.electronAPI && typeof window.electronAPI.characterGetIndex === 'function') {
+      const result = await window.electronAPI.characterGetIndex()
+      if (result && result.success && result.data) {
+        characterAssetOverrides = result.data.assetOverrides || {}
+        characterAssetOverridesLoadedAt = now
+        return characterAssetOverrides
+      }
+    }
+  } catch (e) {
+    console.warn('[CharacterDisplay] 加载角色资源映射失败:', e)
+  }
+  if (!characterAssetOverrides) characterAssetOverrides = {}
+  characterAssetOverridesLoadedAt = now
+  return characterAssetOverrides
+}
 
 // ========= 自定义字体系统 =========
 let availableFonts = []
@@ -191,6 +276,10 @@ function normalizeFileSrc(src) {
   if (!src || typeof src !== 'string') return ''
   if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return src
   if (src.startsWith('/background/') || src.startsWith('/assets/') || src.startsWith('/userdata/')) return src
+  if (window.__ASG_OBS_MODE__ && typeof window.__rewriteAssetPath__ === 'function') {
+    const rewritten = window.__rewriteAssetPath__(src)
+    if (rewritten && rewritten !== src) return rewritten
+  }
   if (src.startsWith('file:')) return src
   const normalized = src.replace(/\\/g, '/')
   const base = normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : `file:///${encodeURI(normalized)}`
@@ -201,6 +290,7 @@ function normalizeFileSrc(src) {
 // 加载状态
 async function loadState() {
   try {
+    await ensureCharacterAssetOverrides()
     const result = await window.electronAPI.invoke('localBp:getState')
     if (result && result.success && result.data) {
       const data = result.data
@@ -408,10 +498,12 @@ function render() {
     // 根据展示模式选择资源文件夹
     const imgContainer = document.getElementById(`survivor${i}-img`)
     const mode = imgContainer?.getAttribute('data-display-mode') === 'full' ? 'full' : 'half'
-    const folder = mode === 'full' ? 'surBig' : 'surHalf'
+    const variant = mode === 'full' ? 'big' : 'half'
+    const src = getCharacterAssetSrc('survivor', variant, character)
+    const fallbackSrc = getCharacterAssetSrc('survivor', 'half', character)
     setWidgetContent(
       `survivor${i}-img`,
-      `<img class="character-image" src="../assets/${folder}/${character}.png" onerror="if(this.dataset.fallback){this.style.display='none';}else{this.dataset.fallback='1';this.src='../assets/surHalf/${character}.png';}" alt="${escapeHtml(character)}">`
+      `<img class="character-image" src="${src}" onerror="if(this.dataset.fallback){this.style.display='none';}else{this.dataset.fallback='1';this.src='${fallbackSrc}';}" alt="${escapeHtml(character)}">`
     )
 
     setWidgetContent(
@@ -455,10 +547,12 @@ function render() {
   // 根据展示模式选择资源文件夹
   const hunterContainer = document.getElementById('hunter-img')
   const hunterMode = hunterContainer?.getAttribute('data-display-mode') === 'full' ? 'full' : 'half'
-  const hunterFolder = hunterMode === 'full' ? 'hunBig' : 'hunHalf'
+  const hunterVariant = hunterMode === 'full' ? 'big' : 'half'
+  const hunterSrc = getCharacterAssetSrc('hunter', hunterVariant, hunterCharacter)
+  const hunterFallbackSrc = getCharacterAssetSrc('hunter', 'half', hunterCharacter)
   setWidgetContent(
     'hunter-img',
-    `<img class="character-image" src="../assets/${hunterFolder}/${hunterCharacter}.png" onerror="if(this.dataset.fallback){this.style.display='none';}else{this.dataset.fallback='1';this.src='../assets/hunHalf/${hunterCharacter}.png';}" alt="${escapeHtml(hunterCharacter)}">`
+    `<img class="character-image" src="${hunterSrc}" onerror="if(this.dataset.fallback){this.style.display='none';}else{this.dataset.fallback='1';this.src='${hunterFallbackSrc}';}" alt="${escapeHtml(hunterCharacter)}">`
   )
 
   setWidgetContent(
@@ -500,8 +594,9 @@ function escapeHtml(text) {
 
 // 监听状态更新
 if (window.electronAPI && window.electronAPI.onLocalBpStateUpdate) {
-  window.electronAPI.onLocalBpStateUpdate((data) => {
+  window.electronAPI.onLocalBpStateUpdate(async (data) => {
     if (data) {
+      await ensureCharacterAssetOverrides()
       // 兼容两种结构：raw localBpState（survivors/hunter）或 buildLocalBpFrontendState（currentRoundData.selected*）
       const selectedSurvivors = data.currentRoundData && Array.isArray(data.currentRoundData.selectedSurvivors)
         ? data.currentRoundData.selectedSurvivors

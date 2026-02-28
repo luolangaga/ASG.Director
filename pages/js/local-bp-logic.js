@@ -18,6 +18,254 @@ let characters = {
   survivors: [],
   hunters: []
 }
+let characterAssetOverrides = {}
+
+function getCharacterAssetSrc(type, variant, name) {
+  const folderMap = type === 'survivor'
+    ? { header: 'surHeader', half: 'surHalf', big: 'surBig' }
+    : { header: 'hunHeader', half: 'hunHalf', big: 'hunBig' }
+  const folder = folderMap[variant]
+  if (!folder || !name) return ''
+  const override = characterAssetOverrides && characterAssetOverrides[folder] && characterAssetOverrides[folder][name]
+  return override || `../assets/${folder}/${name}.png`
+}
+
+const LOCAL_BP_CONSOLE_BG_DEFAULTS = Object.freeze({
+  imagePath: null,
+  maskOpacity: 0.25,
+  blur: 0,
+  autoCompressLargeImage: true,
+  cardOpacity: 1
+})
+let localBpConsoleBackground = { ...LOCAL_BP_CONSOLE_BG_DEFAULTS }
+let localBpConsoleBgSaveTimer = null
+
+function clampLocalBpConsoleBgNumber(value, min, max, fallback) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return fallback
+  return Math.min(max, Math.max(min, num))
+}
+
+function normalizeLocalBpConsoleBgSettings(raw) {
+  const base = raw && typeof raw === 'object' ? raw : {}
+  const imagePath = (typeof base.imagePath === 'string' && base.imagePath.trim())
+    ? base.imagePath.trim()
+    : null
+  const maskOpacity = clampLocalBpConsoleBgNumber(base.maskOpacity, 0, 1, LOCAL_BP_CONSOLE_BG_DEFAULTS.maskOpacity)
+  const blur = clampLocalBpConsoleBgNumber(base.blur, 0, 40, LOCAL_BP_CONSOLE_BG_DEFAULTS.blur)
+  const autoCompressLargeImage = base.autoCompressLargeImage !== false
+  const cardOpacity = clampLocalBpConsoleBgNumber(base.cardOpacity, 0, 1, LOCAL_BP_CONSOLE_BG_DEFAULTS.cardOpacity)
+  return { imagePath, maskOpacity, blur, autoCompressLargeImage, cardOpacity }
+}
+
+function toLocalBpConsoleBgFileUrl(filePath, bustCache = false) {
+  if (!filePath) return ''
+  const normalized = String(filePath).replace(/\\/g, '/')
+  let url = normalized.startsWith('/')
+    ? `file://${encodeURI(normalized)}`
+    : `file:///${encodeURI(normalized)}`
+  if (bustCache) {
+    url += (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`
+  }
+  return url
+}
+
+function setLocalBpConsoleBgPathLabel(filePath) {
+  const el = document.getElementById('localBpConsoleBgPath')
+  if (!el) return
+  if (!filePath) {
+    el.textContent = '未设置'
+    el.title = ''
+    return
+  }
+  const normalized = String(filePath).replace(/\\/g, '/')
+  const fileName = normalized.split('/').pop() || filePath
+  el.textContent = fileName
+  el.title = String(filePath)
+}
+
+function updateLocalBpConsoleBgLabels() {
+  const maskInput = document.getElementById('localBpConsoleBgMask')
+  const blurInput = document.getElementById('localBpConsoleBgBlur')
+  const cardOpacityInput = document.getElementById('localBpConsoleBgCardOpacity')
+  const maskValue = document.getElementById('localBpConsoleBgMaskValue')
+  const blurValue = document.getElementById('localBpConsoleBgBlurValue')
+  const cardOpacityValue = document.getElementById('localBpConsoleBgCardOpacityValue')
+  if (maskInput && maskValue) {
+    const val = parseInt(maskInput.value, 10) || 0
+    maskValue.textContent = `${val}%`
+  }
+  if (blurInput && blurValue) {
+    const val = parseInt(blurInput.value, 10) || 0
+    blurValue.textContent = `${val}px`
+  }
+  if (cardOpacityInput && cardOpacityValue) {
+    const val = parseInt(cardOpacityInput.value, 10) || 100
+    cardOpacityValue.textContent = `${val}%`
+  }
+}
+
+function syncLocalBpConsoleBgInputs(settings) {
+  const maskInput = document.getElementById('localBpConsoleBgMask')
+  const blurInput = document.getElementById('localBpConsoleBgBlur')
+  const autoCompressInput = document.getElementById('localBpConsoleBgAutoCompress')
+  const cardOpacityInput = document.getElementById('localBpConsoleBgCardOpacity')
+  if (maskInput) maskInput.value = String(Math.round(settings.maskOpacity * 100))
+  if (blurInput) blurInput.value = String(Math.round(settings.blur))
+  if (autoCompressInput) autoCompressInput.checked = settings.autoCompressLargeImage !== false
+  if (cardOpacityInput) cardOpacityInput.value = String(Math.round(settings.cardOpacity * 100))
+  setLocalBpConsoleBgPathLabel(settings.imagePath)
+  updateLocalBpConsoleBgLabels()
+}
+
+function applyLocalBpConsoleBgSettings(settings, options = {}) {
+  const body = document.body
+  if (!body) return
+  const normalized = normalizeLocalBpConsoleBgSettings(settings)
+  const hasImage = !!normalized.imagePath
+  const bustCache = options.bustCache === true
+  const cardOpacity = clampLocalBpConsoleBgNumber(normalized.cardOpacity, 0, 1, 1)
+  const cardAltOpacity = clampLocalBpConsoleBgNumber(cardOpacity * 0.92, 0, 1, 0.92)
+  const topMenuOpacity = clampLocalBpConsoleBgNumber(0.18 + cardOpacity * 0.72, 0, 1, 0.85)
+
+  body.style.setProperty('--local-bp-custom-bg-mask-opacity', String(normalized.maskOpacity))
+  body.style.setProperty('--local-bp-custom-bg-blur', `${normalized.blur}px`)
+  body.style.setProperty('--local-bp-custom-bg-scale', String(1 + Math.min(0.2, normalized.blur / 180)))
+  body.style.setProperty('--local-bp-card-opacity', String(cardOpacity))
+  body.style.setProperty('--fluent-surface', `rgba(255, 255, 255, ${cardOpacity})`)
+  body.style.setProperty('--fluent-surface-alt', `rgba(250, 249, 248, ${cardAltOpacity})`)
+  body.style.setProperty('--local-bp-top-menu-opacity', String(topMenuOpacity))
+
+  if (hasImage) {
+    const imageUrl = toLocalBpConsoleBgFileUrl(normalized.imagePath, bustCache)
+    const safeImageUrl = imageUrl.replace(/"/g, '\\"')
+    body.style.setProperty('--local-bp-custom-bg-image', `url("${safeImageUrl}")`)
+    body.classList.add('has-custom-bg')
+  } else {
+    body.style.setProperty('--local-bp-custom-bg-image', 'none')
+    body.classList.remove('has-custom-bg')
+  }
+}
+
+function collectLocalBpConsoleBgSettingsFromInputs() {
+  const maskInput = document.getElementById('localBpConsoleBgMask')
+  const blurInput = document.getElementById('localBpConsoleBgBlur')
+  const autoCompressInput = document.getElementById('localBpConsoleBgAutoCompress')
+  const cardOpacityInput = document.getElementById('localBpConsoleBgCardOpacity')
+  const maskPercent = clampLocalBpConsoleBgNumber(maskInput ? parseInt(maskInput.value, 10) : 25, 0, 100, 25)
+  const blur = clampLocalBpConsoleBgNumber(blurInput ? parseInt(blurInput.value, 10) : 0, 0, 40, 0)
+  const cardOpacityPercent = clampLocalBpConsoleBgNumber(cardOpacityInput ? parseInt(cardOpacityInput.value, 10) : 100, 0, 100, 100)
+  return {
+    imagePath: localBpConsoleBackground.imagePath,
+    maskOpacity: maskPercent / 100,
+    blur,
+    autoCompressLargeImage: autoCompressInput ? autoCompressInput.checked : localBpConsoleBackground.autoCompressLargeImage !== false,
+    cardOpacity: cardOpacityPercent / 100
+  }
+}
+
+async function loadLocalBpConsoleBgSettings() {
+  try {
+    let settings = { ...LOCAL_BP_CONSOLE_BG_DEFAULTS }
+    if (window.electronAPI && window.electronAPI.getLocalBpConsoleBackground) {
+      const result = await window.electronAPI.getLocalBpConsoleBackground()
+      if (result && result.success && result.settings) {
+        settings = normalizeLocalBpConsoleBgSettings(result.settings)
+      }
+    }
+    localBpConsoleBackground = settings
+    syncLocalBpConsoleBgInputs(localBpConsoleBackground)
+    applyLocalBpConsoleBgSettings(localBpConsoleBackground)
+  } catch (e) {
+    console.error('[LocalBP] 加载控制台背景设置失败:', e)
+  }
+}
+
+async function persistLocalBpConsoleBgSettings(nextSettings, options = {}) {
+  const normalized = normalizeLocalBpConsoleBgSettings(nextSettings)
+  const bustCache = options.bustCache === true
+  const showError = options.showError !== false
+  try {
+    if (window.electronAPI && window.electronAPI.setLocalBpConsoleBackground) {
+      const result = await window.electronAPI.setLocalBpConsoleBackground(normalized)
+      if (!result || !result.success) {
+        throw new Error(result?.error || '保存背景设置失败')
+      }
+      localBpConsoleBackground = normalizeLocalBpConsoleBgSettings(result.settings || normalized)
+    } else {
+      localBpConsoleBackground = normalized
+    }
+    syncLocalBpConsoleBgInputs(localBpConsoleBackground)
+    applyLocalBpConsoleBgSettings(localBpConsoleBackground, { bustCache })
+    return true
+  } catch (e) {
+    if (showError) {
+      console.error('[LocalBP] 保存控制台背景设置失败:', e)
+    }
+    return false
+  }
+}
+
+function queueLocalBpConsoleBgSave(immediate = false) {
+  if (localBpConsoleBgSaveTimer) {
+    clearTimeout(localBpConsoleBgSaveTimer)
+    localBpConsoleBgSaveTimer = null
+  }
+  const delay = immediate ? 0 : 180
+  localBpConsoleBgSaveTimer = setTimeout(async () => {
+    const draft = collectLocalBpConsoleBgSettingsFromInputs()
+    localBpConsoleBackground = normalizeLocalBpConsoleBgSettings(draft)
+    applyLocalBpConsoleBgSettings(localBpConsoleBackground)
+    await persistLocalBpConsoleBgSettings(localBpConsoleBackground, { showError: immediate })
+  }, delay)
+}
+
+function onLocalBpConsoleBgInput(immediate = false) {
+  updateLocalBpConsoleBgLabels()
+  queueLocalBpConsoleBgSave(immediate)
+}
+
+async function selectLocalBpConsoleBackground() {
+  try {
+    if (!window.electronAPI || !window.electronAPI.selectLocalBpConsoleBackground) {
+      console.error('[LocalBP] 当前版本不支持选择控制台背景')
+      return
+    }
+    const result = await window.electronAPI.selectLocalBpConsoleBackground({
+      autoCompressLargeImage: localBpConsoleBackground.autoCompressLargeImage !== false
+    })
+    if (!result || !result.success) {
+      if (!result?.canceled) {
+        console.error('[LocalBP] 选择控制台背景失败:', result?.error || '未知错误')
+      }
+      return
+    }
+    const imagePath = result.path ? String(result.path) : ''
+    if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(imagePath)) {
+      console.error('[LocalBP] 控制台背景仅支持常见图片格式')
+      return
+    }
+    const draft = collectLocalBpConsoleBgSettingsFromInputs()
+    draft.imagePath = imagePath
+    await persistLocalBpConsoleBgSettings(draft, { bustCache: true, showError: true })
+  } catch (e) {
+    console.error('[LocalBP] 选择控制台背景异常:', e)
+  }
+}
+
+async function clearLocalBpConsoleBackground() {
+  const draft = collectLocalBpConsoleBgSettingsFromInputs()
+  draft.imagePath = null
+  await persistLocalBpConsoleBgSettings(draft, { showError: true })
+}
+
+if (window.electronAPI && typeof window.electronAPI.on === 'function') {
+  window.electronAPI.on('local-bp-console-bg-updated', (settings) => {
+    localBpConsoleBackground = normalizeLocalBpConsoleBgSettings(settings)
+    syncLocalBpConsoleBgInputs(localBpConsoleBackground)
+    applyLocalBpConsoleBgSettings(localBpConsoleBackground, { bustCache: true })
+  })
+}
 
 const AUTO_GLOBAL_BAN_KEY = 'localBp_autoGlobalBan'
 let autoGlobalBan = loadAutoGlobalBanState()
@@ -67,6 +315,878 @@ function uniqueList(list) {
   return Array.from(new Set((Array.isArray(list) ? list : []).filter(Boolean)))
 }
 
+const LOCAL_BP_MODULE_LAYOUT_KEY = 'localBp_module_layout_v1'
+const LOCAL_BP_LAYOUT_PAGES = ['bp', 'ocr', 'baseinfo', 'talents', 'score', 'postmatch']
+const LOCAL_BP_LAYOUT_PAGE_LABELS = Object.freeze({
+  bp: 'BP控制',
+  ocr: 'OCR控制台',
+  baseinfo: '对局基础信息',
+  talents: '天赋与技能',
+  score: '比分管理',
+  postmatch: '赛后数据'
+})
+
+const LOCAL_BP_MODULE_SPECS = Object.freeze([
+  { id: 'bp-top-section', selector: '#bp-top-section', title: 'BP顶部操作', page: 'bp' },
+  { id: 'bp-main-scroll-module', selector: '#bp-main-scroll-module', title: 'BP主操作区', page: 'bp' },
+  { id: 'ocr-main-scroll-module', selector: '#ocr-main-scroll-module', title: 'OCR控制台', page: 'ocr' },
+  { id: 'talents-main-scroll-module', selector: '#talents-main-scroll-module', title: '天赋与技能', page: 'talents' },
+  { id: 'baseinfo-top-section', selector: '#baseinfo-top-section', title: '基础信息顶部操作', page: 'baseinfo' },
+  { id: 'baseinfo-main-scroll-module', selector: '#baseinfo-main-scroll-module', title: '基础信息主内容', page: 'baseinfo' },
+  { id: 'score-controls', selector: '#score-controls', title: '比分页操作', page: 'score' },
+  { id: 'score-main-scroll-module', selector: '#score-main-scroll-module', title: '比分页主内容', page: 'score' },
+  { id: 'postmatch-controls', selector: '#postmatch-controls', title: '赛后页操作', page: 'postmatch' },
+  { id: 'postmatch-main-scroll-module', selector: '#postmatch-main-scroll-module', title: '赛后页主内容', page: 'postmatch' }
+])
+
+let localBpLayoutEditMode = false
+let localBpModuleLayoutReady = false
+let localBpResizingModuleId = null
+let localBpPointerDrag = null
+const localBpModuleShellMap = new Map()
+const localBpModuleCanvasMap = new Map()
+const LOCAL_BP_MODULE_MIN_WIDTH = 280
+const LOCAL_BP_MODULE_GAP = 12
+const LOCAL_BP_SPLIT_FIT_EPSILON = 2
+
+function parsePositiveInt(value, fallback = null) {
+  const n = parseInt(value, 10)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  return n
+}
+
+function getLocalBpModuleSpec(id) {
+  return LOCAL_BP_MODULE_SPECS.find(item => item.id === id) || null
+}
+
+function getLocalBpPageContainer(page) {
+  return document.querySelector(`#page-${page} > .container`)
+}
+
+function ensureLocalBpModuleCanvas(page) {
+  if (!LOCAL_BP_LAYOUT_PAGES.includes(page)) return null
+  const cached = localBpModuleCanvasMap.get(page)
+  if (cached && cached.isConnected) return cached
+  const container = getLocalBpPageContainer(page)
+  if (!container) return null
+
+  let canvas = container.querySelector(`.lb-module-canvas[data-page="${page}"]`)
+  if (!canvas) {
+    canvas = document.createElement('div')
+    canvas.className = 'lb-module-canvas'
+    canvas.dataset.page = page
+    container.appendChild(canvas)
+  }
+  localBpModuleCanvasMap.set(page, canvas)
+  return canvas
+}
+
+function buildLocalBpModulePageOptions(selectEl, currentPage) {
+  if (!selectEl) return
+  selectEl.innerHTML = ''
+  LOCAL_BP_LAYOUT_PAGES.forEach((page) => {
+    const option = document.createElement('option')
+    option.value = page
+    option.textContent = LOCAL_BP_LAYOUT_PAGE_LABELS[page] || page
+    if (page === currentPage) option.selected = true
+    selectEl.appendChild(option)
+  })
+}
+
+function clearLocalBpModuleDropHints() {
+  document.querySelectorAll('.lb-module-shell.lb-module-drop-before').forEach((node) => node.classList.remove('lb-module-drop-before'))
+  document.querySelectorAll('.lb-module-shell.lb-module-dock-left').forEach((node) => node.classList.remove('lb-module-dock-left'))
+  document.querySelectorAll('.lb-module-shell.lb-module-dock-right').forEach((node) => node.classList.remove('lb-module-dock-right'))
+  document.querySelectorAll('.lb-module-canvas.lb-canvas-dock-left').forEach((node) => node.classList.remove('lb-canvas-dock-left'))
+  document.querySelectorAll('.lb-module-canvas.lb-canvas-dock-right').forEach((node) => node.classList.remove('lb-canvas-dock-right'))
+}
+
+function getLocalBpModuleCanvasFromPoint(x, y) {
+  const target = document.elementFromPoint(x, y)
+  if (!target || !target.closest) return null
+  return target.closest('.lb-module-canvas')
+}
+
+function getLocalBpInsertBeforeByPoint(canvas, x, y, excludeShell) {
+  if (!canvas) return null
+  const shells = Array.from(canvas.querySelectorAll('.lb-module-shell[data-module-id]'))
+    .filter((shell) => shell !== excludeShell)
+
+  for (const shell of shells) {
+    const rect = shell.getBoundingClientRect()
+    if (!rect.width || !rect.height) continue
+    const midY = rect.top + rect.height * 0.5
+    const midX = rect.left + rect.width * 0.5
+    if (y < midY) return shell
+    if (y <= rect.bottom && x < midX) return shell
+  }
+  return null
+}
+
+function getLocalBpShellFromPoint(x, y, excludeShell) {
+  const target = document.elementFromPoint(x, y)
+  if (!target || !target.closest) return null
+  const shell = target.closest('.lb-module-shell[data-module-id]')
+  if (!shell || shell === excludeShell) return null
+  if (shell.classList.contains('lb-module-floating')) return null
+  return shell
+}
+
+function getLocalBpCanvasContentWidth(canvas, fallback = 0) {
+  if (!canvas) return fallback
+  const style = window.getComputedStyle(canvas)
+  const paddingLeft = parseFloat(style.paddingLeft || '0') || 0
+  const paddingRight = parseFloat(style.paddingRight || '0') || 0
+  const raw = Math.floor((canvas.clientWidth || 0) - paddingLeft - paddingRight)
+  if (raw > 0) return raw
+  const rect = canvas.getBoundingClientRect()
+  const rectRaw = Math.floor((rect.width || 0) - paddingLeft - paddingRight)
+  if (rectRaw > 0) return rectRaw
+  return fallback
+}
+
+function getLocalBpCanvasHalfWidth(canvas, fallback = 520) {
+  const canvasWidth = getLocalBpCanvasContentWidth(canvas, 0)
+  if (!canvasWidth) return fallback
+  return Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.floor((canvasWidth - LOCAL_BP_MODULE_GAP - LOCAL_BP_SPLIT_FIT_EPSILON) / 2))
+}
+
+function updateLocalBpModulePageSelectByShell(shell, page) {
+  const select = shell ? shell.querySelector('.lb-module-page-select') : null
+  if (!select) return
+  select.value = page
+}
+
+function getLocalBpSplitAvailableWidth(canvas, fallback = 1040) {
+  const canvasWidth = getLocalBpCanvasContentWidth(canvas, 0)
+  if (!canvasWidth) return fallback
+  const exactAvailable = Math.floor(canvasWidth - LOCAL_BP_MODULE_GAP - LOCAL_BP_SPLIT_FIT_EPSILON)
+  return Math.max((LOCAL_BP_MODULE_MIN_WIDTH * 2), exactAvailable)
+}
+
+function getLocalBpShellCurrentWidth(shell, fallback = LOCAL_BP_MODULE_MIN_WIDTH) {
+  if (!shell) return fallback
+  const explicit = parsePositiveInt(shell.style.width, null)
+  if (explicit) return explicit
+  const rectWidth = Math.round(shell.getBoundingClientRect().width || 0)
+  if (rectWidth > 0) return rectWidth
+  return fallback
+}
+
+function setLocalBpShellWidth(shell, width) {
+  if (!shell) return
+  const nextWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.round(width || 0))
+  shell.style.width = `${nextWidth}px`
+  shell.style.flexBasis = `${nextWidth}px`
+}
+
+function setLocalBpShellFullWidth(shell) {
+  if (!shell) return
+  shell.style.width = ''
+  shell.style.flexBasis = ''
+}
+
+function clearLocalBpSplitLink(shell) {
+  if (!shell) return
+  const selfId = shell.dataset.moduleId || ''
+  const peerId = shell.dataset.splitPeer || ''
+  if (peerId) {
+    const peer = localBpModuleShellMap.get(peerId)
+    if (peer && peer.dataset.splitPeer === selfId) {
+      peer.removeAttribute('data-split-peer')
+    }
+  }
+  shell.removeAttribute('data-split-peer')
+}
+
+function getLocalBpSplitPeerShell(shell, requireSameParent = true) {
+  if (!shell) return null
+  const selfId = shell.dataset.moduleId || ''
+  const peerId = shell.dataset.splitPeer || ''
+  if (!selfId || !peerId) return null
+  const peer = localBpModuleShellMap.get(peerId)
+  if (!peer || peer === shell) return null
+  if ((peer.dataset.splitPeer || '') !== selfId) return null
+  if (requireSameParent && peer.parentElement !== shell.parentElement) return null
+  return peer
+}
+
+function linkLocalBpSplitPair(shellA, shellB) {
+  if (!shellA || !shellB || shellA === shellB) return
+  clearLocalBpSplitLink(shellA)
+  clearLocalBpSplitLink(shellB)
+  const aId = shellA.dataset.moduleId || ''
+  const bId = shellB.dataset.moduleId || ''
+  if (!aId || !bId) return
+  shellA.dataset.splitPeer = bId
+  shellB.dataset.splitPeer = aId
+}
+
+function normalizeLocalBpSplitPairWidths(shell) {
+  const peer = getLocalBpSplitPeerShell(shell, true)
+  if (!peer || !shell.parentElement) return false
+  const available = getLocalBpSplitAvailableWidth(shell.parentElement, 1040)
+  let shellWidth = getLocalBpShellCurrentWidth(shell, Math.floor(available * 0.5))
+  shellWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.min(available - LOCAL_BP_MODULE_MIN_WIDTH, shellWidth))
+  let peerWidth = available - shellWidth
+  if (peerWidth < LOCAL_BP_MODULE_MIN_WIDTH) {
+    peerWidth = LOCAL_BP_MODULE_MIN_WIDTH
+    shellWidth = available - peerWidth
+  }
+  setLocalBpShellWidth(shell, shellWidth)
+  setLocalBpShellWidth(peer, peerWidth)
+  return true
+}
+
+function getLocalBpSplitDragPreviewWidth(parent, targetShell, fallback = 520) {
+  if (!parent || !targetShell) return fallback
+  const available = getLocalBpSplitAvailableWidth(parent, Math.max(560, fallback * 2))
+  let targetWidth = getLocalBpShellCurrentWidth(targetShell, Math.floor(available * 0.7))
+  targetWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.min(available - LOCAL_BP_MODULE_MIN_WIDTH, targetWidth))
+  let dragWidth = available - targetWidth
+  if (dragWidth < LOCAL_BP_MODULE_MIN_WIDTH) dragWidth = LOCAL_BP_MODULE_MIN_WIDTH
+  return Math.round(dragWidth)
+}
+
+function setLocalBpModuleWidthPreset(shell, mode) {
+  if (!shell) return
+  const peerBefore = getLocalBpSplitPeerShell(shell, true)
+  clearLocalBpSplitLink(shell)
+  const canvas = shell.closest('.lb-module-canvas')
+  if (mode === 'half') {
+    const halfWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.floor(getLocalBpSplitAvailableWidth(canvas, 1040) / 2))
+    setLocalBpShellWidth(shell, halfWidth)
+    saveLocalBpModuleLayout()
+    return
+  }
+  setLocalBpShellFullWidth(shell)
+  if (peerBefore) setLocalBpShellFullWidth(peerBefore)
+  saveLocalBpModuleLayout()
+}
+
+function applyLocalBpSplitLayout(dragShell, targetShell, side, parent) {
+  if (!dragShell || !targetShell || !parent) return false
+  const dockSide = side === 'left' ? 'left' : (side === 'right' ? 'right' : null)
+  if (!dockSide) return false
+
+  const available = getLocalBpSplitAvailableWidth(parent, 1040)
+  let targetWidth = getLocalBpShellCurrentWidth(targetShell, Math.floor(available * 0.75))
+  targetWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.min(available - LOCAL_BP_MODULE_MIN_WIDTH, targetWidth))
+  let dragWidth = available - targetWidth
+  if (dragWidth < LOCAL_BP_MODULE_MIN_WIDTH) {
+    dragWidth = LOCAL_BP_MODULE_MIN_WIDTH
+    targetWidth = available - dragWidth
+  }
+
+  setLocalBpShellWidth(targetShell, targetWidth)
+  setLocalBpShellWidth(dragShell, dragWidth)
+
+  if (dockSide === 'left') {
+    parent.insertBefore(dragShell, targetShell)
+  } else {
+    parent.insertBefore(dragShell, targetShell.nextElementSibling)
+  }
+
+  linkLocalBpSplitPair(dragShell, targetShell)
+  normalizeLocalBpSplitPairWidths(dragShell)
+
+  return true
+}
+
+function getLocalBpCanvasDockSide(canvas, pointerX) {
+  if (!canvas) return null
+  const rect = canvas.getBoundingClientRect()
+  if (!rect.width) return null
+  const ratio = Math.max(0, Math.min(1, (pointerX - rect.left) / rect.width))
+  if (ratio <= 0.38) return 'left'
+  if (ratio >= 0.62) return 'right'
+  return null
+}
+
+function getLocalBpShellDockSide(shell, pointerX) {
+  if (!shell) return null
+  const rect = shell.getBoundingClientRect()
+  if (!rect.width) return null
+  const ratio = Math.max(0, Math.min(1, (pointerX - rect.left) / rect.width))
+  if (ratio <= 0.46) return 'left'
+  if (ratio >= 0.54) return 'right'
+  return null
+}
+
+function pickLocalBpNearestShell(canvas, pointerX, pointerY, excludeShell) {
+  if (!canvas) return null
+  const shells = Array.from(canvas.querySelectorAll('.lb-module-shell[data-module-id]'))
+    .filter((shell) => shell !== excludeShell && !shell.classList.contains('lb-module-floating'))
+  if (!shells.length) return null
+
+  let bestShell = null
+  let bestScore = Infinity
+  for (const shell of shells) {
+    const rect = shell.getBoundingClientRect()
+    if (!rect.width || !rect.height) continue
+    const centerX = rect.left + rect.width * 0.5
+    const centerY = rect.top + rect.height * 0.5
+    const dy = Math.abs(pointerY - centerY)
+    const dx = Math.abs(pointerX - centerX)
+    const score = dy * 1.4 + dx
+    if (score < bestScore) {
+      bestScore = score
+      bestShell = shell
+    }
+  }
+  return bestShell
+}
+
+function detectLocalBpDockIntent(dragShell, pointerX, pointerY, fallbackParent = null) {
+  const pointCanvas = getLocalBpModuleCanvasFromPoint(pointerX, pointerY)
+  const parent = pointCanvas || fallbackParent
+  if (!parent) return null
+
+  let targetShell = getLocalBpShellFromPoint(pointerX, pointerY, dragShell)
+  let side = null
+
+  if (targetShell && targetShell.parentElement === parent) {
+    side = getLocalBpShellDockSide(targetShell, pointerX) || getLocalBpCanvasDockSide(parent, pointerX)
+  } else {
+    targetShell = pickLocalBpNearestShell(parent, pointerX, pointerY, dragShell)
+    side = getLocalBpCanvasDockSide(parent, pointerX)
+  }
+
+  if (!targetShell || !side) return null
+
+  return {
+    mode: 'split',
+    targetId: targetShell.dataset.moduleId || '',
+    side,
+    parent
+  }
+}
+
+function setupLocalBpModuleResize(shell) {
+  if (!shell) return
+  const handle = shell.querySelector('.lb-module-resize')
+  if (!handle) return
+
+  handle.addEventListener('mousedown', (event) => {
+    if (!localBpLayoutEditMode) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const page = shell.closest('.lb-module-canvas')?.dataset?.page || shell.dataset.defaultPage || 'bp'
+    const canvas = ensureLocalBpModuleCanvas(page)
+    const canvasRect = canvas ? canvas.getBoundingClientRect() : null
+    const splitPeer = getLocalBpSplitPeerShell(shell, true)
+
+    localBpResizingModuleId = shell.dataset.moduleId || ''
+    const startX = event.clientX
+    const startY = event.clientY
+    const startWidth = Math.round(shell.getBoundingClientRect().width)
+    const startHeight = Math.round(shell.getBoundingClientRect().height)
+
+    const onMouseMove = (moveEvent) => {
+      if (!localBpResizingModuleId) return
+      const dx = moveEvent.clientX - startX
+      const dy = moveEvent.clientY - startY
+
+      const liveRect = canvas ? canvas.getBoundingClientRect() : canvasRect
+      const maxWidth = liveRect ? Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.floor(liveRect.width)) : Math.max(LOCAL_BP_MODULE_MIN_WIDTH, window.innerWidth - 80)
+      let nextWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.min(maxWidth, startWidth + dx))
+      const nextHeight = Math.max(96, Math.min(window.innerHeight - 80, startHeight + dy))
+
+      if (splitPeer && splitPeer.parentElement === shell.parentElement) {
+        const available = getLocalBpSplitAvailableWidth(canvas, Math.max(560, maxWidth))
+        nextWidth = Math.max(LOCAL_BP_MODULE_MIN_WIDTH, Math.min(available - LOCAL_BP_MODULE_MIN_WIDTH, startWidth + dx))
+        const peerWidth = available - nextWidth
+        setLocalBpShellWidth(shell, nextWidth)
+        setLocalBpShellWidth(splitPeer, peerWidth)
+      } else {
+        setLocalBpShellWidth(shell, nextWidth)
+      }
+
+      shell.style.height = `${Math.round(nextHeight)}px`
+    }
+
+    const onMouseUp = () => {
+      if (!localBpResizingModuleId) return
+      localBpResizingModuleId = null
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      normalizeLocalBpSplitPairWidths(shell)
+      saveLocalBpModuleLayout()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  })
+}
+
+function setupLocalBpModuleDrag(shell) {
+  if (!shell) return
+  const moduleId = shell.dataset.moduleId || ''
+  const dragHandle = shell.querySelector('.lb-module-drag-handle')
+  const dragZone = shell.querySelector('.lb-module-title-wrap') || dragHandle
+  if (!dragZone) return
+
+  dragZone.addEventListener('mousedown', (event) => {
+    if (!localBpLayoutEditMode || !moduleId) return
+    const interactiveTarget = event.target?.closest?.('button, select, input, textarea, a')
+    if (interactiveTarget) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const rect = shell.getBoundingClientRect()
+    const placeholder = document.createElement('div')
+    placeholder.className = 'lb-module-placeholder'
+    placeholder.style.width = `${Math.max(280, Math.round(rect.width))}px`
+    placeholder.style.height = `${Math.max(96, Math.round(rect.height))}px`
+
+    const parent = shell.parentElement
+    if (!parent) return
+    parent.insertBefore(placeholder, shell.nextSibling)
+
+    shell.classList.add('dragging', 'lb-module-floating')
+    shell.style.width = `${Math.round(rect.width)}px`
+    shell.style.height = `${Math.round(rect.height)}px`
+    shell.style.left = `${Math.round(rect.left)}px`
+    shell.style.top = `${Math.round(rect.top)}px`
+
+    localBpPointerDrag = {
+      moduleId,
+      shell,
+      placeholder,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      originalWidth: Math.max(280, Math.round(rect.width)),
+      wasSplitBeforeDrag: !!getLocalBpSplitPeerShell(shell, true),
+      onMouseMove: null,
+      onMouseUp: null,
+      dock: null,
+      tabHover: null
+    }
+
+    const onMouseMove = (moveEvent) => {
+      if (!localBpPointerDrag || localBpPointerDrag.moduleId !== moduleId) return
+      const dragState = localBpPointerDrag
+      const nextLeft = Math.round(moveEvent.clientX - dragState.offsetX)
+      const nextTop = Math.round(moveEvent.clientY - dragState.offsetY)
+      dragState.shell.style.left = `${nextLeft}px`
+      dragState.shell.style.top = `${nextTop}px`
+
+      const pointerTarget = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+      const hoveredTab = pointerTarget?.closest?.('.menu-tab[data-page]')
+      const hoveredPage = hoveredTab?.dataset?.page || ''
+      if (LOCAL_BP_LAYOUT_PAGES.includes(hoveredPage) && typeof switchPage === 'function') {
+        const now = Date.now()
+        if (!dragState.tabHover || dragState.tabHover.page !== hoveredPage) {
+          dragState.tabHover = { page: hoveredPage, ts: now }
+        } else if (now - dragState.tabHover.ts >= 220) {
+          switchPage(hoveredPage)
+          const switchedCanvas = ensureLocalBpModuleCanvas(hoveredPage)
+          if (switchedCanvas && dragState.placeholder.parentElement !== switchedCanvas) {
+            switchedCanvas.appendChild(dragState.placeholder)
+          }
+          dragState.tabHover = null
+        }
+      } else {
+        dragState.tabHover = null
+      }
+
+      const hoveredCanvas = getLocalBpModuleCanvasFromPoint(moveEvent.clientX, moveEvent.clientY)
+      const targetCanvas = hoveredCanvas || dragState.placeholder.parentElement
+      if (!targetCanvas) return
+
+      if (dragState.placeholder.parentElement !== targetCanvas) {
+        targetCanvas.appendChild(dragState.placeholder)
+      }
+      clearLocalBpModuleDropHints()
+
+      const dockIntent = detectLocalBpDockIntent(dragState.shell, moveEvent.clientX, moveEvent.clientY, targetCanvas)
+      if (dockIntent && dockIntent.parent === targetCanvas) {
+        const hoveredShell = localBpModuleShellMap.get(dockIntent.targetId)
+        targetCanvas.classList.add(dockIntent.side === 'left' ? 'lb-canvas-dock-left' : 'lb-canvas-dock-right')
+        if (hoveredShell) {
+          hoveredShell.classList.add(dockIntent.side === 'left' ? 'lb-module-dock-left' : 'lb-module-dock-right')
+        }
+
+        dragState.dock = dockIntent
+
+        const previewWidth = hoveredShell
+          ? getLocalBpSplitDragPreviewWidth(targetCanvas, hoveredShell, dragState.originalWidth)
+          : getLocalBpCanvasHalfWidth(targetCanvas, dragState.originalWidth)
+        dragState.placeholder.style.width = `${previewWidth}px`
+
+        if (dockIntent.side === 'left' && hoveredShell) {
+          if (dragState.placeholder !== hoveredShell.previousElementSibling) {
+            targetCanvas.insertBefore(dragState.placeholder, hoveredShell)
+          }
+        } else if (hoveredShell && dragState.placeholder !== hoveredShell.nextElementSibling) {
+          targetCanvas.insertBefore(dragState.placeholder, hoveredShell.nextElementSibling)
+        }
+        return
+      }
+
+      dragState.dock = null
+      dragState.placeholder.style.width = `${dragState.originalWidth}px`
+      const insertBefore = getLocalBpInsertBeforeByPoint(targetCanvas, moveEvent.clientX, moveEvent.clientY, dragState.shell)
+      if (insertBefore && insertBefore !== dragState.placeholder) {
+        insertBefore.classList.add('lb-module-drop-before')
+        targetCanvas.insertBefore(dragState.placeholder, insertBefore)
+      } else if (dragState.placeholder.parentElement === targetCanvas) {
+        targetCanvas.appendChild(dragState.placeholder)
+      }
+    }
+
+    const onMouseUp = (upEvent) => {
+      if (!localBpPointerDrag || localBpPointerDrag.moduleId !== moduleId) return
+      const dragState = localBpPointerDrag
+      localBpPointerDrag = null
+
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+
+      const targetParent = dragState.placeholder.parentElement
+      if (targetParent) {
+        targetParent.insertBefore(dragState.shell, dragState.placeholder)
+      }
+      dragState.placeholder.remove()
+      clearLocalBpModuleDropHints()
+
+      dragState.shell.classList.remove('dragging', 'lb-module-floating')
+      dragState.shell.style.left = ''
+      dragState.shell.style.top = ''
+
+      const releaseCanvas = getLocalBpModuleCanvasFromPoint(upEvent?.clientX || 0, upEvent?.clientY || 0) || targetParent
+      const releaseDock = detectLocalBpDockIntent(dragState.shell, upEvent?.clientX || 0, upEvent?.clientY || 0, releaseCanvas)
+      const finalDock = releaseDock || dragState.dock
+
+      let splitApplied = false
+      if (finalDock && finalDock.mode === 'split') {
+        const splitTarget = localBpModuleShellMap.get(finalDock.targetId || '')
+        const splitParent = finalDock.parent || targetParent
+        if (splitTarget && splitParent && splitTarget.parentElement === splitParent) {
+          splitApplied = applyLocalBpSplitLayout(dragState.shell, splitTarget, finalDock.side, splitParent)
+        }
+      }
+      if (!splitApplied) {
+        clearLocalBpSplitLink(dragState.shell)
+        if (dragState.wasSplitBeforeDrag) {
+          setLocalBpShellFullWidth(dragState.shell)
+        }
+      }
+
+      const newPage = getLocalBpModulePageByShell(dragState.shell) || dragState.shell.dataset.defaultPage || 'bp'
+      updateLocalBpModulePageSelectByShell(dragState.shell, newPage)
+      ensureLocalBpModuleDataReady(moduleId)
+      saveLocalBpModuleLayout()
+    }
+
+    localBpPointerDrag.onMouseMove = onMouseMove
+    localBpPointerDrag.onMouseUp = onMouseUp
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  })
+}
+
+function ensureLocalBpModuleDataReady(moduleId) {
+  if (!moduleId) return
+  if (moduleId.startsWith('score-')) {
+    initScorePage()
+    return
+  }
+  if (moduleId.startsWith('postmatch-')) {
+    initPostMatchPage()
+    return
+  }
+  if (moduleId.startsWith('baseinfo-')) {
+    initBaseInfoPage()
+    return
+  }
+  if (moduleId === 'talents-main-scroll-module') {
+    updateTalentSkillUI()
+    return
+  }
+  if (moduleId === 'ocr-main-scroll-module' && !localBpOcrInitDone) {
+    initLocalBpOcrPanel()
+      .then(() => renderLocalBpOcrRegions())
+      .catch((error) => setLocalBpOcrStatus(error?.message || 'OCR 面板初始化失败', 'error'))
+  }
+}
+
+function createLocalBpModuleShell(spec, sourceEl) {
+  const shell = document.createElement('div')
+  shell.className = 'lb-module-shell'
+  shell.dataset.moduleId = spec.id
+  shell.dataset.defaultPage = spec.page
+
+  const header = document.createElement('div')
+  header.className = 'lb-module-header'
+
+  const titleWrap = document.createElement('div')
+  titleWrap.className = 'lb-module-title-wrap'
+
+  const dragHandle = document.createElement('span')
+  dragHandle.className = 'lb-module-drag-handle'
+  dragHandle.textContent = '::'
+  dragHandle.title = '拖拽排序'
+
+  const title = document.createElement('span')
+  title.className = 'lb-module-title'
+  title.textContent = spec.title
+
+  titleWrap.appendChild(dragHandle)
+  titleWrap.appendChild(title)
+
+  const actions = document.createElement('div')
+  actions.className = 'lb-module-actions'
+
+  const pageSelect = document.createElement('select')
+  pageSelect.className = 'lb-module-page-select'
+  buildLocalBpModulePageOptions(pageSelect, spec.page)
+  pageSelect.addEventListener('change', () => {
+    const targetPage = LOCAL_BP_LAYOUT_PAGES.includes(pageSelect.value) ? pageSelect.value : spec.page
+    const targetCanvas = ensureLocalBpModuleCanvas(targetPage)
+    if (!targetCanvas) return
+    clearLocalBpSplitLink(shell)
+    targetCanvas.appendChild(shell)
+    ensureLocalBpModuleDataReady(spec.id)
+    saveLocalBpModuleLayout()
+  })
+
+  const resetBtn = document.createElement('button')
+  resetBtn.className = 'btn btn-secondary btn-small'
+  resetBtn.textContent = '重置尺寸'
+  resetBtn.addEventListener('click', () => {
+    const peerBefore = getLocalBpSplitPeerShell(shell, true)
+    clearLocalBpSplitLink(shell)
+    setLocalBpShellFullWidth(shell)
+    if (peerBefore) setLocalBpShellFullWidth(peerBefore)
+    shell.style.height = ''
+    saveLocalBpModuleLayout()
+  })
+
+  const halfBtn = document.createElement('button')
+  halfBtn.className = 'btn btn-secondary btn-small'
+  halfBtn.textContent = '半宽'
+  halfBtn.title = '快速两列排布'
+  halfBtn.addEventListener('click', () => {
+    setLocalBpModuleWidthPreset(shell, 'half')
+  })
+
+  const fullBtn = document.createElement('button')
+  fullBtn.className = 'btn btn-secondary btn-small'
+  fullBtn.textContent = '整宽'
+  fullBtn.title = '恢复整行宽度'
+  fullBtn.addEventListener('click', () => {
+    setLocalBpModuleWidthPreset(shell, 'full')
+  })
+
+  actions.appendChild(pageSelect)
+  actions.appendChild(halfBtn)
+  actions.appendChild(fullBtn)
+  actions.appendChild(resetBtn)
+  header.appendChild(titleWrap)
+  header.appendChild(actions)
+
+  const body = document.createElement('div')
+  body.className = 'lb-module-body'
+  body.appendChild(sourceEl)
+
+  const resize = document.createElement('div')
+  resize.className = 'lb-module-resize'
+  resize.title = '拖拽调整大小'
+
+  shell.appendChild(header)
+  shell.appendChild(body)
+  shell.appendChild(resize)
+
+  setupLocalBpModuleDrag(shell)
+  setupLocalBpModuleResize(shell)
+  return shell
+}
+
+function loadLocalBpModuleLayout() {
+  try {
+    const raw = localStorage.getItem(LOCAL_BP_MODULE_LAYOUT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return (parsed && typeof parsed === 'object' && parsed.modules && typeof parsed.modules === 'object')
+      ? parsed.modules
+      : null
+  } catch {
+    return null
+  }
+}
+
+function getLocalBpModulePageByShell(shell) {
+  return shell?.closest('.lb-module-canvas')?.dataset?.page || ''
+}
+
+function applyLocalBpModuleLayout(modulesLayout) {
+  const layout = modulesLayout && typeof modulesLayout === 'object' ? modulesLayout : {}
+  const sortBuckets = {}
+  LOCAL_BP_LAYOUT_PAGES.forEach((page) => {
+    sortBuckets[page] = []
+  })
+
+  LOCAL_BP_MODULE_SPECS.forEach((spec, index) => {
+    const shell = localBpModuleShellMap.get(spec.id)
+    if (!shell) return
+    const saved = (layout[spec.id] && typeof layout[spec.id] === 'object') ? layout[spec.id] : {}
+    const targetPage = LOCAL_BP_LAYOUT_PAGES.includes(saved.page) ? saved.page : spec.page
+    const order = Number.isFinite(parseInt(saved.order, 10)) ? parseInt(saved.order, 10) : index
+
+    const targetCanvas = ensureLocalBpModuleCanvas(targetPage)
+    if (targetCanvas) {
+      sortBuckets[targetPage].push({ shell, order, id: spec.id })
+      updateLocalBpModulePageSelectByShell(shell, targetPage)
+    }
+
+    const width = parsePositiveInt(saved.width, null)
+    const height = parsePositiveInt(saved.height, null)
+    shell.style.width = width ? `${width}px` : ''
+    shell.style.flexBasis = width ? `${width}px` : ''
+    shell.style.height = height ? `${height}px` : ''
+    clearLocalBpSplitLink(shell)
+  })
+
+  Object.keys(sortBuckets).forEach((page) => {
+    const canvas = ensureLocalBpModuleCanvas(page)
+    if (!canvas) return
+    sortBuckets[page]
+      .sort((a, b) => a.order - b.order)
+      .forEach((item) => canvas.appendChild(item.shell))
+  })
+
+  const linkedPairs = new Set()
+  LOCAL_BP_MODULE_SPECS.forEach((spec) => {
+    const saved = (layout[spec.id] && typeof layout[spec.id] === 'object') ? layout[spec.id] : {}
+    const peerId = typeof saved.splitWith === 'string' ? saved.splitWith : ''
+    if (!peerId) return
+    const pairKey = spec.id < peerId ? `${spec.id}|${peerId}` : `${peerId}|${spec.id}`
+    if (linkedPairs.has(pairKey)) return
+
+    const shell = localBpModuleShellMap.get(spec.id)
+    const peer = localBpModuleShellMap.get(peerId)
+    if (!shell || !peer) return
+    if (shell.parentElement !== peer.parentElement) return
+
+    const peerSaved = (layout[peerId] && typeof layout[peerId] === 'object') ? layout[peerId] : {}
+    if (peerSaved.splitWith !== spec.id) return
+
+    linkLocalBpSplitPair(shell, peer)
+    normalizeLocalBpSplitPairWidths(shell)
+    linkedPairs.add(pairKey)
+  })
+}
+
+function collectLocalBpModuleLayout() {
+  const modules = {}
+  LOCAL_BP_LAYOUT_PAGES.forEach((page) => {
+    const canvas = ensureLocalBpModuleCanvas(page)
+    if (!canvas) return
+    const shells = Array.from(canvas.querySelectorAll('.lb-module-shell[data-module-id]'))
+    shells.forEach((shell, order) => {
+      const id = shell.dataset.moduleId
+      if (!id) return
+      const splitPeer = getLocalBpSplitPeerShell(shell, true)
+      modules[id] = {
+        page,
+        order,
+        width: parsePositiveInt(shell.style.width, null),
+        height: parsePositiveInt(shell.style.height, null),
+        splitWith: splitPeer ? (splitPeer.dataset.moduleId || null) : null
+      }
+    })
+  })
+  return { modules }
+}
+
+function saveLocalBpModuleLayout() {
+  try {
+    const payload = collectLocalBpModuleLayout()
+    localStorage.setItem(LOCAL_BP_MODULE_LAYOUT_KEY, JSON.stringify(payload))
+  } catch (error) {
+    console.warn('[LocalBP] 保存模块布局失败:', error?.message || error)
+  }
+}
+
+function applyLocalBpLayoutEditMode() {
+  const body = document.body
+  if (!body) return
+  body.classList.toggle('localbp-layout-edit', localBpLayoutEditMode)
+
+  const bar = document.getElementById('localBpLayoutEditBar')
+  if (bar) bar.style.display = localBpLayoutEditMode ? 'flex' : 'none'
+
+  const toggleBtn = document.getElementById('layoutEditToggleBtn')
+  if (toggleBtn) toggleBtn.classList.toggle('active', localBpLayoutEditMode)
+
+  localBpModuleShellMap.forEach((shell) => {
+    const select = shell.querySelector('.lb-module-page-select')
+    if (select) select.disabled = !localBpLayoutEditMode
+  })
+
+  if (!localBpLayoutEditMode && localBpPointerDrag && localBpPointerDrag.shell) {
+    const dragState = localBpPointerDrag
+    localBpPointerDrag = null
+    if (dragState.onMouseMove) window.removeEventListener('mousemove', dragState.onMouseMove)
+    if (dragState.onMouseUp) window.removeEventListener('mouseup', dragState.onMouseUp)
+    const targetParent = dragState.placeholder?.parentElement
+    if (targetParent) targetParent.insertBefore(dragState.shell, dragState.placeholder)
+    if (dragState.placeholder) dragState.placeholder.remove()
+    dragState.shell.classList.remove('dragging', 'lb-module-floating')
+    dragState.shell.style.left = ''
+    dragState.shell.style.top = ''
+    saveLocalBpModuleLayout()
+  }
+}
+
+function toggleLocalBpLayoutEditMode(force) {
+  const next = typeof force === 'boolean' ? force : !localBpLayoutEditMode
+  localBpLayoutEditMode = !!next
+  applyLocalBpLayoutEditMode()
+}
+
+function resetLocalBpModuleLayout() {
+  localStorage.removeItem(LOCAL_BP_MODULE_LAYOUT_KEY)
+  applyLocalBpModuleLayout(null)
+  saveLocalBpModuleLayout()
+}
+
+function initLocalBpModuleLayout() {
+  if (localBpModuleLayoutReady) return
+  localBpModuleLayoutReady = true
+
+  LOCAL_BP_LAYOUT_PAGES.forEach((page) => ensureLocalBpModuleCanvas(page))
+
+  LOCAL_BP_MODULE_SPECS.forEach((spec) => {
+    const sourceEl = document.querySelector(spec.selector)
+    if (!sourceEl) return
+    const shell = createLocalBpModuleShell(spec, sourceEl)
+    localBpModuleShellMap.set(spec.id, shell)
+    const defaultCanvas = ensureLocalBpModuleCanvas(spec.page)
+    if (defaultCanvas) defaultCanvas.appendChild(shell)
+  })
+
+  const saved = loadLocalBpModuleLayout()
+  applyLocalBpModuleLayout(saved)
+  applyLocalBpLayoutEditMode()
+}
+
+function ensureLocalBpModulesOnPageReady(page) {
+  if (!page) return
+  const canvas = ensureLocalBpModuleCanvas(page)
+  if (!canvas) return
+  const shells = canvas.querySelectorAll('.lb-module-shell[data-module-id]')
+  shells.forEach((shell) => ensureLocalBpModuleDataReady(shell.dataset.moduleId || ''))
+}
+
+if (typeof window !== 'undefined') {
+  window.toggleLocalBpLayoutEditMode = toggleLocalBpLayoutEditMode
+  window.resetLocalBpModuleLayout = resetLocalBpModuleLayout
+}
+
 function clearAutoGlobalBanHistory() {
   autoGlobalBan.rounds = []
   saveAutoGlobalBanState()
@@ -113,6 +1233,35 @@ function assignAutoGlobalBanRound(roundId, role) {
   saveAutoGlobalBanState()
   renderAutoGlobalBanUI()
   applyAutoGlobalBans(true)
+}
+
+async function swapAutoGlobalBanRoundsByTeamRotation() {
+  if (!autoGlobalBan || !Array.isArray(autoGlobalBan.rounds)) return
+
+  let changed = false
+  autoGlobalBan.rounds = autoGlobalBan.rounds.map((round) => {
+    if (!round || typeof round !== 'object') return round
+    const currentAssigned = round.assigned
+    const swappedAssigned = currentAssigned === 'asbh'
+      ? 'ahbs'
+      : (currentAssigned === 'ahbs' ? 'asbh' : currentAssigned)
+
+    if (swappedAssigned !== currentAssigned) {
+      changed = true
+      return { ...round, assigned: swappedAssigned }
+    }
+    return round
+  })
+
+  if (!changed) return
+
+  saveAutoGlobalBanState()
+  renderAutoGlobalBanUI()
+  await applyAutoGlobalBans(true)
+}
+
+if (typeof window !== 'undefined') {
+  window.swapAutoGlobalBanRoundsByTeamRotation = swapAutoGlobalBanRoundsByTeamRotation
 }
 
 function buildAutoGlobalBanItem(round) {
@@ -322,7 +1471,22 @@ function saveTeamManagerSelection(sel) {
   localStorage.setItem(TEAM_MANAGER_SELECTION_KEY, JSON.stringify(sel || {}))
 }
 
-function parseCsvRows(text) {
+function detectCsvDelimiter(text) {
+  const firstLine = String(text || '').split(/\r?\n/, 1)[0] || ''
+  const candidates = [',', ';', '\t']
+  let best = ','
+  let bestCount = -1
+  for (const delimiter of candidates) {
+    const count = (firstLine.match(new RegExp(`\\${delimiter}`, 'g')) || []).length
+    if (count > bestCount) {
+      best = delimiter
+      bestCount = count
+    }
+  }
+  return best
+}
+
+function parseCsvRows(text, delimiter = ',') {
   const rows = []
   let row = []
   let field = ''
@@ -347,7 +1511,7 @@ function parseCsvRows(text) {
       field = ''
       continue
     }
-    if (!inQuotes && ch === ',') {
+    if (!inQuotes && ch === delimiter) {
       row.push(field)
       field = ''
       continue
@@ -362,42 +1526,53 @@ function parseCsvRows(text) {
 }
 
 function normalizeHeader(h) {
-  return (h || '').replace('\uFEFF', '').trim().toLowerCase()
+  return (h || '').replace(/\uFEFF/g, '').replace(/\u0000/g, '').trim().toLowerCase()
+}
+
+function normalizeCell(v) {
+  return String(v || '').replace(/\u0000/g, '').trim()
+}
+
+function findHeaderIndex(header, aliases) {
+  return header.findIndex(h => aliases.includes(h))
 }
 
 function parseTeamsFromCsv(text) {
-  const rows = parseCsvRows(text)
+  const sanitized = String(text || '').replace(/\u0000/g, '')
+  const rows = parseCsvRows(sanitized, detectCsvDelimiter(sanitized))
   if (rows.length <= 1) return []
   const header = rows[0].map(normalizeHeader)
   const idx = {
-    teamName: header.findIndex(h => h === 'teamname'),
-    teamId: header.findIndex(h => h === 'teamid'),
-    qq: header.findIndex(h => h === 'qqnumber'),
-    playerName: header.findIndex(h => h === 'playername'),
-    gameId: header.findIndex(h => h === 'gameid'),
-    gameRank: header.findIndex(h => h === 'gamerank'),
-    playerDesc: header.findIndex(h => h === 'playerdescription')
+    teamName: findHeaderIndex(header, ['teamname', 'team_name', '战队名称', '队伍名称']),
+    teamId: findHeaderIndex(header, ['teamid', 'team_id', '战队id', '战队编号', '队伍id', '队伍编号']),
+    qq: findHeaderIndex(header, ['qqnumber', 'qq', 'qq号']),
+    playerName: findHeaderIndex(header, ['playername', 'player_name', '选手名称', '成员名称']),
+    gameId: findHeaderIndex(header, ['gameid', 'game_id', '游戏id', '游戏编号']),
+    gameRank: findHeaderIndex(header, ['gamerank', 'game_rank', '段位']),
+    playerDesc: findHeaderIndex(header, ['playerdescription', 'player_description', '选手描述', '成员描述'])
   }
   const map = new Map()
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i]
-    const teamName = idx.teamName >= 0 ? row[idx.teamName] : ''
-    const teamId = idx.teamId >= 0 ? row[idx.teamId] : ''
+    const teamName = idx.teamName >= 0 ? normalizeCell(row[idx.teamName]) : ''
+    const teamId = idx.teamId >= 0 ? normalizeCell(row[idx.teamId]) : ''
     if (!teamName && !teamId) continue
-    const key = teamId || teamName
+    const key = teamId && teamName
+      ? `id:${teamId}|name:${teamName}`
+      : (teamId ? `id:${teamId}` : `name:${teamName}`)
     if (!map.has(key)) {
       map.set(key, {
         id: teamId,
         name: teamName || teamId,
-        qq: idx.qq >= 0 ? row[idx.qq] : '',
+        qq: idx.qq >= 0 ? normalizeCell(row[idx.qq]) : '',
         players: []
       })
     }
     const team = map.get(key)
-    const playerName = idx.playerName >= 0 ? row[idx.playerName] : ''
-    const gameId = idx.gameId >= 0 ? row[idx.gameId] : ''
-    const gameRank = idx.gameRank >= 0 ? row[idx.gameRank] : ''
-    const playerDescription = idx.playerDesc >= 0 ? row[idx.playerDesc] : ''
+    const playerName = idx.playerName >= 0 ? normalizeCell(row[idx.playerName]) : ''
+    const gameId = idx.gameId >= 0 ? normalizeCell(row[idx.gameId]) : ''
+    const gameRank = idx.gameRank >= 0 ? normalizeCell(row[idx.gameRank]) : ''
+    const playerDescription = idx.playerDesc >= 0 ? normalizeCell(row[idx.playerDesc]) : ''
     if (playerName || gameId) {
       const exists = team.players.some(p => (p.name || '') === playerName && (p.gameId || '') === gameId)
       if (!exists) {
@@ -513,12 +1688,20 @@ function applyTeamsToLocalBpFromManager() {
   if (teamA) {
     matchBase.teamA.name = teamA.name || matchBase.teamA.name
     const rosterA = (teamA.players || []).map(p => p.name || p.gameId).filter(Boolean)
-    if (rosterA.length) matchBase.teamA.members = ensureMembers5(rosterA)
+    if (rosterA.length) {
+      matchBase.teamA.fullMembers = ensureFullMembers(rosterA)
+      matchBase.teamA.roster = [...matchBase.teamA.fullMembers]
+      matchBase.teamA.members = ensureMembers5(rosterA)
+    }
   }
   if (teamB) {
     matchBase.teamB.name = teamB.name || matchBase.teamB.name
     const rosterB = (teamB.players || []).map(p => p.name || p.gameId).filter(Boolean)
-    if (rosterB.length) matchBase.teamB.members = ensureMembers5(rosterB)
+    if (rosterB.length) {
+      matchBase.teamB.fullMembers = ensureFullMembers(rosterB)
+      matchBase.teamB.roster = [...matchBase.teamB.fullMembers]
+      matchBase.teamB.members = ensureMembers5(rosterB)
+    }
   }
   matchBase.lineup.survivors = []
   matchBase.lineup.hunter = null
@@ -558,6 +1741,7 @@ function getDefaultMatchBase() {
     teamA: {
       name: 'A队',
       logo: '',
+      roster: [],
       members: ['', '', '', '', ''],
       memberRoles: [
         { canPlayHunter: false, canPlaySurvivor: false },
@@ -570,6 +1754,7 @@ function getDefaultMatchBase() {
     teamB: {
       name: 'B队',
       logo: '',
+      roster: [],
       members: ['', '', '', '', ''],
       memberRoles: [
         { canPlayHunter: false, canPlaySurvivor: false },
@@ -600,6 +1785,21 @@ function ensureMembers5(list) {
   return arr
 }
 
+function ensureFullMembers(list) {
+  if (!Array.isArray(list)) return []
+  return list.map(v => String(v || '').trim()).filter(Boolean)
+}
+
+function getTeamRoster(team) {
+  if (Array.isArray(team?.fullMembers) && team.fullMembers.length > 0) return team.fullMembers
+  return Array.isArray(team?.members) ? team.members : []
+}
+
+function getTeamMemberName(team, index) {
+  const roster = getTeamRoster(team)
+  return roster[index] || ''
+}
+
 function ensureMemberRoles5(list) {
   const arr = Array.isArray(list) ? list.slice(0, 5) : []
   while (arr.length < 5) {
@@ -621,18 +1821,22 @@ function normalizeMatchBase(raw) {
       name: typeof r.teamA?.name === 'string' ? r.teamA.name : d.teamA.name,
       logo: typeof r.teamA?.logo === 'string' ? r.teamA.logo : d.teamA.logo,
       members: ensureMembers5(r.teamA?.members || r.teamA?.roster),
+      fullMembers: ensureFullMembers(r.teamA?.fullMembers || r.teamA?.roster || r.teamA?.members),
+      roster: ensureFullMembers(r.teamA?.roster || r.teamA?.fullMembers || r.teamA?.members),
       memberRoles: ensureMemberRoles5(r.teamA?.memberRoles)
     },
     teamB: {
       name: typeof r.teamB?.name === 'string' ? r.teamB.name : d.teamB.name,
       logo: typeof r.teamB?.logo === 'string' ? r.teamB.logo : d.teamB.logo,
       members: ensureMembers5(r.teamB?.members || r.teamB?.roster),
+      fullMembers: ensureFullMembers(r.teamB?.fullMembers || r.teamB?.roster || r.teamB?.members),
+      roster: ensureFullMembers(r.teamB?.roster || r.teamB?.fullMembers || r.teamB?.members),
       memberRoles: ensureMemberRoles5(r.teamB?.memberRoles)
     },
     lineup: {
       team: (r.lineup?.team === 'A' || r.lineup?.team === 'B') ? r.lineup.team : d.lineup.team,
-      survivors: Array.isArray(r.lineup?.survivors) ? r.lineup.survivors.filter(i => Number.isInteger(i) && i >= 0 && i <= 4) : d.lineup.survivors,
-      hunter: (Number.isInteger(r.lineup?.hunter) && r.lineup.hunter >= 0 && r.lineup.hunter <= 4) ? r.lineup.hunter : d.lineup.hunter
+      survivors: Array.isArray(r.lineup?.survivors) ? r.lineup.survivors.filter(i => Number.isInteger(i) && i >= 0) : d.lineup.survivors,
+      hunter: (Number.isInteger(r.lineup?.hunter) && r.lineup.hunter >= 0) ? r.lineup.hunter : d.lineup.hunter
     },
     defaultImages: {
       slot0: typeof r.defaultImages?.slot0 === 'string' ? r.defaultImages.slot0 : '',
@@ -741,7 +1945,6 @@ function renderMatchBaseForm() {
 
   // 地图下拉：兼容旧数据/自定义地图名
   ensureSelectHasValue('baseMapName', matchBase.mapName || '')
-  ensureSelectHasValue('pmMapName', matchBase.mapName || '')
 }
 
 function ensureSelectHasValue(selectId, value) {
@@ -760,7 +1963,7 @@ function ensureSelectHasValue(selectId, value) {
 }
 
 async function initMapSelects() {
-  const selects = ['baseMapName', 'pmMapName']
+  const selects = ['baseMapName']
     .map(id => document.getElementById(id))
     .filter(Boolean)
     .filter(el => el.tagName === 'SELECT')
@@ -813,8 +2016,8 @@ function syncMatchBaseToScoreAndPostMatch() {
   if (scoreB) scoreB.value = matchBase.teamB.name || 'B队'
 
   // 2) 同步赛后页基础字段
-  const pmMap = document.getElementById('pmMapName')
-  if (pmMap) pmMap.value = matchBase.mapName || ''
+  const pmMap = document.getElementById('pmMapNameDisplay')
+  if (pmMap) pmMap.textContent = matchBase.mapName || '未选择地图'
   const pmA = document.getElementById('pmTeamAName')
   const pmB = document.getElementById('pmTeamBName')
   if (pmA) pmA.value = matchBase.teamA.name || 'A队'
@@ -897,12 +2100,12 @@ async function syncMatchBaseToFrontend() {
       for (let i = 0; i < 4; i++) {
         const memberIdx = currentMatchBase.lineup.survivors[i]
         if (typeof memberIdx === 'number' && memberIdx >= 0) {
-          playerNames[i] = team.members[memberIdx] || ''
+          playerNames[i] = getTeamMemberName(team, memberIdx)
         }
       }
       // 监管者
       if (typeof currentMatchBase.lineup.hunter === 'number' && currentMatchBase.lineup.hunter >= 0) {
-        playerNames[4] = team.members[currentMatchBase.lineup.hunter] || ''
+        playerNames[4] = getTeamMemberName(team, currentMatchBase.lineup.hunter)
       }
     }
 
@@ -978,8 +2181,13 @@ function updateMatchBaseMapName(name) {
 function updateMatchBaseMember(team, index, value) {
   if (!matchBase) loadMatchBase()
   if (!Number.isInteger(index) || index < 0 || index > 4) return
-  if (team === 'A') matchBase.teamA.members[index] = value || ''
-  if (team === 'B') matchBase.teamB.members[index] = value || ''
+  const target = team === 'A' ? matchBase.teamA : (team === 'B' ? matchBase.teamB : null)
+  if (!target) return
+  target.members[index] = value || ''
+  if (!Array.isArray(target.fullMembers)) target.fullMembers = [...target.members]
+  while (target.fullMembers.length <= index) target.fullMembers.push('')
+  target.fullMembers[index] = value || ''
+  target.roster = ensureFullMembers(target.fullMembers)
   localStorage.setItem(MATCH_BASE_KEY, JSON.stringify(matchBase))
   updateLineupOptions()
 }
@@ -1018,21 +2226,30 @@ function swapTeamInfo() {
     name: matchBase.teamA.name,
     logo: matchBase.teamA.logo,
     members: [...matchBase.teamA.members],
+    fullMembers: Array.isArray(matchBase.teamA.fullMembers) ? [...matchBase.teamA.fullMembers] : [],
+    roster: Array.isArray(matchBase.teamA.roster) ? [...matchBase.teamA.roster] : [],
     memberRoles: matchBase.teamA.memberRoles.map(r => ({ ...r }))
   }
 
   matchBase.teamA.name = matchBase.teamB.name
   matchBase.teamA.logo = matchBase.teamB.logo
   matchBase.teamA.members = [...matchBase.teamB.members]
+  matchBase.teamA.fullMembers = Array.isArray(matchBase.teamB.fullMembers) ? [...matchBase.teamB.fullMembers] : []
+  matchBase.teamA.roster = Array.isArray(matchBase.teamB.roster) ? [...matchBase.teamB.roster] : []
   matchBase.teamA.memberRoles = matchBase.teamB.memberRoles.map(r => ({ ...r }))
 
   matchBase.teamB.name = tempTeam.name
   matchBase.teamB.logo = tempTeam.logo
   matchBase.teamB.members = [...tempTeam.members]
+  matchBase.teamB.fullMembers = [...tempTeam.fullMembers]
+  matchBase.teamB.roster = [...tempTeam.roster]
   matchBase.teamB.memberRoles = tempTeam.memberRoles.map(r => ({ ...r }))
 
   // Save and refresh
   saveMatchBase(false)
+  if (typeof window.swapScoreTeamsData === 'function') {
+    window.swapScoreTeamsData()
+  }
   alert('队伍信息已交换！')
 }
 
@@ -1070,6 +2287,7 @@ function updateLineupOptions() {
   matchBase.lineup.team = selectedTeam
 
   const team = selectedTeam === 'A' ? matchBase.teamA : matchBase.teamB
+  const roster = getTeamRoster(team)
   const survivorContainer = document.getElementById('survivorLineupOptions')
   const hunterContainer = document.getElementById('hunterLineupOptions')
 
@@ -1077,16 +2295,17 @@ function updateLineupOptions() {
 
   // Generate survivor options
   survivorContainer.innerHTML = ''
-  team.members.forEach((memberName, index) => {
-    const canPlay = team.memberRoles[index]?.canPlaySurvivor
-    if (!canPlay || !memberName.trim()) return
+  roster.forEach((memberName, index) => {
+    const nameText = String(memberName || '').trim()
+    const canPlay = index >= 5 ? true : team.memberRoles[index]?.canPlaySurvivor
+    if (!canPlay || !nameText) return
 
     const isChecked = matchBase.lineup.survivors.includes(index)
     const checkbox = document.createElement('label')
     checkbox.style.cssText = 'display:flex;align-items:center;gap:6px;padding:8px;background:#fff;border:2px solid #e2e8f0;border-radius:6px;cursor:pointer;'
     checkbox.innerHTML = `
           <input type="checkbox" value="${index}" ${isChecked ? 'checked' : ''} onchange="toggleSurvivorLineup(${index})">
-          <span style="font-weight:500;">${memberName}</span>
+          <span style="font-weight:500;">${nameText}</span>
         `
     survivorContainer.appendChild(checkbox)
   })
@@ -1097,16 +2316,17 @@ function updateLineupOptions() {
 
   // Generate hunter options
   hunterContainer.innerHTML = ''
-  team.members.forEach((memberName, index) => {
-    const canPlay = team.memberRoles[index]?.canPlayHunter
-    if (!canPlay || !memberName.trim()) return
+  roster.forEach((memberName, index) => {
+    const nameText = String(memberName || '').trim()
+    const canPlay = index >= 5 ? true : team.memberRoles[index]?.canPlayHunter
+    if (!canPlay || !nameText) return
 
     const isChecked = matchBase.lineup.hunter === index
     const radio = document.createElement('label')
     radio.style.cssText = 'display:flex;align-items:center;gap:6px;padding:8px;background:#fff;border:2px solid #e2e8f0;border-radius:6px;cursor:pointer;'
     radio.innerHTML = `
           <input type="radio" name="hunterLineup" value="${index}" ${isChecked ? 'checked' : ''} onchange="selectHunterLineup(${index})">
-          <span style="font-weight:500;">${memberName}</span>
+          <span style="font-weight:500;">${nameText}</span>
         `
     hunterContainer.appendChild(radio)
   })
@@ -1157,7 +2377,7 @@ function updateLineupDisplay() {
       survivorsDisplay.textContent = '未选择'
       survivorsDisplay.style.color = '#9ca3af'
     } else {
-      const names = matchBase.lineup.survivors.map(i => team.members[i] || `成员${i + 1}`).join(', ')
+      const names = matchBase.lineup.survivors.map(i => getTeamMemberName(team, i) || `成员${i + 1}`).join(', ')
       survivorsDisplay.textContent = names
       survivorsDisplay.style.color = '#059669'
     }
@@ -1168,7 +2388,7 @@ function updateLineupDisplay() {
       hunterDisplay.textContent = '未选择'
       hunterDisplay.style.color = '#9ca3af'
     } else {
-      hunterDisplay.textContent = team.members[matchBase.lineup.hunter] || `成员${matchBase.lineup.hunter + 1}`
+      hunterDisplay.textContent = getTeamMemberName(team, matchBase.lineup.hunter) || `成员${matchBase.lineup.hunter + 1}`
       hunterDisplay.style.color = '#dc2626'
     }
   }
@@ -1198,12 +2418,12 @@ async function applyLineup() {
   // Apply to post-match data
   for (let i = 0; i < 4; i++) {
     const memberIndex = matchBase.lineup.survivors[i]
-    const memberName = team.members[memberIndex] || ''
+    const memberName = getTeamMemberName(team, memberIndex)
     const input = document.getElementById(`pmS${i + 1}Name`)
     if (input) input.value = memberName
   }
 
-  const hunterName = team.members[matchBase.lineup.hunter] || ''
+  const hunterName = getTeamMemberName(team, matchBase.lineup.hunter)
   const hunterInput = document.getElementById('pmHunterName')
   if (hunterInput) hunterInput.value = hunterName
 
@@ -1245,6 +2465,7 @@ async function loadCharacters() {
   // 尝试获取 talents / skills 定义
   const idxRes = await window.electronAPI.invoke('character:get-index')
   if (idxRes.success && idxRes.data) {
+    characterAssetOverrides = idxRes.data.assetOverrides || {}
     if (idxRes.data.survivorTalents && idxRes.data.survivorTalents.length > 0) {
       SURVIVOR_TALENTS = idxRes.data.survivorTalents.map(t => typeof t === 'string' ? t : t.name)
     }
@@ -1336,10 +2557,9 @@ function renderPickGrid() {
     list = [...list].sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
   }
 
-  const folder = pickType === 'survivor' ? 'surHeader' : 'hunHeader'
   grid.innerHTML = list.map(name => `
         <div class="character-item" onclick="selectCharacter('${name}')" data-name="${name}">
-          <img class="character-img" src="../assets/${folder}/${name}.png" onerror="this.style.display='none'">
+          <img class="character-img" src="${getCharacterAssetSrc(pickType, 'header', name)}" onerror="this.style.display='none'">
           <div class="character-name">${name}</div>
         </div>
       `).join('')
@@ -1854,7 +3074,7 @@ function unlockAllInputs() {
   })
   const overlays = document.querySelectorAll('[id$="Overlay"], [id$="overlay"]')
   overlays.forEach(el => {
-    if (el.id === 'commandPaletteOverlay') return
+    if (el.id === 'commandPaletteOverlay' || el.id === 'localBpOcrPreviewOverlay') return
     el.remove()
   })
   const backdrops = document.querySelectorAll('[id$="Backdrop"], [id$="backdrop"]')
@@ -2287,6 +3507,23 @@ function switchPage(page) {
   if (page === 'talents') {
     updateTalentSkillUI()
   }
+  // 切到 OCR 页时懒初始化并重绘区域框
+  if (page === 'ocr') {
+    if (localBpOcrInitDone) {
+      renderLocalBpOcrConfigToUi()
+      renderLocalBpOcrRegions()
+      if (localBpOcrRunning) setLocalBpOcrStatus('识别中', 'running')
+      else setLocalBpOcrStatus('待机', 'idle')
+      return
+    }
+    initLocalBpOcrPanel()
+      .then(() => renderLocalBpOcrRegions())
+      .catch((error) => {
+        setLocalBpOcrStatus(error?.message || 'OCR 面板初始化失败', 'error')
+      })
+  }
+
+  ensureLocalBpModulesOnPageReady(page)
 }
 
 function initBaseInfoPage() {
@@ -2301,23 +3538,105 @@ let scoreData = {
   teamADraws: 0, teamBDraws: 0,
   currentRound: 1,
   currentHalf: 1,
+  displayConfig: { auto: true, round: 1, half: 'upper' },
   scoreboardDisplay: { teamA: 'auto', teamB: 'auto' },
   teamAName: 'A队', teamBName: 'B队',
   teamALogo: '', teamBLogo: ''
+}
+let scoreDataReady = false
+
+function normalizeDisplayHalf(value) {
+  return value === 'lower' ? 'lower' : 'upper'
+}
+
+function normalizeDisplayConfig(rawConfig, rawScoreData, boCount) {
+  const safeBoCount = Math.max(1, parseInt(boCount, 10) || 1)
+  const legacyMode = rawScoreData?.scoreboardDisplay?.teamA
+  const legacyHalf = (parseInt(rawScoreData?.currentHalf, 10) || 1) === 2 ? 'lower' : 'upper'
+  const legacyRound = parseInt(rawScoreData?.currentRound, 10) || 1
+
+  const cfg = (rawConfig && typeof rawConfig === 'object') ? rawConfig : {}
+  const auto = (typeof cfg.auto === 'boolean')
+    ? cfg.auto
+    : !(legacyMode === 'upper' || legacyMode === 'lower')
+  const roundRaw = parseInt(cfg.round, 10) || legacyRound || 1
+  const round = Math.min(safeBoCount, Math.max(1, roundRaw))
+  const half = normalizeDisplayHalf(cfg.half || (legacyMode === 'upper' || legacyMode === 'lower' ? legacyMode : legacyHalf))
+  return { auto, round, half }
+}
+
+function getScoreDisplayTarget(dataInput) {
+  const data = normalizeScoreData(dataInput)
+  const bos = Array.isArray(data.bos) ? data.bos : []
+  const safeBos = bos.length ? bos : [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }]
+  const cfg = normalizeDisplayConfig(data.displayConfig, data, safeBos.length)
+
+  let targetIndex = 0
+  let targetHalf = 'upper'
+
+  if (cfg.auto) {
+    let found = false
+    for (let i = safeBos.length - 1; i >= 0; i--) {
+      const bo = safeBos[i] || {}
+      const hasLower = (parseInt(bo?.lower?.teamA, 10) || 0) > 0 || (parseInt(bo?.lower?.teamB, 10) || 0) > 0
+      const hasUpper = (parseInt(bo?.upper?.teamA, 10) || 0) > 0 || (parseInt(bo?.upper?.teamB, 10) || 0) > 0
+      if (hasLower) {
+        targetIndex = i
+        targetHalf = 'lower'
+        found = true
+        break
+      }
+      if (hasUpper) {
+        targetIndex = i
+        targetHalf = 'upper'
+        found = true
+        break
+      }
+    }
+    if (!found) {
+      targetIndex = 0
+      targetHalf = 'upper'
+    }
+  } else {
+    targetIndex = Math.min(safeBos.length - 1, Math.max(0, cfg.round - 1))
+    targetHalf = normalizeDisplayHalf(cfg.half)
+  }
+
+  return {
+    bo: safeBos[targetIndex] || safeBos[0],
+    half: targetHalf,
+    round: targetIndex + 1
+  }
+}
+
+function getCurrentDisplayedSmallScore(dataInput) {
+  const target = getScoreDisplayTarget(dataInput)
+  const bo = target.bo || {}
+  const halfData = bo[target.half] || {}
+  return {
+    teamA: parseInt(halfData.teamA, 10) || 0,
+    teamB: parseInt(halfData.teamB, 10) || 0,
+    round: target.round,
+    half: target.half
+  }
 }
 
 function normalizeScoreData(raw) {
   const d = raw && typeof raw === 'object' ? raw : {}
   const bos = Array.isArray(d.bos) ? d.bos : []
+  const safeBos = bos.length ? bos : [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }]
+  const displayConfig = normalizeDisplayConfig(d.displayConfig, d, safeBos.length)
+  const legacyMode = displayConfig.auto ? 'auto' : displayConfig.half
   return {
-    bos: bos.length ? bos : [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }],
+    bos: safeBos,
     teamAWins: d.teamAWins || 0,
     teamBWins: d.teamBWins || 0,
     teamADraws: d.teamADraws || 0,
     teamBDraws: d.teamBDraws || 0,
-    currentRound: d.currentRound || 1,
-    currentHalf: d.currentHalf || 1,
-    scoreboardDisplay: (d.scoreboardDisplay && typeof d.scoreboardDisplay === 'object') ? d.scoreboardDisplay : { teamA: 'auto', teamB: 'auto' },
+    currentRound: displayConfig.round,
+    currentHalf: displayConfig.half === 'lower' ? 2 : 1,
+    displayConfig,
+    scoreboardDisplay: { teamA: legacyMode, teamB: legacyMode },
     teamAName: typeof d.teamAName === 'string' ? d.teamAName : 'A队',
     teamBName: typeof d.teamBName === 'string' ? d.teamBName : 'B队',
     teamALogo: typeof d.teamALogo === 'string' ? d.teamALogo : '',
@@ -2333,9 +3652,20 @@ function loadScoreDataAny() {
   return normalizeScoreData(null)
 }
 
+function getScoreDataForWrite() {
+  // 比分页未初始化时，不要用默认空对象覆盖已存在存档
+  if (scoreDataReady && scoreData && typeof scoreData === 'object') {
+    scoreData = normalizeScoreData(scoreData)
+    return scoreData
+  }
+  scoreData = loadScoreDataAny()
+  scoreDataReady = true
+  return scoreData
+}
+
 function syncScoreStorageBaseFields() {
   // 从现有 scoreData（或本地存储）读出来，更新队名/Logo，再写回 score_${LOCAL_ROOM_ID}
-  const data = normalizeScoreData(scoreData && typeof scoreData === 'object' ? scoreData : loadScoreDataAny())
+  const data = normalizeScoreData(getScoreDataForWrite())
   let currentMatchBase = matchBase
   if (window.baseManager) {
     currentMatchBase = window.baseManager.state
@@ -2349,6 +3679,7 @@ function syncScoreStorageBaseFields() {
     if (typeof currentMatchBase.teamA?.logo === 'string') data.teamALogo = currentMatchBase.teamA.logo
     if (typeof currentMatchBase.teamB?.logo === 'string') data.teamBLogo = currentMatchBase.teamB.logo
   }
+  scoreData = data
   localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(data))
   localStorage.setItem('localBp_score', JSON.stringify(data))
 }
@@ -2356,6 +3687,7 @@ function syncScoreStorageBaseFields() {
 function initScorePage() {
   if (!matchBase && !window.baseManager) loadMatchBase()
   scoreData = loadScoreDataAny()
+  scoreDataReady = true
   let currentMatchBase = matchBase
   if (window.baseManager) {
     currentMatchBase = window.baseManager.state
@@ -2513,6 +3845,8 @@ function updateScoreDisplay() {
 }
 
 function saveScoreData() {
+  scoreData = getScoreDataForWrite()
+
   // 关键修复：优先从 baseManager 获取最新的 matchBase 状态
   // 避免全局变量 matchBase 是旧值导致 Logo 被清空或回滚
   let currentMatchBase = matchBase
@@ -2553,63 +3887,132 @@ function saveScoreData() {
   // 广播更新
 
   syncMatchBaseToFrontend()
+  syncPostMatchLiveHeaderToForm()
+  syncPostMatchStorageBaseFields()
+}
+
+function swapScoreTeamsData() {
+  scoreData = normalizeScoreData(getScoreDataForWrite())
+
+  scoreData.bos = (Array.isArray(scoreData.bos) ? scoreData.bos : []).map((bo) => {
+    const upperA = parseInt(bo?.upper?.teamA, 10) || 0
+    const upperB = parseInt(bo?.upper?.teamB, 10) || 0
+    const lowerA = parseInt(bo?.lower?.teamA, 10) || 0
+    const lowerB = parseInt(bo?.lower?.teamB, 10) || 0
+    return {
+      upper: { teamA: upperB, teamB: upperA },
+      lower: { teamA: lowerB, teamB: lowerA }
+    }
+  })
+
+  const oldAName = scoreData.teamAName
+  const oldBName = scoreData.teamBName
+  const oldALogo = scoreData.teamALogo
+  const oldBLogo = scoreData.teamBLogo
+  scoreData.teamAName = oldBName
+  scoreData.teamBName = oldAName
+  scoreData.teamALogo = oldBLogo
+  scoreData.teamBLogo = oldALogo
+
+  calculateScore()
+  saveScoreData()
+  renderBoList()
+  updateScoreDisplay()
+  updateScoreboardDisplayUI()
+
+  const nameAInput = document.getElementById('scoreTeamAName')
+  const nameBInput = document.getElementById('scoreTeamBName')
+  if (nameAInput) nameAInput.value = scoreData.teamAName || 'A队'
+  if (nameBInput) nameBInput.value = scoreData.teamBName || 'B队'
 }
 
 function resetScore() {
   if (confirm('确定重置所有比分？')) {
-    if (!matchBase) loadMatchBase()
+    const prev = normalizeScoreData(getScoreDataForWrite())
+    const boCount = Math.max(1, Array.isArray(prev.bos) ? prev.bos.length : 1)
+    const cfg = normalizeDisplayConfig(prev.displayConfig, prev, boCount)
+    const clearedBos = Array.from({ length: boCount }, () => ({
+      upper: { teamA: 0, teamB: 0 },
+      lower: { teamA: 0, teamB: 0 }
+    }))
+    const safeRound = Math.min(boCount, Math.max(1, cfg.round))
+    const safeHalf = normalizeDisplayHalf(cfg.half)
+    const mode = cfg.auto ? 'auto' : safeHalf
+
     scoreData = {
-      bos: [{ upper: { teamA: 0, teamB: 0 }, lower: { teamA: 0, teamB: 0 } }],
+      ...prev,
+      bos: clearedBos,
       teamAWins: 0, teamBWins: 0,
       teamADraws: 0, teamBDraws: 0,
-      currentRound: 1,
-      currentHalf: 1,
-      scoreboardDisplay: { teamA: 'auto', teamB: 'auto' },
-      teamAName: matchBase.teamA.name || 'A队',
-      teamBName: matchBase.teamB.name || 'B队',
-      teamALogo: matchBase.teamA.logo || '',
-      teamBLogo: matchBase.teamB.logo || ''
+      currentRound: safeRound,
+      currentHalf: safeHalf === 'lower' ? 2 : 1,
+      displayConfig: { auto: !!cfg.auto, round: safeRound, half: safeHalf },
+      scoreboardDisplay: { teamA: mode, teamB: mode }
     }
+
     saveScoreData()
     renderBoList()
     updateScoreDisplay()
+    updateScoreboardDisplayUI()
     document.getElementById('scoreTeamAName').value = scoreData.teamAName
     document.getElementById('scoreTeamBName').value = scoreData.teamBName
   }
 }
 
 function updateScoreboardDisplayUI() {
+  const cfg = normalizeDisplayConfig(scoreData?.displayConfig, scoreData, scoreData?.bos?.length || 1)
+
   const roundSelect = document.getElementById('displayRoundSelect')
   if (roundSelect) {
-    const current = scoreData.currentRound || 1
+    const current = cfg.round
     roundSelect.innerHTML = scoreData.bos.map((_, i) => `<option value="${i + 1}" ${current === (i + 1) ? 'selected' : ''}>第 ${i + 1} 个BO</option>`).join('')
-  }
-
-  const modeSelect = document.getElementById('displayModeSelect')
-  if (modeSelect) {
-    modeSelect.value = scoreData.scoreboardDisplay?.teamA || 'auto'
   }
 
   const halfSelect = document.getElementById('displayHalfSelect')
   if (halfSelect) {
-    halfSelect.value = scoreData.currentHalf || 1
+    halfSelect.value = cfg.half
+  }
+
+  const autoToggle = document.getElementById('displayAutoModeToggle')
+  if (autoToggle) {
+    autoToggle.checked = !!cfg.auto
+  }
+
+  const disableManual = !!cfg.auto
+  if (roundSelect) {
+    roundSelect.disabled = disableManual
+    roundSelect.style.background = disableManual ? '#f0f0f0' : ''
+    roundSelect.style.cursor = disableManual ? 'not-allowed' : ''
+    roundSelect.style.color = disableManual ? '#777' : ''
+  }
+  if (halfSelect) {
+    halfSelect.disabled = disableManual
+    halfSelect.style.background = disableManual ? '#f0f0f0' : ''
+    halfSelect.style.cursor = disableManual ? 'not-allowed' : ''
+    halfSelect.style.color = disableManual ? '#777' : ''
   }
 }
 
 function updateScoreboardDisplayConfig() {
-  const round = parseInt(document.getElementById('displayRoundSelect').value) || 1
-  const mode = document.getElementById('displayModeSelect').value
-  const half = parseInt(document.getElementById('displayHalfSelect').value) || 1
+  const autoToggle = document.getElementById('displayAutoModeToggle')
+  const roundSelect = document.getElementById('displayRoundSelect')
+  const halfSelect = document.getElementById('displayHalfSelect')
 
+  const auto = !!autoToggle?.checked
+  const round = parseInt(roundSelect?.value, 10) || 1
+  const half = normalizeDisplayHalf(halfSelect?.value)
+
+  scoreData.displayConfig = { auto, round, half }
   scoreData.currentRound = round
-  scoreData.currentHalf = half
-  // 统一控制两个队的分数显示模式
+  scoreData.currentHalf = half === 'lower' ? 2 : 1
+  const mode = auto ? 'auto' : half
   scoreData.scoreboardDisplay = {
     teamA: mode,
     teamB: mode
   }
 
   saveScoreData()
+  updateScoreboardDisplayUI()
   renderBoList() // 重新渲染列表以更新选中态
 }
 
@@ -2654,6 +4057,9 @@ async function openAllFrontendWindows() {
 
 // ========== 赛后数据功能 ==========
 let postMatchData = {}
+const POSTMATCH_OCR_WINDOW_STORAGE_KEY = 'localBp_postmatch_ocr_window_source_id'
+let postMatchOcrWindowList = []
+let postMatchOcrWindowSourceId = ''
 
 function getDefaultPostMatchData() {
   if (!matchBase) loadMatchBase()
@@ -2734,13 +4140,86 @@ function loadPostMatchAny() {
   return normalizePostMatchData(null)
 }
 
+function getPostMatchLiveMapName() {
+  let currentMatchBase = matchBase
+  if (window.baseManager) {
+    currentMatchBase = window.baseManager.state
+  } else if (!currentMatchBase) {
+    loadMatchBase()
+    currentMatchBase = matchBase
+  }
+  return (currentMatchBase?.mapName || '').trim()
+}
+
+function getPostMatchLiveScores() {
+  const currentScore = scoreData && typeof scoreData === 'object' ? scoreData : loadScoreDataAny()
+  const smallScore = getCurrentDisplayedSmallScore(currentScore)
+  return {
+    teamAScore: smallScore.teamA,
+    teamBScore: smallScore.teamB
+  }
+}
+
+function setPostMatchMapDisplay(mapName) {
+  const el = document.getElementById('pmMapNameDisplay')
+  if (!el) return
+  el.textContent = mapName || '未选择地图'
+}
+
+function syncPostMatchLiveHeaderToForm() {
+  let currentMatchBase = matchBase
+  if (window.baseManager) {
+    currentMatchBase = window.baseManager.state
+  } else if (!currentMatchBase) {
+    loadMatchBase()
+    currentMatchBase = matchBase
+  }
+
+  const mapName = (currentMatchBase?.mapName || '').trim()
+  const teamAName = currentMatchBase?.teamA?.name || 'A队'
+  const teamBName = currentMatchBase?.teamB?.name || 'B队'
+  const teamALogo = currentMatchBase?.teamA?.logo || ''
+  const teamBLogo = currentMatchBase?.teamB?.logo || ''
+  const { teamAScore, teamBScore } = getPostMatchLiveScores()
+
+  setPostMatchMapDisplay(mapName)
+
+  const pmA = document.getElementById('pmTeamAName')
+  const pmB = document.getElementById('pmTeamBName')
+  const pmAScore = document.getElementById('pmTeamAScore')
+  const pmBScore = document.getElementById('pmTeamBScore')
+  if (pmA) pmA.value = teamAName
+  if (pmB) pmB.value = teamBName
+  if (pmAScore) pmAScore.value = teamAScore
+  if (pmBScore) pmBScore.value = teamBScore
+
+  postMatchData = normalizePostMatchData({
+    ...postMatchData,
+    mapName,
+    teamA: { ...(postMatchData?.teamA || {}), name: teamAName, logo: teamALogo, score: teamAScore },
+    teamB: { ...(postMatchData?.teamB || {}), name: teamBName, logo: teamBLogo, score: teamBScore }
+  })
+}
+
 function syncPostMatchStorageBaseFields() {
   const data = normalizePostMatchData(postMatchData && typeof postMatchData === 'object' ? postMatchData : loadPostMatchAny())
-  data.mapName = matchBase?.mapName || data.mapName || ''
-  data.teamA.name = matchBase?.teamA?.name || data.teamA.name || 'A队'
-  data.teamB.name = matchBase?.teamB?.name || data.teamB.name || 'B队'
-  data.teamA.logo = matchBase?.teamA?.logo || data.teamA.logo || ''
-  data.teamB.logo = matchBase?.teamB?.logo || data.teamB.logo || ''
+  let currentMatchBase = matchBase
+  if (window.baseManager) {
+    currentMatchBase = window.baseManager.state
+  } else if (!currentMatchBase) {
+    loadMatchBase()
+    currentMatchBase = matchBase
+  }
+
+  const { teamAScore, teamBScore } = getPostMatchLiveScores()
+  data.mapName = currentMatchBase?.mapName || data.mapName || ''
+  data.teamA.name = currentMatchBase?.teamA?.name || data.teamA.name || 'A队'
+  data.teamB.name = currentMatchBase?.teamB?.name || data.teamB.name || 'B队'
+  data.teamA.logo = currentMatchBase?.teamA?.logo || data.teamA.logo || ''
+  data.teamB.logo = currentMatchBase?.teamB?.logo || data.teamB.logo || ''
+  data.teamA.score = teamAScore
+  data.teamB.score = teamBScore
+  postMatchData = data
   localStorage.setItem(POSTMATCH_STORAGE_KEY, JSON.stringify(data))
   localStorage.setItem('localBp_postmatch', JSON.stringify(data))
 }
@@ -2749,13 +4228,18 @@ function initPostMatchPage() {
   if (!matchBase) loadMatchBase()
   postMatchData = loadPostMatchAny()
   // 强制从 matchBase 统一队名/Logo/地图
-  postMatchData.mapName = matchBase.mapName || postMatchData.mapName || ''
+  postMatchData.mapName = getPostMatchLiveMapName() || postMatchData.mapName || ''
   postMatchData.teamA.name = matchBase.teamA.name || postMatchData.teamA.name || 'A队'
   postMatchData.teamB.name = matchBase.teamB.name || postMatchData.teamB.name || 'B队'
   postMatchData.teamA.logo = matchBase.teamA.logo || postMatchData.teamA.logo || ''
   postMatchData.teamB.logo = matchBase.teamB.logo || postMatchData.teamB.logo || ''
+  const { teamAScore, teamBScore } = getPostMatchLiveScores()
+  postMatchData.teamA.score = teamAScore
+  postMatchData.teamB.score = teamBScore
   populatePostMatchForm()
+  syncPostMatchLiveHeaderToForm()
   syncPostMatchStorageBaseFields()
+  initPostMatchOcrWindowPicker()
 }
 
 function populatePostMatchForm() {
@@ -2763,7 +4247,7 @@ function populatePostMatchForm() {
   document.getElementById('pmTitle').value = d.title
   document.getElementById('pmSubTitle').value = d.subTitle
   document.getElementById('pmGameLabel').value = d.gameLabel
-  document.getElementById('pmMapName').value = d.mapName
+  setPostMatchMapDisplay(d.mapName)
 
   document.getElementById('pmTeamAName').value = d.teamA.name
   document.getElementById('pmTeamAMeta').value = d.teamA.meta || ''
@@ -2793,21 +4277,23 @@ function populatePostMatchForm() {
 
 function collectPostMatchData() {
   if (!matchBase) loadMatchBase()
+  const mapName = getPostMatchLiveMapName()
+  const { teamAScore, teamBScore } = getPostMatchLiveScores()
   return {
     title: document.getElementById('pmTitle').value,
     subTitle: document.getElementById('pmSubTitle').value,
     gameLabel: document.getElementById('pmGameLabel').value,
-    mapName: document.getElementById('pmMapName').value,
+    mapName,
     teamA: {
       name: matchBase.teamA.name || document.getElementById('pmTeamAName').value,
       meta: document.getElementById('pmTeamAMeta').value,
-      score: parseInt(document.getElementById('pmTeamAScore').value) || 0,
+      score: teamAScore,
       logo: matchBase.teamA.logo || ''
     },
     teamB: {
       name: matchBase.teamB.name || document.getElementById('pmTeamBName').value,
       meta: document.getElementById('pmTeamBMeta').value,
-      score: parseInt(document.getElementById('pmTeamBScore').value) || 0,
+      score: teamBScore,
       logo: matchBase.teamB.logo || ''
     },
     survivors: [1, 2, 3, 4].map(i => ({
@@ -2833,7 +4319,6 @@ function collectPostMatchData() {
 function savePostMatch() {
   postMatchData = normalizePostMatchData(collectPostMatchData())
   // 同步地图/队名到 matchBase（统一源）
-  updateMatchBaseMapName(postMatchData.mapName)
   updateMatchBaseTeamName('A', postMatchData.teamA.name)
   updateMatchBaseTeamName('B', postMatchData.teamB.name)
 
@@ -2851,13 +4336,13 @@ function resetPostMatch() {
     document.getElementById('pmTitle').value = '赛后数据'
     document.getElementById('pmSubTitle').value = 'MATCH STATS'
     document.getElementById('pmGameLabel').value = 'GAME 1'
-    document.getElementById('pmMapName').value = matchBase?.mapName || ''
+    setPostMatchMapDisplay(getPostMatchLiveMapName())
     document.getElementById('pmTeamAName').value = matchBase?.teamA?.name || ''
     document.getElementById('pmTeamAMeta').value = ''
-    document.getElementById('pmTeamAScore').value = 0
+    document.getElementById('pmTeamAScore').value = getPostMatchLiveScores().teamAScore
     document.getElementById('pmTeamBName').value = matchBase?.teamB?.name || ''
     document.getElementById('pmTeamBMeta').value = ''
-    document.getElementById('pmTeamBScore').value = 0
+    document.getElementById('pmTeamBScore').value = getPostMatchLiveScores().teamBScore
     for (let i = 1; i <= 4; i++) {
       document.getElementById(`pmS${i}Name`).value = ''
       document.getElementById(`pmS${i}Decode`).value = 0
@@ -2873,6 +4358,7 @@ function resetPostMatch() {
     document.getElementById('pmHunterHit').value = 0
     document.getElementById('pmHunterTerror').value = 0
     document.getElementById('pmHunterDown').value = 0
+    syncPostMatchStorageBaseFields()
   }
 }
 
@@ -2924,8 +4410,156 @@ function readFileAsDataUrl(file) {
   })
 }
 
+function setPostMatchOcrHint(text, isError = false) {
+  const hintEl = document.getElementById('pmOcrWindowHint')
+  if (!hintEl) return
+  hintEl.textContent = text || ''
+  hintEl.style.color = isError ? '#b42318' : '#666'
+}
+
+function setPostMatchOcrButtonsBusy(busy, activeBtnId = '') {
+  const fileBtn = document.getElementById('pmOcrBtn')
+  const captureBtn = document.getElementById('pmOcrCaptureBtn')
+
+  if (fileBtn) {
+    fileBtn.disabled = !!busy
+    fileBtn.textContent = (busy && activeBtnId === 'pmOcrBtn') ? '识别中...' : '文件OCR'
+  }
+  if (captureBtn) {
+    captureBtn.disabled = !!busy
+    captureBtn.textContent = (busy && activeBtnId === 'pmOcrCaptureBtn') ? '截图中...' : '快速截图OCR'
+  }
+}
+
+function renderPostMatchOcrWindowList() {
+  const select = document.getElementById('pmOcrWindowSelect')
+  if (!select) return
+
+  const current = postMatchOcrWindowSourceId || ''
+  select.innerHTML = ''
+
+  const placeholder = document.createElement('option')
+  placeholder.value = ''
+  placeholder.textContent = '请选择要截图识别的窗口'
+  select.appendChild(placeholder)
+
+  for (const item of (Array.isArray(postMatchOcrWindowList) ? postMatchOcrWindowList : [])) {
+    const option = document.createElement('option')
+    option.value = item?.id || ''
+    option.textContent = item?.name || option.value
+    select.appendChild(option)
+  }
+
+  if (current) {
+    select.value = current
+  }
+}
+
+function onPostMatchOcrWindowChange() {
+  const select = document.getElementById('pmOcrWindowSelect')
+  postMatchOcrWindowSourceId = select?.value || ''
+  localStorage.setItem(POSTMATCH_OCR_WINDOW_STORAGE_KEY, postMatchOcrWindowSourceId)
+}
+
+async function loadPostMatchOcrWindowSourceId() {
+  const saved = localStorage.getItem(POSTMATCH_OCR_WINDOW_STORAGE_KEY)
+  if (saved) return saved
+
+  try {
+    const result = await window.electronAPI.invoke('localBp:ocrGetConfig')
+    if (result?.success && typeof result?.data?.config?.windowSourceId === 'string') {
+      return result.data.config.windowSourceId
+    }
+  } catch {}
+
+  return ''
+}
+
+async function refreshPostMatchOcrWindows(showFeedback = true) {
+  const select = document.getElementById('pmOcrWindowSelect')
+  if (!select) return
+
+  if (showFeedback) setPostMatchOcrHint('正在加载窗口列表...')
+  const result = await window.electronAPI.invoke('localBp:ocrListWindows')
+  if (!result?.success || !Array.isArray(result?.data)) {
+    const message = result?.error || '窗口列表加载失败'
+    setPostMatchOcrHint(message, true)
+    if (showFeedback) alert(message)
+    return
+  }
+
+  postMatchOcrWindowList = result.data
+  const exists = postMatchOcrWindowList.some(item => item?.id === postMatchOcrWindowSourceId)
+  if (!exists) {
+    postMatchOcrWindowSourceId = postMatchOcrWindowList[0]?.id || ''
+    localStorage.setItem(POSTMATCH_OCR_WINDOW_STORAGE_KEY, postMatchOcrWindowSourceId)
+  }
+
+  renderPostMatchOcrWindowList()
+  setPostMatchOcrHint(`已加载 ${postMatchOcrWindowList.length} 个窗口`)
+}
+
+async function initPostMatchOcrWindowPicker() {
+  const select = document.getElementById('pmOcrWindowSelect')
+  if (!select) return
+
+  if (select.dataset.bound !== '1') {
+    select.dataset.bound = '1'
+    select.addEventListener('change', onPostMatchOcrWindowChange)
+  }
+
+  if (!postMatchOcrWindowSourceId) {
+    postMatchOcrWindowSourceId = await loadPostMatchOcrWindowSourceId()
+  }
+
+  renderPostMatchOcrWindowList()
+  refreshPostMatchOcrWindows(false)
+}
+
+async function requestPostMatchOcr(base64) {
+  if (!window.electronAPI?.parseGameRecordImage) {
+    throw new Error('当前版本不支持 OCR 调用')
+  }
+  const result = await window.electronAPI.parseGameRecordImage(base64)
+  if (!result?.success) {
+    throw new Error(result?.error || '识别失败')
+  }
+  const dto = result.data
+  const ok = dto?.success ?? dto?.Success
+  if (ok === false) {
+    throw new Error(dto?.message ?? dto?.Message ?? '识别失败')
+  }
+  return dto
+}
+
+function applyPostMatchOcrResult(dto) {
+  const normalized = normalizeOcrResponse(dto)
+  if (normalized.mapName) {
+    updateMatchBaseMapName(normalized.mapName)
+    setPostMatchMapDisplay(normalized.mapName)
+  }
+
+  const reg = normalized.regulator ? normalizePlayer(normalized.regulator) : null
+  if (reg?.roleName) setValue('pmHunterRole', reg.roleName)
+  setValue('pmHunterHit', reg?.hitSurvivorCount || 0)
+  setValue('pmHunterTerror', reg?.terrorShockCount || 0)
+  setValue('pmHunterDown', reg?.downCount || 0)
+  setValue('pmHunterPalletDestroy', reg?.palletDestroyCount || 0)
+
+  const surv = Array.isArray(normalized.survivors) ? normalized.survivors.map(normalizePlayer) : []
+  for (let i = 0; i < 4; i++) {
+    const s = surv[i]
+    if (!s) continue
+    if (s.roleName) setValue(`pmS${i + 1}Name`, s.roleName)
+    setValue(`pmS${i + 1}Decode`, s.decodeProgress)
+    setValue(`pmS${i + 1}Pallet`, s.palletStunCount)
+    setValue(`pmS${i + 1}Rescue`, s.rescueCount)
+    // heal 无法从 OCR 获取，保持手填
+    setValue(`pmS${i + 1}Chase`, s.kiteTime)
+  }
+}
+
 async function ocrFillPostMatch() {
-  const btn = document.getElementById('pmOcrBtn')
   try {
     const input = document.getElementById('pmOcrFile')
     const file = input?.files?.[0]
@@ -2933,67 +4567,660 @@ async function ocrFillPostMatch() {
       alert('请先选择一张对局截图')
       return
     }
-    if (!window.electronAPI?.parseGameRecordImage) {
-      alert('当前版本不支持 OCR 调用')
-      return
-    }
 
-    if (btn) {
-      btn.disabled = true
-      btn.textContent = '识别中...'
-    }
+    setPostMatchOcrButtonsBusy(true, 'pmOcrBtn')
+    setPostMatchOcrHint(`正在识别文件：${file.name}`)
 
     const dataUrl = await readFileAsDataUrl(file)
     const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+    const dto = await requestPostMatchOcr(base64)
+    applyPostMatchOcrResult(dto)
 
-    const result = await window.electronAPI.parseGameRecordImage(base64)
-    if (!result?.success) {
-      alert('识别失败: ' + (result?.error || '未知错误'))
-      return
-    }
-
-    const dto = result.data
-    const ok = dto?.success ?? dto?.Success
-    if (ok === false) {
-      alert('识别失败: ' + (dto?.message ?? dto?.Message ?? '未知错误'))
-      return
-    }
-
-    const normalized = normalizeOcrResponse(dto)
-    if (normalized.mapName) {
-      setValue('pmMapName', normalized.mapName)
-      updateMatchBaseMapName(normalized.mapName)
-    }
-
-    const reg = normalized.regulator ? normalizePlayer(normalized.regulator) : null
-    if (reg?.roleName) setValue('pmHunterRole', reg.roleName)
-    setValue('pmHunterHit', reg?.hitSurvivorCount || 0)
-    setValue('pmHunterTerror', reg?.terrorShockCount || 0)
-    setValue('pmHunterDown', reg?.downCount || 0)
-    setValue('pmHunterPalletDestroy', reg?.palletDestroyCount || 0)
-
-    const surv = Array.isArray(normalized.survivors) ? normalized.survivors.map(normalizePlayer) : []
-    for (let i = 0; i < 4; i++) {
-      const s = surv[i]
-      if (!s) continue
-      if (s.roleName) setValue(`pmS${i + 1}Name`, s.roleName)
-      setValue(`pmS${i + 1}Decode`, s.decodeProgress)
-      setValue(`pmS${i + 1}Pallet`, s.palletStunCount)
-      setValue(`pmS${i + 1}Rescue`, s.rescueCount)
-      // heal 无法从 OCR 获取，保持手填
-      setValue(`pmS${i + 1}Chase`, s.kiteTime)
-    }
-
+    setPostMatchOcrHint(`文件识别完成：${file.name}`)
     alert('识别完成：已回填到表单（请确认后保存）')
   } catch (e) {
     console.error('OCR 回填失败:', e)
+    setPostMatchOcrHint(e?.message || String(e), true)
     alert('OCR 回填失败: ' + (e?.message || e))
   } finally {
-    if (btn) {
-      btn.disabled = false
-      btn.textContent = '识别并回填'
+    setPostMatchOcrButtonsBusy(false)
+  }
+}
+
+async function ocrFillPostMatchFromWindow() {
+  try {
+    const sourceId = postMatchOcrWindowSourceId || document.getElementById('pmOcrWindowSelect')?.value || ''
+    if (!sourceId) {
+      alert('请先选择要截图识别的窗口')
+      return
+    }
+
+    setPostMatchOcrButtonsBusy(true, 'pmOcrCaptureBtn')
+    setPostMatchOcrHint('正在抓取窗口截图...')
+
+    const capture = await window.electronAPI.invoke('localBp:ocrCapturePreview', sourceId)
+    if (!capture?.success || !capture?.data?.dataUrl) {
+      throw new Error(capture?.error || '窗口截图失败')
+    }
+
+    postMatchOcrWindowSourceId = capture.data.sourceId || sourceId
+    localStorage.setItem(POSTMATCH_OCR_WINDOW_STORAGE_KEY, postMatchOcrWindowSourceId)
+    renderPostMatchOcrWindowList()
+
+    setPostMatchOcrHint('截图成功，正在执行 OCR...')
+    const dataUrl = String(capture.data.dataUrl || '')
+    const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+    const dto = await requestPostMatchOcr(base64)
+    applyPostMatchOcrResult(dto)
+
+    const sourceName = capture?.data?.sourceName || '目标窗口'
+    setPostMatchOcrHint(`窗口截图识别完成：${sourceName}`)
+    alert('识别完成：已回填到表单（请确认后保存）')
+  } catch (e) {
+    console.error('窗口截图 OCR 回填失败:', e)
+    setPostMatchOcrHint(e?.message || String(e), true)
+    alert('窗口截图 OCR 回填失败: ' + (e?.message || e))
+  } finally {
+    setPostMatchOcrButtonsBusy(false)
+  }
+}
+
+const LOCAL_BP_OCR_REGION_META = {
+  survivors: { label: '求生者选择', css: 'survivors' },
+  hunter: { label: '监管者选择', css: 'hunter' },
+  survivorBans: { label: '求生者Ban', css: 'survivorBans' },
+  hunterBans: { label: '监管者Ban', css: 'hunterBans' }
+}
+
+let localBpOcrConfig = null
+let localBpOcrWindowList = []
+let localBpOcrRunning = false
+let localBpOcrBusy = false
+let localBpOcrTimer = null
+let localBpOcrActiveRegion = 'survivors'
+let localBpOcrInstallPollTimer = null
+let localBpOcrInitDone = false
+let localBpOcrDrawState = null
+
+function getDefaultLocalBpOcrConfig() {
+  return {
+    windowSourceId: '',
+    windowName: '',
+    intervalMs: 4000,
+    preferredEngine: 'windows',
+    fuzzyThreshold: 0.56,
+    regions: {
+      survivors: null,
+      hunter: null,
+      survivorBans: null,
+      hunterBans: null
     }
   }
+}
+
+function clampNumber(value, min, max, fallback) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  if (n < min) return min
+  if (n > max) return max
+  return n
+}
+
+function normalizeRegion(region) {
+  if (!region || typeof region !== 'object') return null
+  const x = clampNumber(region.x, 0, 1, 0)
+  const y = clampNumber(region.y, 0, 1, 0)
+  const width = clampNumber(region.width, 0, 1, 0)
+  const height = clampNumber(region.height, 0, 1, 0)
+  if (width <= 0 || height <= 0) return null
+  if (x + width > 1 || y + height > 1) return null
+  return { x, y, width, height }
+}
+
+function normalizeLocalBpOcrConfig(input) {
+  const base = getDefaultLocalBpOcrConfig()
+  const cfg = input && typeof input === 'object' ? input : {}
+  const regions = cfg.regions && typeof cfg.regions === 'object' ? cfg.regions : {}
+  return {
+    windowSourceId: typeof cfg.windowSourceId === 'string' ? cfg.windowSourceId : base.windowSourceId,
+    windowName: typeof cfg.windowName === 'string' ? cfg.windowName : base.windowName,
+    intervalMs: Math.round(clampNumber(cfg.intervalMs, 1000, 30000, base.intervalMs)),
+    preferredEngine: cfg.preferredEngine === 'paddleocr' ? 'paddleocr' : 'windows',
+    fuzzyThreshold: clampNumber(cfg.fuzzyThreshold, 0.3, 0.95, base.fuzzyThreshold),
+    regions: {
+      survivors: normalizeRegion(regions.survivors),
+      hunter: normalizeRegion(regions.hunter),
+      survivorBans: normalizeRegion(regions.survivorBans),
+      hunterBans: normalizeRegion(regions.hunterBans)
+    }
+  }
+}
+
+function setLocalBpOcrStatus(text, type = 'idle') {
+  const el = document.getElementById('localBpOcrStatus')
+  if (!el) return
+  el.textContent = text || '待机'
+  el.className = 'local-ocr-status'
+  if (type === 'running') el.classList.add('running')
+  else if (type === 'installing') el.classList.add('installing')
+  else if (type === 'error') el.classList.add('error')
+  else el.classList.add('idle')
+}
+
+function setLocalBpOcrResultText(text) {
+  const el = document.getElementById('localBpOcrResult')
+  if (!el) return
+  el.textContent = text || '识别结果将显示在这里'
+}
+
+function formatLocalBpOcrResult(payload) {
+  if (!payload || typeof payload !== 'object') return '识别结果为空'
+  const matched = payload.matched || {}
+  const raw = payload.raw || {}
+  const applyResult = payload.applyResult || {}
+  const meta = payload.recognitionMeta || {}
+  const engineUsed = meta.engineUsed || {}
+  const imageVariant = meta.imageVariant || {}
+  const hasText = (v) => String(v || '').trim().length > 0
+  const timeText = payload.timestamp ? new Date(payload.timestamp).toLocaleTimeString() : ''
+  const lines = []
+  const allRawEmpty = !hasText(raw.survivors) &&
+    !hasText(raw.hunter) &&
+    !hasText(raw.survivorBans) &&
+    !hasText(raw.hunterBans)
+  lines.push(`时间: ${timeText}`)
+  lines.push(`窗口: ${payload.sourceName || '未知'}`)
+  lines.push(`求生者: ${(matched.survivors || []).join(' / ') || '无'}`)
+  lines.push(`监管者: ${matched.hunter || '无'}`)
+  lines.push(`求生Ban: ${(matched.survivorBans || []).join(' / ') || '无'}`)
+  lines.push(`监管Ban: ${(matched.hunterBans || []).join(' / ') || '无'}`)
+  lines.push(`引擎: 求生=${engineUsed.survivors || '-'} 监管=${engineUsed.hunter || '-'} 求生Ban=${engineUsed.survivorBans || '-'} 监管Ban=${engineUsed.hunterBans || '-'}`)
+  lines.push(`图像增强: 求生=${imageVariant.survivors || '-'} 监管=${imageVariant.hunter || '-'} 求生Ban=${imageVariant.survivorBans || '-'} 监管Ban=${imageVariant.hunterBans || '-'}`)
+  if (meta.warning) {
+    lines.push(`提示: ${meta.warning}`)
+  }
+  lines.push(`回填: ${applyResult.applied ? '已更新本地BP' : '无变更'}`)
+  lines.push('')
+  lines.push(`原始求生文本: ${raw.survivors || '-'}`)
+  lines.push(`原始监管文本: ${raw.hunter || '-'}`)
+  lines.push(`原始求生Ban文本: ${raw.survivorBans || '-'}`)
+  lines.push(`原始监管Ban文本: ${raw.hunterBans || '-'}`)
+  if (allRawEmpty) {
+    lines.push('')
+    lines.push('提示: 4个区域都未识别到文字。请确认目标窗口未最小化、文本在框内，并尝试切换到 PaddleOCR。')
+  }
+  return lines.join('\n')
+}
+
+async function loadLocalBpOcrConfig() {
+  const result = await window.electronAPI.invoke('localBp:ocrGetConfig')
+  if (!result || !result.success) {
+    localBpOcrConfig = getDefaultLocalBpOcrConfig()
+    return
+  }
+  localBpOcrConfig = normalizeLocalBpOcrConfig(result.data?.config || {})
+  const runtime = result.data?.runtime || {}
+  if (runtime.lastRecognition) {
+    setLocalBpOcrResultText(formatLocalBpOcrResult(runtime.lastRecognition))
+  }
+  updateLocalBpOcrInstallHint(runtime.installStatus)
+}
+
+async function saveLocalBpOcrConfigPatch(patch) {
+  if (!localBpOcrConfig) localBpOcrConfig = getDefaultLocalBpOcrConfig()
+  const merged = {
+    ...localBpOcrConfig,
+    ...(patch && typeof patch === 'object' ? patch : {}),
+    regions: {
+      ...(localBpOcrConfig.regions || {}),
+      ...((patch && patch.regions && typeof patch.regions === 'object') ? patch.regions : {})
+    }
+  }
+  const normalized = normalizeLocalBpOcrConfig(merged)
+  const result = await window.electronAPI.invoke('localBp:ocrSetConfig', normalized)
+  if (result && result.success && result.data?.config) {
+    localBpOcrConfig = normalizeLocalBpOcrConfig(result.data.config)
+    updateLocalBpOcrInstallHint(result.data?.runtime?.installStatus)
+  } else {
+    localBpOcrConfig = normalized
+  }
+}
+
+function updateLocalBpOcrInstallHint(status) {
+  const hintEl = document.getElementById('localBpOcrInstallHint')
+  if (!hintEl) return
+  if (!status || typeof status !== 'object') {
+    hintEl.textContent = '可选增强引擎，首次安装较慢。'
+    return
+  }
+  if (status.running) {
+    hintEl.textContent = status.message || 'PaddleOCR 安装中...'
+    return
+  }
+  if (status.success && status.paddleReady) {
+    hintEl.textContent = 'PaddleOCR 已可用。'
+    return
+  }
+  if (!status.paddleReady && status.message) {
+    hintEl.textContent = status.message
+    return
+  }
+  hintEl.textContent = status.paddleReady ? 'PaddleOCR 已可用。' : '可选增强引擎，首次安装较慢。'
+}
+
+function renderLocalBpOcrConfigToUi() {
+  if (!localBpOcrConfig) return
+  const engineSelect = document.getElementById('localBpOcrEngine')
+  if (engineSelect) engineSelect.value = localBpOcrConfig.preferredEngine
+  const intervalInput = document.getElementById('localBpOcrInterval')
+  if (intervalInput) intervalInput.value = String(Math.round((localBpOcrConfig.intervalMs || 4000) / 1000))
+  const windowSelect = document.getElementById('localBpOcrWindowSelect')
+  if (windowSelect) {
+    windowSelect.value = localBpOcrConfig.windowSourceId || ''
+  }
+  setLocalBpOcrActiveRegion(localBpOcrActiveRegion)
+  renderLocalBpOcrRegions()
+}
+
+function renderLocalBpOcrWindowList() {
+  const select = document.getElementById('localBpOcrWindowSelect')
+  if (!select) return
+  const current = localBpOcrConfig?.windowSourceId || ''
+  const options = ['<option value="">请选择游戏窗口</option>']
+  for (const item of localBpOcrWindowList) {
+    const value = item.id || ''
+    const name = item.name || value
+    const selected = current && current === value ? ' selected' : ''
+    options.push(`<option value="${value}"${selected}>${name}</option>`)
+  }
+  select.innerHTML = options.join('')
+  if (current) select.value = current
+}
+
+async function refreshLocalBpOcrWindowList() {
+  const result = await window.electronAPI.invoke('localBp:ocrListWindows')
+  if (!result || !result.success || !Array.isArray(result.data)) {
+    setLocalBpOcrStatus(result?.error || '窗口列表获取失败', 'error')
+    return
+  }
+  localBpOcrWindowList = result.data
+  renderLocalBpOcrWindowList()
+  if (localBpOcrRunning) {
+    setLocalBpOcrStatus('识别中', 'running')
+  } else {
+    setLocalBpOcrStatus('待机', 'idle')
+  }
+}
+
+function setLocalBpOcrPreviewData(previewData) {
+  const stage = document.getElementById('localBpOcrPreviewStage')
+  const image = document.getElementById('localBpOcrPreviewImage')
+  const placeholder = document.getElementById('localBpOcrPreviewPlaceholder')
+  if (!stage || !image || !placeholder) return
+
+  if (!previewData || !previewData.dataUrl) {
+    image.style.display = 'none'
+    image.src = ''
+    placeholder.style.display = 'flex'
+    stage.classList.remove('active')
+    renderLocalBpOcrRegions()
+    return
+  }
+
+  const width = clampNumber(previewData.width, 100, 4000, 1280)
+  const height = clampNumber(previewData.height, 80, 2500, 720)
+  stage.style.width = `${width}px`
+  stage.style.height = `${height}px`
+
+  image.style.display = 'block'
+  image.style.width = '100%'
+  image.style.height = '100%'
+  image.src = previewData.dataUrl
+  placeholder.style.display = 'none'
+  stage.classList.add('active')
+  renderLocalBpOcrRegions()
+}
+
+async function captureLocalBpOcrPreview() {
+  const sourceId = localBpOcrConfig?.windowSourceId || ''
+  if (!sourceId) {
+    setLocalBpOcrStatus('请先选择窗口', 'error')
+    return
+  }
+  const result = await window.electronAPI.invoke('localBp:ocrCapturePreview', sourceId)
+  if (!result || !result.success || !result.data) {
+    setLocalBpOcrStatus(result?.error || '窗口预览失败', 'error')
+    return
+  }
+
+  localBpOcrConfig.windowSourceId = result.data.sourceId || sourceId
+  localBpOcrConfig.windowName = result.data.sourceName || ''
+  await saveLocalBpOcrConfigPatch({
+    windowSourceId: localBpOcrConfig.windowSourceId,
+    windowName: localBpOcrConfig.windowName
+  })
+  renderLocalBpOcrWindowList()
+  setLocalBpOcrPreviewData(result.data)
+  if (localBpOcrRunning) setLocalBpOcrStatus('识别中', 'running')
+  else setLocalBpOcrStatus('预览已更新', 'idle')
+}
+
+function setLocalBpOcrActiveRegion(regionKey) {
+  localBpOcrActiveRegion = LOCAL_BP_OCR_REGION_META[regionKey] ? regionKey : 'survivors'
+  const buttons = document.querySelectorAll('.local-ocr-region-btn')
+  buttons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.region === localBpOcrActiveRegion)
+  })
+}
+
+function renderLocalBpOcrRegions() {
+  const stage = document.getElementById('localBpOcrPreviewStage')
+  const overlay = document.getElementById('localBpOcrPreviewOverlay')
+  if (!stage || !overlay) return
+  const width = stage.clientWidth
+  const height = stage.clientHeight
+  overlay.innerHTML = ''
+  if (!width || !height || !localBpOcrConfig) return
+
+  for (const key of Object.keys(LOCAL_BP_OCR_REGION_META)) {
+    const region = localBpOcrConfig.regions?.[key]
+    if (!region) continue
+    const meta = LOCAL_BP_OCR_REGION_META[key]
+    const box = document.createElement('div')
+    box.className = `local-ocr-region-box ${meta.css}`
+    box.style.left = `${region.x * width}px`
+    box.style.top = `${region.y * height}px`
+    box.style.width = `${region.width * width}px`
+    box.style.height = `${region.height * height}px`
+
+    const label = document.createElement('div')
+    label.className = 'local-ocr-region-label'
+    label.textContent = meta.label
+    box.appendChild(label)
+    overlay.appendChild(box)
+  }
+
+  if (localBpOcrDrawState && localBpOcrDrawState.active) {
+    const draw = localBpOcrDrawState
+    const box = document.createElement('div')
+    box.className = 'local-ocr-region-box drawing'
+    box.style.left = `${draw.left}px`
+    box.style.top = `${draw.top}px`
+    box.style.width = `${draw.width}px`
+    box.style.height = `${draw.height}px`
+    overlay.appendChild(box)
+  }
+}
+
+function getLocalBpOcrPointInStage(event) {
+  const stage = document.getElementById('localBpOcrPreviewStage')
+  if (!stage) return null
+  const rect = stage.getBoundingClientRect()
+  if (!rect.width || !rect.height) return null
+  const x = clampNumber(event.clientX - rect.left, 0, rect.width, 0)
+  const y = clampNumber(event.clientY - rect.top, 0, rect.height, 0)
+  return { x, y, width: rect.width, height: rect.height }
+}
+
+function bindLocalBpOcrDrawing() {
+  const overlay = document.getElementById('localBpOcrPreviewOverlay')
+  if (!overlay || overlay.dataset.bound === '1') return
+  overlay.dataset.bound = '1'
+
+  overlay.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return
+    const stage = document.getElementById('localBpOcrPreviewStage')
+    if (!stage || !stage.classList.contains('active')) return
+    const point = getLocalBpOcrPointInStage(event)
+    if (!point) return
+    localBpOcrDrawState = {
+      active: true,
+      startX: point.x,
+      startY: point.y,
+      left: point.x,
+      top: point.y,
+      width: 0,
+      height: 0,
+      stageWidth: point.width,
+      stageHeight: point.height
+    }
+    renderLocalBpOcrRegions()
+  })
+
+  window.addEventListener('mousemove', (event) => {
+    if (!localBpOcrDrawState || !localBpOcrDrawState.active) return
+    const point = getLocalBpOcrPointInStage(event)
+    if (!point) return
+    const left = Math.min(localBpOcrDrawState.startX, point.x)
+    const top = Math.min(localBpOcrDrawState.startY, point.y)
+    const width = Math.abs(point.x - localBpOcrDrawState.startX)
+    const height = Math.abs(point.y - localBpOcrDrawState.startY)
+    localBpOcrDrawState.left = left
+    localBpOcrDrawState.top = top
+    localBpOcrDrawState.width = width
+    localBpOcrDrawState.height = height
+    localBpOcrDrawState.stageWidth = point.width
+    localBpOcrDrawState.stageHeight = point.height
+    renderLocalBpOcrRegions()
+  })
+
+  window.addEventListener('mouseup', async (event) => {
+    if (event.button !== 0) return
+    if (!localBpOcrDrawState || !localBpOcrDrawState.active) return
+    const draw = localBpOcrDrawState
+    localBpOcrDrawState = null
+    if (draw.width < 6 || draw.height < 6) {
+      renderLocalBpOcrRegions()
+      return
+    }
+
+    const nextRegion = {
+      x: draw.left / draw.stageWidth,
+      y: draw.top / draw.stageHeight,
+      width: draw.width / draw.stageWidth,
+      height: draw.height / draw.stageHeight
+    }
+    if (!localBpOcrConfig) localBpOcrConfig = getDefaultLocalBpOcrConfig()
+    localBpOcrConfig.regions[localBpOcrActiveRegion] = normalizeRegion(nextRegion)
+    await saveLocalBpOcrConfigPatch({
+      regions: {
+        [localBpOcrActiveRegion]: localBpOcrConfig.regions[localBpOcrActiveRegion]
+      }
+    })
+    renderLocalBpOcrRegions()
+  })
+}
+
+function stopLocalBpOcrLoop() {
+  if (localBpOcrTimer) {
+    clearInterval(localBpOcrTimer)
+    localBpOcrTimer = null
+  }
+  localBpOcrRunning = false
+  if (!localBpOcrBusy) {
+    setLocalBpOcrStatus('待机', 'idle')
+  }
+}
+
+async function runLocalBpOcrOnce() {
+  if (localBpOcrBusy) return
+  if (!localBpOcrConfig || !localBpOcrConfig.windowSourceId) {
+    setLocalBpOcrStatus('请先选择窗口', 'error')
+    return
+  }
+  const hasAnyRegion = Object.values(localBpOcrConfig.regions || {}).some(Boolean)
+  if (!hasAnyRegion) {
+    setLocalBpOcrStatus('请先在预览图上框选区域', 'error')
+    return
+  }
+  localBpOcrBusy = true
+  if (localBpOcrRunning) setLocalBpOcrStatus('识别中', 'running')
+  else setLocalBpOcrStatus('识别中', 'installing')
+
+  try {
+    const result = await window.electronAPI.invoke('localBp:ocrRecognizeOnce', { apply: true })
+    if (!result || !result.success || !result.data) {
+      setLocalBpOcrStatus(result?.error || '识别失败', 'error')
+      return
+    }
+    setLocalBpOcrResultText(formatLocalBpOcrResult(result.data))
+    const warning = result.data?.recognitionMeta?.warning
+    if (warning) {
+      setLocalBpOcrStatus('识别为空，请看结果提示', 'error')
+    } else if (localBpOcrRunning) {
+      setLocalBpOcrStatus('识别中', 'running')
+    } else {
+      setLocalBpOcrStatus('识别完成', 'idle')
+    }
+  } catch (error) {
+    setLocalBpOcrStatus(error?.message || '识别异常', 'error')
+  } finally {
+    localBpOcrBusy = false
+  }
+}
+
+async function startLocalBpOcrLoop() {
+  if (!localBpOcrConfig) localBpOcrConfig = getDefaultLocalBpOcrConfig()
+  const intervalInput = document.getElementById('localBpOcrInterval')
+  const seconds = clampNumber(intervalInput?.value, 1, 30, 4)
+  localBpOcrConfig.intervalMs = Math.round(seconds * 1000)
+  await saveLocalBpOcrConfigPatch({ intervalMs: localBpOcrConfig.intervalMs })
+  if (intervalInput) intervalInput.value = String(seconds)
+
+  stopLocalBpOcrLoop()
+  localBpOcrRunning = true
+  setLocalBpOcrStatus('识别中', 'running')
+  runLocalBpOcrOnce()
+  localBpOcrTimer = setInterval(() => {
+    runLocalBpOcrOnce()
+  }, localBpOcrConfig.intervalMs)
+}
+
+async function pollLocalBpOcrInstallStatus() {
+  const result = await window.electronAPI.invoke('localBp:ocrInstallStatus')
+  if (!result || !result.success || !result.data) return
+  const status = result.data
+  updateLocalBpOcrInstallHint(status)
+  if (status.running) {
+    setLocalBpOcrStatus(status.message || '安装 PaddleOCR 中', 'installing')
+    return
+  }
+  if (status.success && status.paddleReady) {
+    setLocalBpOcrStatus('PaddleOCR 已就绪', localBpOcrRunning ? 'running' : 'idle')
+    if (localBpOcrInstallPollTimer) {
+      clearInterval(localBpOcrInstallPollTimer)
+      localBpOcrInstallPollTimer = null
+    }
+    return
+  }
+  if (!status.running && localBpOcrInstallPollTimer) {
+    clearInterval(localBpOcrInstallPollTimer)
+    localBpOcrInstallPollTimer = null
+  }
+}
+
+async function installLocalBpOcrPaddle() {
+  const btn = document.getElementById('localBpOcrInstallPaddleBtn')
+  if (btn) btn.disabled = true
+  try {
+    const result = await window.electronAPI.invoke('localBp:ocrInstallPaddle')
+    if (!result || !result.success) {
+      setLocalBpOcrStatus(result?.error || '启动安装失败', 'error')
+      return
+    }
+    setLocalBpOcrStatus('安装 PaddleOCR 中', 'installing')
+    if (localBpOcrInstallPollTimer) clearInterval(localBpOcrInstallPollTimer)
+    localBpOcrInstallPollTimer = setInterval(() => {
+      pollLocalBpOcrInstallStatus()
+    }, 2000)
+    pollLocalBpOcrInstallStatus()
+  } finally {
+    if (btn) btn.disabled = false
+  }
+}
+
+function bindLocalBpOcrEvents() {
+  if (localBpOcrInitDone) return
+  localBpOcrInitDone = true
+
+  const refreshBtn = document.getElementById('localBpOcrRefreshWindowsBtn')
+  const captureBtn = document.getElementById('localBpOcrCaptureBtn')
+  const startBtn = document.getElementById('localBpOcrStartBtn')
+  const stopBtn = document.getElementById('localBpOcrStopBtn')
+  const runOnceBtn = document.getElementById('localBpOcrRunOnceBtn')
+  const installBtn = document.getElementById('localBpOcrInstallPaddleBtn')
+  const engineSelect = document.getElementById('localBpOcrEngine')
+  const intervalInput = document.getElementById('localBpOcrInterval')
+  const windowSelect = document.getElementById('localBpOcrWindowSelect')
+  const regionBtns = document.querySelectorAll('.local-ocr-region-btn')
+
+  refreshBtn?.addEventListener('click', () => {
+    refreshLocalBpOcrWindowList()
+  })
+
+  captureBtn?.addEventListener('click', () => {
+    captureLocalBpOcrPreview()
+  })
+
+  startBtn?.addEventListener('click', () => {
+    startLocalBpOcrLoop()
+  })
+
+  stopBtn?.addEventListener('click', () => {
+    stopLocalBpOcrLoop()
+  })
+
+  runOnceBtn?.addEventListener('click', () => {
+    runLocalBpOcrOnce()
+  })
+
+  installBtn?.addEventListener('click', () => {
+    installLocalBpOcrPaddle()
+  })
+
+  engineSelect?.addEventListener('change', async () => {
+    const value = engineSelect.value === 'paddleocr' ? 'paddleocr' : 'windows'
+    localBpOcrConfig.preferredEngine = value
+    await saveLocalBpOcrConfigPatch({ preferredEngine: value })
+  })
+
+  intervalInput?.addEventListener('change', async () => {
+    const seconds = clampNumber(intervalInput.value, 1, 30, 4)
+    intervalInput.value = String(seconds)
+    localBpOcrConfig.intervalMs = Math.round(seconds * 1000)
+    await saveLocalBpOcrConfigPatch({ intervalMs: localBpOcrConfig.intervalMs })
+    if (localBpOcrRunning) {
+      startLocalBpOcrLoop()
+    }
+  })
+
+  windowSelect?.addEventListener('change', async () => {
+    localBpOcrConfig.windowSourceId = windowSelect.value || ''
+    const selected = localBpOcrWindowList.find(item => item.id === localBpOcrConfig.windowSourceId)
+    localBpOcrConfig.windowName = selected?.name || ''
+    await saveLocalBpOcrConfigPatch({
+      windowSourceId: localBpOcrConfig.windowSourceId,
+      windowName: localBpOcrConfig.windowName
+    })
+  })
+
+  regionBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setLocalBpOcrActiveRegion(btn.dataset.region || 'survivors')
+    })
+  })
+
+  bindLocalBpOcrDrawing()
+}
+
+async function initLocalBpOcrPanel() {
+  const panel = document.getElementById('localBpOcrStatus')
+  if (!panel) return
+  await loadLocalBpOcrConfig()
+  bindLocalBpOcrEvents()
+  await refreshLocalBpOcrWindowList()
+  renderLocalBpOcrConfigToUi()
+  setLocalBpOcrStatus('待机', 'idle')
 }
 
 window.bpGuideState = {
@@ -3834,6 +6061,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  if (!isGuideOnly) {
+    initLocalBpModuleLayout()
+    ensureLocalBpModulesOnPageReady('bp')
+  }
+
+  loadLocalBpConsoleBgSettings()
   syncDefaultImagesToMainProcess()
   updateDisplay()
   initGlobalShortcuts()
@@ -3846,6 +6079,18 @@ window.addEventListener('DOMContentLoaded', () => {
     resetInteractionOverlays()
     resetSearchInputs()
     unlockAllInputs()
+  }
+})
+
+window.addEventListener('beforeunload', () => {
+  stopLocalBpOcrLoop()
+  if (localBpConsoleBgSaveTimer) {
+    clearTimeout(localBpConsoleBgSaveTimer)
+    localBpConsoleBgSaveTimer = null
+  }
+  if (localBpOcrInstallPollTimer) {
+    clearInterval(localBpOcrInstallPollTimer)
+    localBpOcrInstallPollTimer = null
   }
 })
 
@@ -3886,7 +6131,7 @@ function initGlobalShortcuts() {
 }
 
 function navigateTab(direction) {
-  const pages = ['bp', 'baseinfo', 'talents', 'score', 'postmatch']
+  const pages = ['bp', 'ocr', 'baseinfo', 'talents', 'score', 'postmatch']
   // Find current active tab
   const activeTab = document.querySelector('.menu-tab.active')
   if (!activeTab) return

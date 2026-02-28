@@ -112,6 +112,25 @@ if (!window.electronAPI) {
         return {}
       }
     },
+    characterGetIndex: async () => {
+      try {
+        const resp = await fetch('/api/local-bp-characters')
+        const payload = await resp.json()
+        if (payload && payload.success) {
+          return {
+            success: true,
+            data: {
+              survivors: payload.data?.survivors || [],
+              hunters: payload.data?.hunters || [],
+              assetOverrides: payload.data?.assetOverrides || {}
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[OBS Mode] 获取角色索引失败:', e)
+      }
+      return { success: false, error: '获取角色索引失败' }
+    },
     // 房间数据监听 - 通过SSE实现
     onRoomData: (callback) => {
       window.onRoomData = callback
@@ -166,6 +185,51 @@ var roomData = null
 var connection = null
 var currentLayout = null
 var timerInterval = null
+let characterAssetOverrides = null
+let characterAssetOverridesLoadedAt = 0
+
+function getCharacterAssetFolder(roleType, variant) {
+  const table = roleType === 'survivor'
+    ? { header: 'surHeader', half: 'surHalf', big: 'surBig' }
+    : { header: 'hunHeader', half: 'hunHalf', big: 'hunBig' }
+  return table[variant] || null
+}
+
+function getCharacterDefaultAssetSrc(roleType, variant, name) {
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder || !name) return ''
+  return `../assets/${folder}/${name}.png`
+}
+
+function getCharacterAssetSrc(roleType, variant, name) {
+  if (!name) return ''
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder) return ''
+  const override = characterAssetOverrides && characterAssetOverrides[folder] && characterAssetOverrides[folder][name]
+  return override || getCharacterDefaultAssetSrc(roleType, variant, name)
+}
+
+async function ensureCharacterAssetOverrides(force = false) {
+  const now = Date.now()
+  if (!force && characterAssetOverrides && (now - characterAssetOverridesLoadedAt) < 5000) {
+    return characterAssetOverrides
+  }
+  try {
+    if (window.electronAPI && typeof window.electronAPI.characterGetIndex === 'function') {
+      const result = await window.electronAPI.characterGetIndex()
+      if (result && result.success && result.data) {
+        characterAssetOverrides = result.data.assetOverrides || {}
+        characterAssetOverridesLoadedAt = now
+        return characterAssetOverrides
+      }
+    }
+  } catch (e) {
+    console.warn('[Frontend] 加载角色资源映射失败:', e)
+  }
+  if (!characterAssetOverrides) characterAssetOverrides = {}
+  characterAssetOverridesLoadedAt = now
+  return characterAssetOverrides
+}
 
 // 默认布局
 const defaultLayout = {
@@ -444,6 +508,64 @@ function closeFontSelector() {
   activeFontContainerId = null
 }
 
+let transparentBorderBlinkTimer = null
+let transparentDragHintTimer = null
+let transparentDragHintListenerBound = false
+
+function triggerTransparentBorderBlink() {
+  const el = document.getElementById('transparentBorderBlink')
+  if (!el) return
+  if (!document.body.classList.contains('transparent-bg')) return
+
+  el.classList.add('active')
+  if (transparentBorderBlinkTimer) {
+    clearTimeout(transparentBorderBlinkTimer)
+  }
+  transparentBorderBlinkTimer = setTimeout(() => {
+    el.classList.remove('active')
+    transparentBorderBlinkTimer = null
+  }, 3000)
+}
+
+function setTransparentDragHintActive(active) {
+  const el = document.getElementById('transparentDragHint')
+  if (!el) return
+  el.classList.toggle('active', active)
+}
+
+function syncTransparentDragHintState() {
+  if (!document.body.classList.contains('transparent-bg')) {
+    if (transparentDragHintTimer) {
+      clearTimeout(transparentDragHintTimer)
+      transparentDragHintTimer = null
+    }
+    setTransparentDragHintActive(false)
+  }
+}
+
+function showTransparentDragHint(duration = 2000) {
+  if (!document.body.classList.contains('transparent-bg')) return
+  setTransparentDragHintActive(true)
+  if (transparentDragHintTimer) {
+    clearTimeout(transparentDragHintTimer)
+  }
+  transparentDragHintTimer = setTimeout(() => {
+    setTransparentDragHintActive(false)
+    transparentDragHintTimer = null
+  }, duration)
+}
+
+function setupTransparentDragHint() {
+  if (transparentDragHintListenerBound) return
+  transparentDragHintListenerBound = true
+  document.addEventListener('mousemove', (e) => {
+    if (!document.body.classList.contains('transparent-bg')) return
+    if (e.clientY <= 24) {
+      showTransparentDragHint(1500)
+    }
+  })
+}
+
 // 点击外部关闭弹窗及样式监听
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('fontSelectorModal')
@@ -608,6 +730,7 @@ if (window.electronAPI && window.electronAPI.onCustomFontsChanged) {
 // 初始化
 async function init() {
   console.log('[Frontend] 前台页面初始化开始')
+  await ensureCharacterAssetOverrides(true)
 
   // 注入样式修复：强制角色名字显示在底部
   const styleFix = document.createElement('style');
@@ -632,6 +755,17 @@ async function init() {
   `;
   document.head.appendChild(styleFix);
 
+  // 启动兜底：主动拉取一次本地BP状态。
+  // 目的：即使 room-data 初始化消息因时序问题未命中监听，也能恢复地图等关键信息。
+  try {
+    const initState = await window.electronAPI.invoke('localBp:getState')
+    if (initState && initState.success && initState.data && initState.data.enabled) {
+      await updateFromLocalBp(initState.data)
+    }
+  } catch (e) {
+    console.warn('[Frontend] 初始化主动拉取本地BP状态失败:', e?.message || e)
+  }
+
   // 加载布局
   const result = await window.electronAPI.loadLayout()
   console.log('[Frontend] 初始化时加载布局结果:', result)
@@ -642,6 +776,9 @@ async function init() {
   }
   console.log('[Frontend] 当前布局:', currentLayout)
   applyLayout()
+  triggerTransparentBorderBlink()
+  setupTransparentDragHint()
+  showTransparentDragHint(2000)
   applyGlobalBanLayoutConfig()
   applyLocalBanLayoutConfig()
 
@@ -686,7 +823,7 @@ async function init() {
   initLayoutSettingsLiveUpdate()
 
   // 监听房间数据
-  window.electronAPI.onRoomData((data) => {
+  window.electronAPI.onRoomData(async (data) => {
     console.log('收到房间数据:', data)
     roomData = data
 
@@ -727,6 +864,15 @@ async function init() {
     // 本地BP模式：不连接服务器
     if (roomData && roomData.localMode) {
       console.log('[Frontend] localMode=true，跳过 connectToServer')
+      // 初始化时主动拉取一次本地BP状态，避免页面首次打开时地图/角色为空
+      try {
+        const res = await window.electronAPI.invoke('localBp:getState')
+        if (res && res.success && res.data) {
+          await updateFromLocalBp(res.data)
+        }
+      } catch (e) {
+        console.warn('[Frontend] 初始化拉取本地BP状态失败:', e?.message || e)
+      }
       return
     }
 
@@ -744,7 +890,11 @@ async function init() {
       triggerLocalBlink(data.index)
     } else if (data.type === 'state') {
       // 更新状态显示
+      await ensureCharacterAssetOverrides()
       updateDisplay(data.state)
+    } else if (data.type === 'character-assets-updated') {
+      await ensureCharacterAssetOverrides(true)
+      if (data.state) updateDisplay(data.state)
     } else if (data.type === 'layout-updated') {
       // 布局已更新，热更新加载
       console.log('布局已更新，执行热更新...')
@@ -770,6 +920,7 @@ async function init() {
       applyLayout()
     } else {
       // 兼容旧的直接传state的方式
+      await ensureCharacterAssetOverrides()
       updateDisplay(data)
     }
   })
@@ -1616,6 +1767,7 @@ function applyLayout() {
   } else {
     document.body.classList.remove('transparent-bg')
   }
+  syncTransparentDragHintState()
 
   // 需要跳过的非DOM元素配置字段
   const skipFields = [
@@ -2340,16 +2492,14 @@ function initDraggable() {
       }
 
       const prev = (currentLayout && currentLayout[activeContainer.id]) ? currentLayout[activeContainer.id] : {}
-      const next = {
-        ...prev,
+      currentLayout[activeContainer.id] = {
         x: parseInt(activeContainer.style.left) || activeContainer.offsetLeft,
         y: parseInt(activeContainer.style.top) || activeContainer.offsetTop,
         width: activeContainer.offsetWidth,
-        height: activeContainer.offsetHeight
+        height: activeContainer.offsetHeight,
+        hidden: (typeof prev.hidden === 'boolean') ? prev.hidden : false,
+        fontFamily: prev.fontFamily || null // Preserve existing font family
       }
-      if (typeof next.hidden !== 'boolean') next.hidden = false
-      if (typeof next.fontFamily === 'undefined') next.fontFamily = null
-      currentLayout[activeContainer.id] = next
 
       // Special handling for timerProgressBar colors
       if (activeContainer.id === 'timerProgressBar') {
@@ -2785,7 +2935,8 @@ async function connectToServer() {
       .build()
 
     // 注册事件处理器
-    connection.on('RoomStateUpdated', (state) => {
+    connection.on('RoomStateUpdated', async (state) => {
+      await ensureCharacterAssetOverrides()
       updateDisplay(state)
     })
 
@@ -2797,7 +2948,8 @@ async function connectToServer() {
       // 会通过RoomStateUpdated更新
     })
 
-    connection.on('PhaseChanged', (state) => {
+    connection.on('PhaseChanged', async (state) => {
+      await ensureCharacterAssetOverrides()
       updateDisplay(state)
     })
 
@@ -2834,6 +2986,7 @@ async function connectToServer() {
     // 以观众身份加入房间
     const state = await connection.invoke('JoinRoom', roomData.roomId, '', 'spectator')
     if (state) {
+      await ensureCharacterAssetOverrides()
       updateDisplay(state)
     }
 
@@ -2926,12 +3079,15 @@ function updateDisplay(state) {
       }
 
       if (logo.startsWith('file://') || logo.startsWith('data:')) {
-        imgEl.src = logo
+        const rev = state && state.assetRev ? `?rev=${state.assetRev}` : ''
+        imgEl.src = logo + rev
       } else {
         const normalizedPath = logo.replace(/\\/g, '/')
-        imgEl.src = normalizedPath.startsWith('/')
+        const baseUrl = normalizedPath.startsWith('/')
           ? `file://${encodeURI(normalizedPath)}`
           : `file:///${encodeURI(normalizedPath)}`
+        const rev = state && state.assetRev ? `?rev=${state.assetRev}` : ''
+        imgEl.src = baseUrl + rev
       }
       imgEl.style.display = 'block'
       const containerId = teamKey === 'teamA' ? 'teamALogo' : 'teamBLogo'
@@ -3029,7 +3185,8 @@ function updateDisplay(state) {
 
           if (hasChanged || nameEl.textContent !== playerName) {
             nameEl.textContent = playerName
-            placeholder.style.display = 'block'
+            // 只有当没有名字且没有角色时才显示问号 placeholder (Align with Hunter logic)
+            placeholder.style.display = playerName ? 'none' : 'block'
             if (imgEl) {
               imgEl.style.display = 'none'
               imgEl.classList.remove('dissolve-in')
@@ -3145,7 +3302,7 @@ function updateDisplay(state) {
       item.className = 'ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/surHeader/${name}.png`
+      img.src = getCharacterAssetSrc('survivor', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3167,7 +3324,7 @@ function updateDisplay(state) {
       item.className = 'ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/hunHeader/${name}.png`
+      img.src = getCharacterAssetSrc('hunter', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3194,7 +3351,7 @@ function updateDisplay(state) {
       item.className = 'global-ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/surHeader/${name}.png`
+      img.src = getCharacterAssetSrc('survivor', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3218,7 +3375,7 @@ function updateDisplay(state) {
       item.className = 'global-ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/hunHeader/${name}.png`
+      img.src = getCharacterAssetSrc('hunter', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3319,9 +3476,22 @@ function updateMapImage(mapName) {
   img.src = url
 }
 
-function updateFromLocalBp(state) {
+async function updateFromLocalBp(state) {
   if (!state) return
+  await ensureCharacterAssetOverrides()
   const mapped = Object.assign({}, state)
+  if (!mapped.currentMap) {
+    try {
+      const raw = localStorage.getItem('localBp_matchBase')
+      const parsed = raw ? JSON.parse(raw) : null
+      if (parsed && typeof parsed.mapName === 'string' && parsed.mapName.trim()) {
+        mapped.currentMap = parsed.mapName.trim()
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (mapped.mapName && !mapped.currentMap) mapped.currentMap = mapped.mapName
   if (mapped.selectedMap && !mapped.currentMap) mapped.currentMap = mapped.selectedMap
   updateDisplay(mapped)
   const idx = Number(state.blinkingSurvivorIndex)
@@ -3404,12 +3574,8 @@ function refreshCharacterImage(boxId) {
 
   const roleType = boxId.startsWith('survivor') ? 'survivor' : 'hunter';
   const displayMode = getCharacterDisplayMode(boxId);
-  // 使用surBig/hunBig作为全身立绘资源
-  const folder = roleType === 'survivor'
-    ? (displayMode === 'full' ? 'surBig' : 'surHalf')
-    : (displayMode === 'full' ? 'hunBig' : 'hunHalf');
-
-  const newSrc = `../assets/${folder}/${characterName}.png`;
+  const variant = displayMode === 'full' ? 'big' : 'half';
+  const newSrc = getCharacterAssetSrc(roleType, variant, characterName);
 
   // 使用淡入淡出效果
   imgEl.style.opacity = '0';
@@ -3422,8 +3588,7 @@ function refreshCharacterImage(boxId) {
       console.warn(`[Frontend] 图片加载失败: ${newSrc}`);
       // 如果全身图加载失败，尝试降级到半身图
       if (displayMode === 'full') {
-        const fallbackFolder = roleType === 'survivor' ? 'surHalf' : 'hunHalf';
-        const fallbackSrc = `../assets/${fallbackFolder}/${characterName}.png`;
+        const fallbackSrc = getCharacterAssetSrc(roleType, 'half', characterName);
         console.log(`[Frontend] 尝试降级到半身图: ${fallbackSrc}`);
         this.src = fallbackSrc;
         this.onerror = function () {
@@ -3458,10 +3623,8 @@ function showImageForCharacter(boxEl, roleType, name) {
 
   // 根据展示模式选择资源文件夹 - 使用surBig/hunBig作为全身立绘
   const displayMode = getCharacterDisplayMode(boxEl.id);
-  const folder = roleType === 'survivor'
-    ? (displayMode === 'full' ? 'surBig' : 'surHalf')
-    : (displayMode === 'full' ? 'hunBig' : 'hunHalf');
-  const src = `../assets/${folder}/${name}.png`;
+  const variant = displayMode === 'full' ? 'big' : 'half';
+  const src = getCharacterAssetSrc(roleType, variant, name);
 
   const previousName = imgEl.getAttribute('data-character')
   const wasVisible = imgEl.style.display !== 'none'

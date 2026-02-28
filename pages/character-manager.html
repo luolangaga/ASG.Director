@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ASG导播 - 角色管理</title>
+  <title>Idvevent导播 - 角色管理</title>
   <style>
     * {
       margin: 0;
@@ -215,6 +215,17 @@
       transform: translateY(-5px);
       border-color: rgba(255, 215, 0, 0.3);
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .character-card.built-in {
+      cursor: default;
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+
+    .character-card.built-in:hover {
+      transform: none;
+      border-color: rgba(148, 163, 184, 0.45);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
     }
 
     .character-card.selected {
@@ -877,7 +888,7 @@
       }
 
       grid.innerHTML = filtered.map(char => `
-        <div class="character-card" onclick="openEditModal('${char.name}')">
+        <div class="character-card ${char.builtIn ? 'built-in' : ''}" data-built-in="${char.builtIn ? '1' : '0'}" onclick="${char.builtIn ? '' : `openEditModal('${char.name}')`}">
           <div class="character-images" style="display:grid; grid-template-columns: 1fr 1fr 1fr;">
             <div class="header-img" style="flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;">
               ${char.hasHeaderImage
@@ -904,9 +915,10 @@
           <div class="character-info">
             <div class="character-info-header">
               <div class="character-name">${char.name}</div>
-              <button class="delete-btn" onclick="event.stopPropagation(); openDeleteModal('${char.name}', '${char.type}')" title="删除角色">🗑️</button>
+              ${char.builtIn ? '<span class="status-badge" style="background:#4b5563;">内置</span>' : `<button class="delete-btn" onclick="event.stopPropagation(); openDeleteModal('${char.name}', '${char.type}')" title="删除角色">🗑️</button>`}
             </div>
             <div class="character-status">
+              ${char.builtIn ? '<span class="status-badge" style="background:#4b5563;">只读</span>' : ''}
               ${char.hasHeaderImage ? '<span class="status-badge has-half">头像</span>' : ''}
               ${char.hasHalfImage ? '<span class="status-badge has-half">半身图</span>' : ''}
               ${char.hasBigImage ? '<span class="status-badge has-big">全身图</span>' : ''}
@@ -1033,6 +1045,10 @@
       try {
         let result
         if (editingCharacter) {
+          if (editingCharacter.builtIn) {
+            showToast('内置角色不可修改，请新增自定义角色', 'error')
+            return
+          }
           // 更新角色
           result = await window.electronAPI.characterUpdate({
             oldName: editingCharacter.name,
@@ -1125,6 +1141,7 @@
     document.addEventListener('contextmenu', (e) => {
       const card = e.target.closest('.character-card')
       if (card) {
+        if (card.dataset.builtIn === '1') return
         e.preventDefault()
         const name = card.querySelector('.character-name').textContent
         openDeleteModal(name, currentTab)

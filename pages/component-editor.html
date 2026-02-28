@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASG 组件设计器</title>
+    <title>Idvevent 组件设计器</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
     
   <link rel="stylesheet" href="./css/component-editor.css">
@@ -14,7 +14,9 @@
     <!-- 顶部工具栏 -->
     <div class="toolbar">
         <span class="toolbar-title">🎨 组件设计器</span>
+        <button class="btn btn-secondary btn-sm" onclick="createNewFrontendWindow()">🪟 新建前台窗口</button>
         <button class="btn btn-secondary btn-sm" onclick="createNewComponent()">➕ 新建组件</button>
+        <button class="btn btn-secondary btn-sm" onclick="openComponentBehaviorTutorial()">📘 API教程</button>
         <button class="btn btn-primary btn-sm" onclick="saveAllComponents()">💾 保存全部</button>
     </div>
 
@@ -22,6 +24,12 @@
         <!-- 左侧组件列表 -->
         <div class="sidebar">
             <div class="sidebar-header">
+                <span class="sidebar-title">前台窗口</span>
+                <span id="windowCount" style="color: var(--text-secondary); font-size: 12px;">0 个</span>
+            </div>
+            <div class="window-list" id="frontendWindowList"></div>
+
+            <div class="sidebar-header" style="border-top: 1px solid var(--border-color);">
                 <span class="sidebar-title">我的组件</span>
                 <span id="componentCount" style="color: var(--text-secondary); font-size: 12px;">0 个</span>
             </div>
@@ -40,6 +48,7 @@
                 <button class="editor-tab active" data-tab="preview" onclick="switchEditorTab('preview')">👁️
                     预览</button>
                 <button class="editor-tab" data-tab="code" onclick="switchEditorTab('code')">📝 代码</button>
+                <button class="editor-tab" data-tab="blocks" onclick="switchEditorTab('blocks')">🧩 积木</button>
             </div>
 
             <div class="editor-content">
@@ -67,6 +76,32 @@
                 <div class="editor-panel" id="codePanel">
                     <div class="code-editor-container">
                         <textarea class="code-editor" id="codeEditor" placeholder="在这里编写 HTML 代码..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 积木面板 -->
+                <div class="editor-panel" id="blocksPanel">
+                    <div class="blocks-layout">
+                        <div class="blocks-sidebar">
+                            <div class="blocks-sidebar-title">触发规则</div>
+                            <div class="blocks-sidebar-desc">
+                                Scratch 风格：先选触发，再拼动作。动作支持调用 API、触发事件、修改组件属性。
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="addBehaviorRule()">➕ 新建规则</button>
+                            <div class="blocks-rule-list" id="blocksRuleList"></div>
+                        </div>
+
+                        <div class="blocks-canvas">
+                            <div class="blocks-canvas-toolbar">
+                                <div class="blocks-canvas-title" id="blocksRuleTitle">选择一条规则开始编辑</div>
+                                <div class="blocks-canvas-controls">
+                                    <select id="blocksNewActionType" class="property-input blocks-inline-select"></select>
+                                    <button class="btn btn-primary btn-sm" onclick="addBehaviorAction()">➕ 添加动作</button>
+                                </div>
+                            </div>
+                            <div class="blocks-rule-config" id="blocksRuleConfig"></div>
+                            <div class="blocks-action-list" id="blocksActionList"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -236,11 +271,72 @@
                 </div>
             </div>
 
+            <div class="export-section">
+                <div class="export-title">投放前台窗口</div>
+                <div class="target-pages" id="targetFrontendWindows"></div>
+                <div class="property-label" style="margin-top: 8px;">
+                    语法与 OBS 自动化一致：支持 <code>{{bpHunter}}</code>、<code>{{bpSurvivors.0}}</code> 等模板变量。
+                </div>
+            </div>
+
+            <div class="properties-section">
+                <div class="properties-section-title">变量快捷插入</div>
+                <div class="quick-vars">
+                    <button class="quick-var-btn" onclick="insertTemplateVariable('{{bpHunter}}')">{{bpHunter}}</button>
+                    <button class="quick-var-btn" onclick="insertTemplateVariable('{{bpSurvivors.0}}')">{{bpSurvivors.0}}</button>
+                    <button class="quick-var-btn" onclick="insertTemplateVariable('{{bpSurvivorsText}}')">{{bpSurvivorsText}}</button>
+                    <button class="quick-var-btn" onclick="insertTemplateVariable('{{matchScore}}')">{{matchScore}}</button>
+                    <button class="quick-var-btn" onclick="insertTemplateVariable('{{matchTitle}}')">{{matchTitle}}</button>
+                    <button class="quick-var-btn" onclick="insertTemplateVariable('{{roomId}}')">{{roomId}}</button>
+                </div>
+            </div>
+
             <!-- 操作按钮 -->
             <div class="properties-section" style="border-bottom: none;">
                 <button class="btn btn-primary" style="width: 100%; margin-bottom: 8px;"
                     onclick="saveCurrentComponent()">💾 保存组件</button>
                 <button class="btn btn-danger" style="width: 100%;" onclick="deleteCurrentComponent()">🗑️ 删除组件</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="newFrontendWindowModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">新建空白前台窗口</span>
+                <button class="modal-close" onclick="closeNewFrontendWindowModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="property-group" style="margin-bottom: 16px;">
+                    <label class="property-label">窗口名称</label>
+                    <input type="text" class="property-input" id="newWindowName" placeholder="例如：赛事信息条窗口">
+                </div>
+                <div class="property-group" style="margin-bottom: 16px;">
+                    <label class="property-label">窗口 ID（英文/数字/连字符）</label>
+                    <input type="text" class="property-input" id="newWindowId" placeholder="例如：info-bar">
+                </div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">宽度</label>
+                        <input type="number" class="property-input" id="newWindowWidth" value="1280" min="320">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">高度</label>
+                        <input type="number" class="property-input" id="newWindowHeight" value="720" min="180">
+                    </div>
+                </div>
+                <label class="target-page-item" style="margin-top: 8px;">
+                    <input type="checkbox" id="newWindowAutoOpen" checked>
+                    <span class="target-page-name">进入本地 BP 时自动打开</span>
+                </label>
+                <label class="target-page-item" style="margin-top: 8px;">
+                    <input type="checkbox" id="newWindowAlwaysOnTop">
+                    <span class="target-page-name">窗口置顶</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeNewFrontendWindowModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmNewFrontendWindow()">创建并打开</button>
             </div>
         </div>
     </div>

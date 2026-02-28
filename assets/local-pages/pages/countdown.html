@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>倒计时</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Manrope:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --accent: #22c55e;
+        --accent-soft: rgba(34, 197, 94, 0.25);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+        font-family: "Manrope", "Microsoft YaHei", sans-serif;
+        color: #f8fafc;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .card {
+        width: 420px;
+        padding: 28px;
+        border-radius: 22px;
+        background: rgba(10, 14, 24, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 24px 40px rgba(0, 0, 0, 0.4);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, var(--accent-soft), transparent 50%);
+        opacity: 0.9;
+        pointer-events: none;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+        z-index: 1;
+      }
+      .title {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .status {
+        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .timer {
+        font-family: "Orbitron", sans-serif;
+        font-size: 72px;
+        letter-spacing: 2px;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+      }
+      .progress-ring {
+        width: 160px;
+        height: 160px;
+        margin: 0 auto;
+        border-radius: 50%;
+        background: conic-gradient(var(--accent) var(--progress, 0%), rgba(255, 255, 255, 0.08) 0%);
+        display: grid;
+        place-items: center;
+        position: relative;
+        z-index: 1;
+      }
+      .progress-ring::after {
+        content: "";
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: rgba(8, 10, 18, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .label {
+        text-align: center;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.65);
+        position: relative;
+        z-index: 1;
+      }
+      .controls {
+        position: absolute;
+        top: 18px;
+        right: 18px;
+        width: 240px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(12, 16, 26, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+      }
+      .controls.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-8px);
+      }
+      .control-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      input, select {
+        background: rgba(5, 8, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: #e2e8f0;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        flex: 1;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: white;
+        background: var(--accent);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .toggle {
+        position: absolute;
+        top: 18px;
+        left: 18px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .blink {
+        animation: blink 1s ease infinite;
+      }
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="card">
+        <div class="header">
+          <div class="title">倒计时</div>
+          <div class="status" id="statusText">待机中</div>
+        </div>
+        <div class="progress-ring" id="ring"></div>
+        <div class="timer" id="timerText">10:00</div>
+        <div class="label" id="labelText">下一场准备中</div>
+      </div>
+      <button class="toggle" id="toggleControls">控件</button>
+      <div class="controls" id="controls">
+        <div class="control-row">
+          <label>提示文字</label>
+          <input id="labelInput" type="text" />
+        </div>
+        <div class="control-row">
+          <label>时长 (分钟)</label>
+          <input id="durationInput" type="number" min="1" max="180" />
+        </div>
+        <div class="control-row">
+          <label>主题颜色</label>
+          <input id="accentInput" type="color" />
+        </div>
+        <div class="btn-row">
+          <button id="startBtn">开始</button>
+          <button class="secondary" id="pauseBtn">暂停</button>
+        </div>
+        <div class="btn-row">
+          <button class="secondary" id="resetBtn">重置</button>
+          <button class="secondary" id="hideBtn">隐藏</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const storageKey = "countdown_widget_v1";
+      const defaults = {
+        label: "下一场准备中",
+        durationMinutes: 10,
+        accent: "#22c55e",
+        hidden: false,
+        controlsHidden: false
+      };
+      const state = { ...defaults, ...(JSON.parse(localStorage.getItem(storageKey)) || {}) };
+      let endTime = null;
+      let running = false;
+      const timerText = document.getElementById("timerText");
+      const statusText = document.getElementById("statusText");
+      const labelText = document.getElementById("labelText");
+      const ring = document.getElementById("ring");
+      const labelInput = document.getElementById("labelInput");
+      const durationInput = document.getElementById("durationInput");
+      const accentInput = document.getElementById("accentInput");
+      const startBtn = document.getElementById("startBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const hideBtn = document.getElementById("hideBtn");
+      const controls = document.getElementById("controls");
+      const toggleControls = document.getElementById("toggleControls");
+      function persist() {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      }
+      function formatTime(seconds) {
+        const clamped = Math.max(0, Math.floor(seconds));
+        const mm = String(Math.floor(clamped / 60)).padStart(2, "0");
+        const ss = String(clamped % 60).padStart(2, "0");
+        return `${mm}:${ss}`;
+      }
+      function apply() {
+        labelText.textContent = state.label;
+        labelInput.value = state.label;
+        durationInput.value = state.durationMinutes;
+        accentInput.value = state.accent;
+        document.documentElement.style.setProperty("--accent", state.accent);
+        document.documentElement.style.setProperty("--accent-soft", `${state.accent}33`);
+        document.querySelector(".card").style.display = state.hidden ? "none" : "flex";
+        hideBtn.textContent = state.hidden ? "显示" : "隐藏";
+        controls.classList.toggle("hidden", state.controlsHidden);
+      }
+      function updateTimer() {
+        const total = state.durationMinutes * 60;
+        let remaining = total;
+        if (running && endTime) {
+          remaining = Math.max(0, (endTime - Date.now()) / 1000);
+        }
+        timerText.textContent = formatTime(remaining);
+        const progress = total > 0 ? ((total - remaining) / total) * 100 : 0;
+        ring.style.setProperty("--progress", `${progress}%`);
+        if (remaining <= 0 && running) {
+          running = false;
+          endTime = null;
+          statusText.textContent = "已结束";
+          timerText.classList.add("blink");
+        } else {
+          timerText.classList.toggle("blink", remaining <= 10 && running);
+          statusText.textContent = running ? "倒计时中" : "待机中";
+        }
+      }
+      labelInput.addEventListener("input", (e) => {
+        state.label = e.target.value;
+        persist();
+        apply();
+      });
+      durationInput.addEventListener("input", (e) => {
+        state.durationMinutes = Math.max(1, Number(e.target.value));
+        persist();
+        updateTimer();
+      });
+      accentInput.addEventListener("input", (e) => {
+        state.accent = e.target.value;
+        persist();
+        apply();
+      });
+      startBtn.addEventListener("click", () => {
+        const total = state.durationMinutes * 60;
+        endTime = Date.now() + total * 1000;
+        running = true;
+        timerText.classList.remove("blink");
+        updateTimer();
+      });
+      pauseBtn.addEventListener("click", () => {
+        if (!running) return;
+        const remaining = Math.max(0, (endTime - Date.now()) / 1000);
+        state.durationMinutes = Math.ceil(remaining / 60);
+        endTime = null;
+        running = false;
+        persist();
+        updateTimer();
+      });
+      resetBtn.addEventListener("click", () => {
+        running = false;
+        endTime = null;
+        state.durationMinutes = defaults.durationMinutes;
+        state.label = defaults.label;
+        persist();
+        apply();
+        updateTimer();
+      });
+      hideBtn.addEventListener("click", () => {
+        state.hidden = !state.hidden;
+        persist();
+        apply();
+      });
+      toggleControls.addEventListener("click", () => {
+        state.controlsHidden = !state.controlsHidden;
+        persist();
+        apply();
+      });
+      apply();
+      updateTimer();
+      setInterval(updateTimer, 200);
+    </script>
+  </body>
+</html>

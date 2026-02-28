@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>滚动信息条</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --accent: #38bdf8;
+        --duration: 18s;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+        font-family: "Manrope", "Microsoft YaHei", sans-serif;
+        color: #f8fafc;
+      }
+      .bar {
+        position: absolute;
+        left: 0;
+        bottom: 4%;
+        width: 100%;
+        padding: 12px 0;
+        background: linear-gradient(90deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.72));
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        overflow: hidden;
+      }
+      .accent {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 3px;
+        width: 100%;
+        background: linear-gradient(90deg, var(--accent), transparent);
+      }
+      .ticker-track {
+        display: flex;
+        white-space: nowrap;
+        animation: scroll var(--duration) linear infinite;
+        gap: 48px;
+      }
+      .ticker-item {
+        font-size: 20px;
+        letter-spacing: 0.5px;
+        padding-left: 40px;
+        position: relative;
+      }
+      .ticker-item::before {
+        content: "●";
+        position: absolute;
+        left: 0;
+        color: var(--accent);
+      }
+      .controls {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 280px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(12, 16, 26, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+      }
+      .controls.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-8px);
+      }
+      textarea, input, select {
+        background: rgba(5, 8, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: #e2e8f0;
+        padding: 6px 8px;
+        font-size: 12px;
+        font-family: "Manrope", "Microsoft YaHei", sans-serif;
+      }
+      textarea {
+        min-height: 70px;
+        resize: vertical;
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        flex: 1;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: white;
+        background: var(--accent);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .toggle {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      @keyframes scroll {
+        from { transform: translateX(100%); }
+        to { transform: translateX(-100%); }
+      }
+      .reverse {
+        animation-direction: reverse;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <div class="accent"></div>
+      <div id="tickerTrack" class="ticker-track"></div>
+    </div>
+    <button class="toggle" id="toggleControls">控件</button>
+    <div class="controls" id="controls">
+      <label>内容（用 | 分隔）</label>
+      <textarea id="contentInput"></textarea>
+      <div class="btn-row">
+        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+          <label>速度</label>
+          <input id="speedInput" type="range" min="6" max="30" step="1" />
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+          <label>方向</label>
+          <select id="directionSelect">
+            <option value="left">向左</option>
+            <option value="right">向右</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+          <label>主色</label>
+          <input id="accentInput" type="color" />
+        </div>
+        <button class="secondary" id="resetBtn">重置</button>
+      </div>
+    </div>
+    <script>
+      const query = new URLSearchParams(window.location.search);
+      const instanceId = (query.get("id") || "default").trim() || "default";
+      const storageKey = `ticker_widget_v2_${instanceId}`;
+      const defaults = {
+        content: "ASG秋季赛开赛｜观众互动抽奖进行中｜感谢赞助商支持｜关注官方账号获取赛程",
+        speed: 18,
+        direction: "left",
+        accent: "#38bdf8",
+        controlsHidden: false
+      };
+      function safeReadState() {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey)) || {};
+        } catch {
+          return {};
+        }
+      }
+      function parseBool(value) {
+        if (value === null || value === undefined) return null;
+        const normalized = String(value).trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) return true;
+        if (["0", "false", "no", "off"].includes(normalized)) return false;
+        return null;
+      }
+      function parseColor(value) {
+        if (typeof value !== "string") return null;
+        const normalized = value.trim();
+        if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) return normalized;
+        return null;
+      }
+      function parseSpeed(value) {
+        const speed = Number(value);
+        if (!Number.isFinite(speed)) return null;
+        if (speed < 6 || speed > 30) return null;
+        return speed;
+      }
+      const state = { ...defaults, ...safeReadState() };
+      const queryState = {};
+      const contentParam = query.get("content");
+      if (contentParam !== null) queryState.content = contentParam;
+      const speedParam = parseSpeed(query.get("speed"));
+      if (speedParam !== null) queryState.speed = speedParam;
+      const directionParam = query.get("direction");
+      if (["left", "right"].includes(directionParam || "")) queryState.direction = directionParam;
+      const accentParam = parseColor(query.get("accent"));
+      if (accentParam) queryState.accent = accentParam;
+      const controlsHiddenParam = parseBool(query.get("controlsHidden"));
+      if (controlsHiddenParam !== null) queryState.controlsHidden = controlsHiddenParam;
+      Object.assign(state, queryState);
+      const tickerTrack = document.getElementById("tickerTrack");
+      const contentInput = document.getElementById("contentInput");
+      const speedInput = document.getElementById("speedInput");
+      const directionSelect = document.getElementById("directionSelect");
+      const accentInput = document.getElementById("accentInput");
+      const controls = document.getElementById("controls");
+      const toggleControls = document.getElementById("toggleControls");
+      const resetBtn = document.getElementById("resetBtn");
+      function persist() {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      }
+      function buildItems() {
+        tickerTrack.innerHTML = "";
+        const items = state.content.split("|").map(item => item.trim()).filter(Boolean);
+        const payload = items.length ? items : [defaults.content];
+        payload.concat(payload).forEach(text => {
+          const span = document.createElement("div");
+          span.className = "ticker-item";
+          span.textContent = text;
+          tickerTrack.appendChild(span);
+        });
+      }
+      function apply() {
+        contentInput.value = state.content;
+        speedInput.value = state.speed;
+        directionSelect.value = state.direction;
+        accentInput.value = state.accent;
+        document.documentElement.style.setProperty("--accent", state.accent);
+        document.documentElement.style.setProperty("--duration", `${state.speed}s`);
+        tickerTrack.classList.toggle("reverse", state.direction === "right");
+        controls.classList.toggle("hidden", state.controlsHidden);
+        buildItems();
+      }
+      contentInput.addEventListener("input", (e) => {
+        state.content = e.target.value;
+        persist();
+        apply();
+      });
+      speedInput.addEventListener("input", (e) => {
+        state.speed = Number(e.target.value);
+        persist();
+        apply();
+      });
+      directionSelect.addEventListener("change", (e) => {
+        state.direction = e.target.value;
+        persist();
+        apply();
+      });
+      accentInput.addEventListener("input", (e) => {
+        state.accent = e.target.value;
+        persist();
+        apply();
+      });
+      resetBtn.addEventListener("click", () => {
+        Object.assign(state, defaults);
+        persist();
+        apply();
+      });
+      toggleControls.addEventListener("click", () => {
+        state.controlsHidden = !state.controlsHidden;
+        persist();
+        apply();
+      });
+      if (Object.keys(queryState).length > 0) {
+        persist();
+      }
+      apply();
+    </script>
+  </body>
+</html>

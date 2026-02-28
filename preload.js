@@ -106,6 +106,14 @@ const electronAPI = {
   // 透明背景设置
   getTransparentBackground: () => ipcRenderer.invoke('get-transparent-background'),
   setTransparentBackground: (enabled) => ipcRenderer.invoke('set-transparent-background', enabled),
+  getBpStartupWindowAnimation: () => ipcRenderer.invoke('bp-startup-window-animation:get'),
+  setBpStartupWindowAnimation: (enabled) => ipcRenderer.invoke('bp-startup-window-animation:set', enabled),
+  directorSyncGetSettings: () => ipcRenderer.invoke('director-sync:get-settings'),
+  directorSyncSetSettings: (patch) => ipcRenderer.invoke('director-sync:set-settings', patch),
+  directorSyncGetStatus: () => ipcRenderer.invoke('director-sync:get-status'),
+  directorSyncReconnect: () => ipcRenderer.invoke('director-sync:reconnect'),
+  directorSyncDisconnect: () => ipcRenderer.invoke('director-sync:disconnect'),
+  onDirectorSyncStatus: (callback) => ipcRenderer.on('director-sync-status', (event, status) => callback(status)),
 
   // 背景图片
   selectBackground: () => ipcRenderer.invoke('select-background'),
@@ -137,6 +145,8 @@ const electronAPI = {
 
   // 本地前台（仅前台窗口）
   openLocalFrontend: () => ipcRenderer.invoke('open-local-frontend'),
+  openCustomFrontendWindow: (windowId) => ipcRenderer.invoke('open-custom-frontend-window', windowId),
+  closeCustomFrontendWindow: (windowId) => ipcRenderer.invoke('close-custom-frontend-window', windowId),
 
   // 内置地图资源列表
   listMapAssets: () => ipcRenderer.invoke('list-map-assets'),
@@ -162,7 +172,10 @@ const electronAPI = {
   openStore: () => ipcRenderer.invoke('open-store'),
   openPluginStore: () => ipcRenderer.invoke('open-plugin-store'),
   openComponentEditor: () => ipcRenderer.invoke('open-component-editor'),
+  openComponentDesignerTutorial: () => ipcRenderer.invoke('open-component-designer-tutorial'),
   openAnimationEditor: () => ipcRenderer.invoke('open-animation-editor'),
+  openObsAutomationEditor: () => ipcRenderer.invoke('obs-automation:open-editor'),
+  openObsAutomationTutorial: () => ipcRenderer.invoke('obs-automation:open-tutorial'),
 
   // 插件系统
   openPluginManager: () => ipcRenderer.invoke('open-plugin-manager'),
@@ -174,8 +187,14 @@ const electronAPI = {
   switchEnvironment: (env) => ipcRenderer.invoke('switch-environment', env),
   localPagesGetPages: () => ipcRenderer.invoke('local-pages:get-pages'),
   localPagesGetStatus: () => ipcRenderer.invoke('local-pages:get-status'),
+  localPagesReadFile: (fileName) => ipcRenderer.invoke('local-pages:read-file', fileName),
+  localPagesWriteFile: (fileName, content) => ipcRenderer.invoke('local-pages:write-file', fileName, content),
+  localPagesGenerateWithAi: (payload) => ipcRenderer.invoke('local-pages:generate-with-ai', payload),
   localBpAutoOpenGet: () => ipcRenderer.invoke('local-bp:auto-open:get'),
   localBpAutoOpenSet: (settings) => ipcRenderer.invoke('local-bp:auto-open:set', settings),
+  getLocalBpConsoleBackground: () => ipcRenderer.invoke('local-bp-console-bg:get'),
+  setLocalBpConsoleBackground: (settings) => ipcRenderer.invoke('local-bp-console-bg:set', settings),
+  selectLocalBpConsoleBackground: (options) => ipcRenderer.invoke('local-bp-console-bg:select-image', options),
   getFrontendResizeLock: () => ipcRenderer.invoke('frontend-resize-lock:get'),
   setFrontendResizeLock: (locked) => ipcRenderer.invoke('frontend-resize-lock:set', locked),
   storeGetPacks: (params) => ipcRenderer.invoke('store-get-packs', params),
@@ -204,6 +223,7 @@ const electronAPI = {
 
   // 应用控制
   restartApp: () => ipcRenderer.invoke('app-restart'),
+  notifyMainUiBootstrapReady: () => ipcRenderer.invoke('main-ui-bootstrap-ready'),
 
   // 应用更新
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
@@ -216,6 +236,7 @@ const electronAPI = {
   getAuthStatus: () => ipcRenderer.invoke('asg-get-auth-status'),
   getMyEvents: () => ipcRenderer.invoke('asg-get-my-events'),
   getEventMatches: (eventId) => ipcRenderer.invoke('asg-get-event-matches', eventId),
+  getPublicPartners: (type) => ipcRenderer.invoke('asg-get-public-partners', type),
   getMatchPredictions: (matchId) => ipcRenderer.invoke('asg-get-match-predictions', matchId),
   createBilibiliPrediction: (dto) => ipcRenderer.invoke('asg-create-bilibili-prediction', dto),
   openPredictionWindow: (matchId) => ipcRenderer.invoke('open-prediction-window', matchId),

@@ -112,6 +112,25 @@ if (!window.electronAPI) {
         return {}
       }
     },
+    characterGetIndex: async () => {
+      try {
+        const resp = await fetch('/api/local-bp-characters')
+        const payload = await resp.json()
+        if (payload && payload.success) {
+          return {
+            success: true,
+            data: {
+              survivors: payload.data?.survivors || [],
+              hunters: payload.data?.hunters || [],
+              assetOverrides: payload.data?.assetOverrides || {}
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[OBS Mode] 获取角色索引失败:', e)
+      }
+      return { success: false, error: '获取角色索引失败' }
+    },
     // 房间数据监听 - 通过SSE实现
     onRoomData: (callback) => {
       window.onRoomData = callback
@@ -166,6 +185,61 @@ var roomData = null
 var connection = null
 var currentLayout = null
 var timerInterval = null
+let characterAssetOverrides = null
+let characterAssetOverridesLoadedAt = 0
+const FRONTEND_MAIN_WINDOW_ID = 'frontend-main'
+const currentFrontendWindowId = (() => {
+  try {
+    const params = new URLSearchParams(window.location.search || '')
+    return params.get('windowId') || FRONTEND_MAIN_WINDOW_ID
+  } catch {
+    return FRONTEND_MAIN_WINDOW_ID
+  }
+})()
+window.__ASG_FRONTEND_WINDOW_ID__ = currentFrontendWindowId
+
+function getCharacterAssetFolder(roleType, variant) {
+  const table = roleType === 'survivor'
+    ? { header: 'surHeader', half: 'surHalf', big: 'surBig' }
+    : { header: 'hunHeader', half: 'hunHalf', big: 'hunBig' }
+  return table[variant] || null
+}
+
+function getCharacterDefaultAssetSrc(roleType, variant, name) {
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder || !name) return ''
+  return `../assets/${folder}/${name}.png`
+}
+
+function getCharacterAssetSrc(roleType, variant, name) {
+  if (!name) return ''
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder) return ''
+  const override = characterAssetOverrides && characterAssetOverrides[folder] && characterAssetOverrides[folder][name]
+  return override || getCharacterDefaultAssetSrc(roleType, variant, name)
+}
+
+async function ensureCharacterAssetOverrides(force = false) {
+  const now = Date.now()
+  if (!force && characterAssetOverrides && (now - characterAssetOverridesLoadedAt) < 5000) {
+    return characterAssetOverrides
+  }
+  try {
+    if (window.electronAPI && typeof window.electronAPI.characterGetIndex === 'function') {
+      const result = await window.electronAPI.characterGetIndex()
+      if (result && result.success && result.data) {
+        characterAssetOverrides = result.data.assetOverrides || {}
+        characterAssetOverridesLoadedAt = now
+        return characterAssetOverrides
+      }
+    }
+  } catch (e) {
+    console.warn('[Frontend] 加载角色资源映射失败:', e)
+  }
+  if (!characterAssetOverrides) characterAssetOverrides = {}
+  characterAssetOverridesLoadedAt = now
+  return characterAssetOverrides
+}
 
 // 默认布局
 const defaultLayout = {
@@ -666,6 +740,7 @@ if (window.electronAPI && window.electronAPI.onCustomFontsChanged) {
 // 初始化
 async function init() {
   console.log('[Frontend] 前台页面初始化开始')
+  await ensureCharacterAssetOverrides(true)
 
   // 注入样式修复：强制角色名字显示在底部
   const styleFix = document.createElement('style');
@@ -689,6 +764,17 @@ async function init() {
     }
   `;
   document.head.appendChild(styleFix);
+
+  // 启动兜底：主动拉取一次本地BP状态。
+  // 目的：即使 room-data 初始化消息因时序问题未命中监听，也能恢复地图等关键信息。
+  try {
+    const initState = await window.electronAPI.invoke('localBp:getState')
+    if (initState && initState.success && initState.data && initState.data.enabled) {
+      await updateFromLocalBp(initState.data)
+    }
+  } catch (e) {
+    console.warn('[Frontend] 初始化主动拉取本地BP状态失败:', e?.message || e)
+  }
 
   // 加载布局
   const result = await window.electronAPI.loadLayout()
@@ -747,9 +833,18 @@ async function init() {
   initLayoutSettingsLiveUpdate()
 
   // 监听房间数据
-  window.electronAPI.onRoomData((data) => {
+  window.electronAPI.onRoomData(async (data) => {
     console.log('收到房间数据:', data)
     roomData = data
+    customComponentTemplateVars = Object.assign({}, customComponentTemplateVars, {
+      roomId: data?.roomId || customComponentTemplateVars.roomId || 'local-bp',
+      roomName: data?.roomName || data?.roomId || customComponentTemplateVars.roomName || '',
+      roomStatus: data?.localMode ? 'localbp' : (data?.status || customComponentTemplateVars.roomStatus || ''),
+      bpTeamA: data?.teamAName || customComponentTemplateVars.bpTeamA || '',
+      bpTeamB: data?.teamBName || customComponentTemplateVars.bpTeamB || '',
+      localTeamA: data?.teamAName || customComponentTemplateVars.localTeamA || '',
+      localTeamB: data?.teamBName || customComponentTemplateVars.localTeamB || ''
+    })
 
     // 显示队伍名称和logo
     if (roomData.teamAName) {
@@ -788,6 +883,15 @@ async function init() {
     // 本地BP模式：不连接服务器
     if (roomData && roomData.localMode) {
       console.log('[Frontend] localMode=true，跳过 connectToServer')
+      // 初始化时主动拉取一次本地BP状态，避免页面首次打开时地图/角色为空
+      try {
+        const res = await window.electronAPI.invoke('localBp:getState')
+        if (res && res.success && res.data) {
+          await updateFromLocalBp(res.data)
+        }
+      } catch (e) {
+        console.warn('[Frontend] 初始化拉取本地BP状态失败:', e?.message || e)
+      }
       return
     }
 
@@ -797,7 +901,14 @@ async function init() {
   // 监听更新数据
   window.electronAPI.onUpdateData(async (data) => {
     console.log('收到更新数据:', data)
-    if (data.type === 'timer') {
+    refreshCustomComponentTemplateVars(data)
+    if (data && data.type === 'automation-component-patch') {
+      applyAutomationComponentPatch(data)
+      return
+    } else if (data && data.type === 'automation-custom-event') {
+      applyAutomationCustomEvent(data)
+      return
+    } else if (data.type === 'timer') {
       // 更新计时器显示
       updateTimerFromBackend(data.remaining)
       updateTimerProgressBar(data.remaining, data.total, data.indeterminate)
@@ -805,7 +916,15 @@ async function init() {
       triggerLocalBlink(data.index)
     } else if (data.type === 'state') {
       // 更新状态显示
+      await ensureCharacterAssetOverrides()
       updateDisplay(data.state)
+      refreshCustomComponentsByTemplate(data)
+    } else if (data.type === 'score') {
+      refreshCustomComponentsByTemplate(data)
+    } else if (data.type === 'character-assets-updated') {
+      await ensureCharacterAssetOverrides(true)
+      if (data.state) updateDisplay(data.state)
+      refreshCustomComponentsByTemplate(data)
     } else if (data.type === 'layout-updated') {
       // 布局已更新，热更新加载
       console.log('布局已更新，执行热更新...')
@@ -831,7 +950,9 @@ async function init() {
       applyLayout()
     } else {
       // 兼容旧的直接传state的方式
+      await ensureCharacterAssetOverrides()
       updateDisplay(data)
+      refreshCustomComponentsByTemplate(data)
     }
   })
 
@@ -1024,11 +1145,531 @@ async function loadPluginWidgets() {
 
 // ========= 用户自定义组件系统 =========
 let customComponentsLoaded = []
+let customComponentTemplateVars = { timestamp: Date.now(), frontendWindowId: currentFrontendWindowId }
+let latestFrontendStateForTemplate = null
+let latestScoreDataForTemplate = null
+let lastTemplateEventData = {}
+let customComponentUpdateListenerBound = false
+
+function getTemplateNestedValue(obj, path) {
+  if (!obj || typeof obj !== 'object' || !path) return undefined
+  const parts = String(path).split('.')
+  let value = obj
+  for (const part of parts) {
+    if (value == null) return undefined
+    value = value[part]
+  }
+  return value
+}
+
+function resolveCustomComponentTemplate(template, eventData = {}) {
+  if (typeof template !== 'string' || !template) return ''
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, rawPath) => {
+    const path = String(rawPath || '').trim()
+    if (!path) return ''
+    if (path.startsWith('eventData.')) {
+      return getTemplateNestedValue(eventData, path.slice(10)) ?? ''
+    }
+    if (Object.prototype.hasOwnProperty.call(customComponentTemplateVars, path)) {
+      return customComponentTemplateVars[path] ?? ''
+    }
+    return getTemplateNestedValue(customComponentTemplateVars, path) ?? ''
+  })
+}
+
+function isComponentTargetForCurrentFrontendWindow(comp) {
+  if (!comp || !Array.isArray(comp.targetPages) || !comp.targetPages.includes('frontend')) return false
+  const targets = Array.isArray(comp.targetWindows)
+    ? comp.targetWindows.map(v => String(v || '').trim()).filter(Boolean)
+    : []
+  if (!targets.length) return currentFrontendWindowId === FRONTEND_MAIN_WINDOW_ID
+  return targets.includes(currentFrontendWindowId)
+}
+
+function asTemplateInt(input, fallback = 0) {
+  const n = parseInt(input, 10)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function asTemplateString(input, fallback = '') {
+  if (typeof input === 'string') return input
+  if (input == null) return fallback
+  return String(input)
+}
+
+function normalizeTemplateHalf(input) {
+  return input === 'lower' ? 'lower' : 'upper'
+}
+
+function resolveTemplateScoreDisplayTarget(scoreData) {
+  const bos = Array.isArray(scoreData?.bos) ? scoreData.bos : []
+  if (!bos.length) {
+    return { round: 1, half: 'upper', scoreA: 0, scoreB: 0, boCount: 0 }
+  }
+
+  const cfgRaw = (scoreData?.displayConfig && typeof scoreData.displayConfig === 'object') ? scoreData.displayConfig : {}
+  const legacyHalf = (asTemplateInt(scoreData?.currentHalf, 1) === 2) ? 'lower' : 'upper'
+  const auto = (typeof cfgRaw.auto === 'boolean')
+    ? cfgRaw.auto
+    : !((scoreData?.scoreboardDisplay?.teamA === 'upper') || (scoreData?.scoreboardDisplay?.teamA === 'lower'))
+  const round = Math.max(1, Math.min(bos.length, asTemplateInt(cfgRaw.round, asTemplateInt(scoreData?.currentRound, 1))))
+  const half = normalizeTemplateHalf(cfgRaw.half || legacyHalf)
+
+  let targetIndex = round - 1
+  let targetHalf = half
+
+  if (auto) {
+    targetIndex = 0
+    targetHalf = 'upper'
+    let found = false
+    for (let i = bos.length - 1; i >= 0; i--) {
+      const bo = bos[i] || {}
+      const hasLower = asTemplateInt(bo?.lower?.teamA, 0) > 0 || asTemplateInt(bo?.lower?.teamB, 0) > 0
+      const hasUpper = asTemplateInt(bo?.upper?.teamA, 0) > 0 || asTemplateInt(bo?.upper?.teamB, 0) > 0
+      if (hasLower) {
+        targetIndex = i
+        targetHalf = 'lower'
+        found = true
+        break
+      }
+      if (hasUpper) {
+        targetIndex = i
+        targetHalf = 'upper'
+        found = true
+        break
+      }
+    }
+    if (!found) {
+      targetIndex = 0
+      targetHalf = 'upper'
+    }
+  }
+
+  const bo = bos[targetIndex] || {}
+  const halfData = bo[targetHalf] || {}
+  return {
+    round: targetIndex + 1,
+    half: targetHalf,
+    scoreA: asTemplateInt(halfData.teamA, 0),
+    scoreB: asTemplateInt(halfData.teamB, 0),
+    boCount: bos.length
+  }
+}
+
+function buildTemplateMatchVariables(eventData = {}) {
+  const vars = (eventData && eventData.__templateVarsBase && typeof eventData.__templateVarsBase === 'object')
+    ? eventData.__templateVarsBase
+    : (customComponentTemplateVars || {})
+  const scoreData = (eventData?.scoreData && typeof eventData.scoreData === 'object') ? eventData.scoreData : latestScoreDataForTemplate
+  const target = resolveTemplateScoreDisplayTarget(scoreData)
+
+  const teamAName = asTemplateString(
+    scoreData?.teamAName ?? eventData?.teamA?.name ?? eventData?.teamAName ?? vars.matchTeamA ?? vars.localTeamA ?? '',
+    ''
+  )
+  const teamBName = asTemplateString(
+    scoreData?.teamBName ?? eventData?.teamB?.name ?? eventData?.teamBName ?? vars.matchTeamB ?? vars.localTeamB ?? '',
+    ''
+  )
+  const scoreA = asTemplateInt(scoreData?.teamAWins, asTemplateInt(eventData?.matchScoreA, asTemplateInt(vars.matchScoreA, 0)))
+  const scoreB = asTemplateInt(scoreData?.teamBWins, asTemplateInt(eventData?.matchScoreB, asTemplateInt(vars.matchScoreB, 0)))
+  const drawA = asTemplateInt(scoreData?.teamADraws, asTemplateInt(eventData?.matchDrawA, asTemplateInt(vars.matchDrawA, 0)))
+  const drawB = asTemplateInt(scoreData?.teamBDraws, asTemplateInt(eventData?.matchDrawB, asTemplateInt(vars.matchDrawB, 0)))
+  const mapName = asTemplateString(eventData?.mapName ?? vars.mapName ?? '', '')
+  const round = asTemplateInt(target.round, asTemplateInt(vars.matchRound, 1))
+  const half = normalizeTemplateHalf(target.half || vars.matchHalf)
+  const halfText = half === 'lower' ? '下半局' : '上半局'
+  const smallA = asTemplateInt(target.scoreA, asTemplateInt(vars.matchSmallScoreA, 0))
+  const smallB = asTemplateInt(target.scoreB, asTemplateInt(vars.matchSmallScoreB, 0))
+  const boCount = asTemplateInt(target.boCount, asTemplateInt(vars.matchBoCount, 0))
+  const hasTeamNames = !!(teamAName || teamBName)
+
+  return {
+    matchTeamA: teamAName,
+    matchTeamB: teamBName,
+    matchScoreA: scoreA,
+    matchScoreB: scoreB,
+    matchDrawA: drawA,
+    matchDrawB: drawB,
+    matchMap: mapName,
+    matchRound: round,
+    matchHalf: half,
+    matchHalfText: halfText,
+    matchBoCount: boCount,
+    matchSmallScoreA: smallA,
+    matchSmallScoreB: smallB,
+    matchScore: `${scoreA}:${scoreB}`,
+    matchSmallScore: `${smallA}:${smallB}`,
+    matchTitle: hasTeamNames ? `${teamAName} vs ${teamBName}` : '',
+    matchScoreText: hasTeamNames ? `${teamAName} ${scoreA} : ${scoreB} ${teamBName}` : `${scoreA}:${scoreB}`
+  }
+}
+
+function applyBpTemplateVariables(targetVars, eventData = {}) {
+  if (!targetVars || typeof targetVars !== 'object') return
+  const survivors = eventData.survivors || eventData.selectedSurvivors || []
+  const selectedCount = survivors.filter(Boolean).length
+  const bannedSurvivors = eventData.hunterBannedSurvivors || []
+  const bannedHunters = eventData.survivorBannedHunters || []
+
+  Object.assign(targetVars, {
+    bpHunter: eventData.hunter || eventData.selectedHunter || eventData.character || '',
+    bpSurvivors: survivors,
+    bpBannedSurvivors: bannedSurvivors,
+    bpBannedHunters: bannedHunters,
+    bpRound: eventData.round || eventData.currentRound || 0,
+    bpSurvivorSelectedCount: Number.isFinite(eventData.selectedCount) ? eventData.selectedCount : selectedCount,
+    bpLatestSurvivor: eventData.survivor || eventData.character || '',
+    'bpSurvivors.0': survivors[0] || '',
+    'bpSurvivors.1': survivors[1] || '',
+    'bpSurvivors.2': survivors[2] || '',
+    'bpSurvivors.3': survivors[3] || '',
+    bpSurvivorsText: survivors.filter(s => s).join(', '),
+    bpBannedSurvivorsText: bannedSurvivors.filter(s => s).join(', '),
+    bpBannedHuntersText: bannedHunters.filter(s => s).join(', '),
+    bpTeamA: eventData.teamAName || eventData.teamA || '',
+    bpTeamB: eventData.teamBName || eventData.teamB || ''
+  })
+}
+
+function buildTemplateEventDataFromState(state, rawData = {}) {
+  const data = rawData && typeof rawData === 'object' ? rawData : {}
+  const st = state && typeof state === 'object' ? state : {}
+  const roundData = st.currentRoundData || {}
+  const survivors = Array.isArray(roundData.selectedSurvivors)
+    ? roundData.selectedSurvivors
+    : (Array.isArray(st.survivors) ? st.survivors : [])
+  const selectedCount = survivors.filter(Boolean).length
+  const latestSurvivor = selectedCount > 0 ? (survivors[selectedCount - 1] || '') : ''
+
+  return {
+    ...data,
+    roomId: data.roomId || roomData?.roomId || '',
+    roomName: data.roomName || roomData?.roomId || roomData?.roomName || '',
+    status: data.status || data.roomStatus || roomData?.status || 'localbp',
+    mapName: data.mapName || st.currentMap || st.mapName || '',
+    teamA: data.teamA || st.teamA || {},
+    teamB: data.teamB || st.teamB || {},
+    teamAName: data.teamAName || st?.teamA?.name || '',
+    teamBName: data.teamBName || st?.teamB?.name || '',
+    hunter: data.hunter || roundData.selectedHunter || st.hunter || '',
+    selectedHunter: data.selectedHunter || roundData.selectedHunter || st.hunter || '',
+    survivors,
+    selectedSurvivors: survivors,
+    selectedCount: asTemplateInt(data.selectedCount, selectedCount),
+    survivor: data.survivor || latestSurvivor,
+    character: data.character || data.survivor || latestSurvivor || roundData.selectedHunter || st.hunter || '',
+    hunterBannedSurvivors: data.hunterBannedSurvivors || roundData.hunterBannedSurvivors || st.hunterBannedSurvivors || [],
+    survivorBannedHunters: data.survivorBannedHunters || roundData.survivorBannedHunters || st.survivorBannedHunters || [],
+    round: asTemplateInt(data.round, asTemplateInt(st.currentRound || data.currentRound, 0)),
+    currentRound: asTemplateInt(data.currentRound, asTemplateInt(st.currentRound || data.round, 0)),
+    scoreData: data.scoreData || latestScoreDataForTemplate || undefined
+  }
+}
+
+function buildTemplateEventDataFromScore(scoreData, rawData = {}) {
+  const data = rawData && typeof rawData === 'object' ? rawData : {}
+  const score = scoreData && typeof scoreData === 'object' ? scoreData : {}
+  const st = latestFrontendStateForTemplate || {}
+  const vars = customComponentTemplateVars || {}
+  return {
+    ...data,
+    scoreData: score,
+    mapName: data.mapName || st.currentMap || st.mapName || vars.mapName || '',
+    teamA: data.teamA || st.teamA || {},
+    teamB: data.teamB || st.teamB || {},
+    teamAName: data.teamAName || st?.teamA?.name || vars.localTeamA || '',
+    teamBName: data.teamBName || st?.teamB?.name || vars.localTeamB || '',
+    roomId: data.roomId || vars.roomId || roomData?.roomId || '',
+    roomName: data.roomName || vars.roomName || roomData?.roomId || '',
+    status: data.status || data.roomStatus || vars.roomStatus || 'localbp'
+  }
+}
+
+function normalizeTemplateEventData(data) {
+  if (!data || typeof data !== 'object') return {}
+  if (data.type === 'state' && data.state) return buildTemplateEventDataFromState(data.state, data)
+  if (data.state && typeof data.state === 'object') return buildTemplateEventDataFromState(data.state, data)
+  if (data.type === 'score' && data.scoreData) return buildTemplateEventDataFromScore(data.scoreData, data)
+  if (data.scoreData && typeof data.scoreData === 'object') return buildTemplateEventDataFromScore(data.scoreData, data)
+  return data
+}
+
+function resolveTemplateEventType(rawData, normalizedData) {
+  const raw = rawData && typeof rawData === 'object' ? rawData : {}
+  const normalized = normalizedData && typeof normalizedData === 'object' ? normalizedData : {}
+
+  const explicit = typeof raw.eventType === 'string' && raw.eventType.trim()
+    ? raw.eventType.trim()
+    : (typeof normalized.eventType === 'string' ? normalized.eventType.trim() : '')
+  if (explicit) return explicit
+
+  const rawType = typeof raw.type === 'string' ? raw.type.trim() : ''
+  if (rawType && rawType.includes(':')) return rawType
+  if (rawType === 'state' || (raw.state && typeof raw.state === 'object')) return 'localbp:state-updated'
+  if (rawType === 'score' || (raw.scoreData && typeof raw.scoreData === 'object')) return 'localbp:score-updated'
+  if (rawType === 'timer') return 'timer:interval'
+  return rawType || 'frontend:update'
+}
+
+function updateTemplateVarsByObsEventType(eventType, eventData = {}) {
+  const vars = customComponentTemplateVars || {}
+  const nextVars = Object.assign({}, vars, {
+    lastEvent: eventType,
+    lastEventData: eventData,
+    timestamp: Date.now(),
+    frontendWindowId: currentFrontendWindowId
+  })
+
+  if (eventType.startsWith('bp:')) {
+    applyBpTemplateVariables(nextVars, eventData)
+  }
+
+  if (eventType.startsWith('localbp:')) {
+    const prevRoomId = nextVars.roomId || ''
+    const prevRoomName = nextVars.roomName || ''
+    const prevRoomStatus = nextVars.roomStatus || ''
+    const prevMapName = nextVars.mapName || ''
+    const prevTeamA = nextVars.localTeamA || ''
+    const prevTeamB = nextVars.localTeamB || ''
+
+    Object.assign(nextVars, {
+      roomId: eventData.roomId || eventData.id || prevRoomId,
+      roomName: eventData.roomName || eventData.name || prevRoomName,
+      roomStatus: eventData.status || prevRoomStatus,
+      mapName: eventData.mapName || prevMapName,
+      localTeamA: eventData.teamA?.name || eventData.teamAName || prevTeamA,
+      localTeamB: eventData.teamB?.name || eventData.teamBName || prevTeamB
+    })
+
+    Object.assign(nextVars, buildTemplateMatchVariables({
+      ...eventData,
+      __templateVarsBase: nextVars
+    }))
+  }
+
+  if (eventType === 'timer:interval') {
+    Object.assign(nextVars, {
+      timerRuleId: eventData.timerRuleId || '',
+      timerRuleName: eventData.timerRuleName || '',
+      intervalMs: Number.isFinite(eventData.intervalMs) ? eventData.intervalMs : 0
+    })
+  }
+
+  customComponentTemplateVars = nextVars
+}
+
+function refreshCustomComponentTemplateVars(data) {
+  if (!data || typeof data !== 'object') return
+  const normalizedData = normalizeTemplateEventData(data)
+  lastTemplateEventData = normalizedData
+
+  if (data.type === 'state' && data.state) {
+    latestFrontendStateForTemplate = data.state
+    applyBpTemplateVariables(customComponentTemplateVars, normalizedData)
+  } else if (data.state && typeof data.state === 'object') {
+    latestFrontendStateForTemplate = data.state
+    applyBpTemplateVariables(customComponentTemplateVars, normalizedData)
+  } else if (data.type === 'score' && data.scoreData) {
+    latestScoreDataForTemplate = data.scoreData
+  } else if (data.scoreData && typeof data.scoreData === 'object') {
+    latestScoreDataForTemplate = data.scoreData
+  }
+
+  const eventType = resolveTemplateEventType(data, normalizedData)
+  updateTemplateVarsByObsEventType(eventType, normalizedData)
+}
+
+function shouldApplyAutomationMessage(data, pageName = 'frontend') {
+  if (!data || typeof data !== 'object') return false
+  const targetPage = typeof data.targetPage === 'string' ? data.targetPage.trim().toLowerCase() : ''
+  if (targetPage && targetPage !== 'all' && targetPage !== pageName) return false
+  const targetWindowId = typeof data.targetWindowId === 'string' ? data.targetWindowId.trim() : ''
+  if (targetWindowId && targetWindowId !== currentFrontendWindowId) return false
+  return true
+}
+
+function parseAutomationPatchObject(input) {
+  if (input && typeof input === 'object' && !Array.isArray(input)) return input
+  if (typeof input === 'string' && input.trim()) {
+    try {
+      const parsed = JSON.parse(input)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
+function toCssLength(value, fallback = null) {
+  if (value == null || value === '') return fallback
+  if (typeof value === 'number' && Number.isFinite(value)) return `${Math.round(value)}px`
+  const raw = String(value).trim()
+  if (!raw) return fallback
+  if (/^-?\d+(\.\d+)?$/.test(raw)) return `${Math.round(Number(raw))}px`
+  return raw
+}
+
+function applyNestedPath(target, path, value) {
+  if (!target || typeof target !== 'object' || !path) return
+  const parts = String(path).split('.').filter(Boolean)
+  if (!parts.length) return
+  let cursor = target
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i]
+    if (!cursor[key] || typeof cursor[key] !== 'object') cursor[key] = {}
+    cursor = cursor[key]
+  }
+  cursor[parts[parts.length - 1]] = value
+}
+
+function applyAutomationComponentPatch(data) {
+  if (!shouldApplyAutomationMessage(data, 'frontend')) return false
+  const componentId = typeof data.componentId === 'string' ? data.componentId.trim() : ''
+  if (!componentId) return false
+
+  const container = document.getElementById(componentId)
+  if (!container) return false
+
+  const patch = parseAutomationPatchObject(data.patch)
+  const content = container.querySelector('.custom-component-content') || container.querySelector('.plugin-widget-content')
+
+  if (typeof patch.visible === 'boolean') {
+    container.style.display = patch.visible ? '' : 'none'
+  }
+  if (patch.x != null) container.style.left = toCssLength(patch.x, container.style.left)
+  if (patch.y != null) container.style.top = toCssLength(patch.y, container.style.top)
+  if (patch.width != null) container.style.width = toCssLength(patch.width, container.style.width)
+  if (patch.height != null) container.style.height = toCssLength(patch.height, container.style.height)
+  if (patch.zIndex != null) container.style.zIndex = String(patch.zIndex)
+  if (patch.opacity != null) container.style.opacity = String(patch.opacity)
+
+  if (patch.style && typeof patch.style === 'object') {
+    Object.assign(container.style, patch.style)
+  }
+  if (content && patch.contentStyle && typeof patch.contentStyle === 'object') {
+    Object.assign(content.style, patch.contentStyle)
+  }
+  if (patch.attrs && typeof patch.attrs === 'object') {
+    Object.entries(patch.attrs).forEach(([k, v]) => {
+      if (!k) return
+      if (v == null || v === false) container.removeAttribute(k)
+      else container.setAttribute(k, String(v))
+    })
+  }
+
+  const classAdd = Array.isArray(patch.classAdd) ? patch.classAdd : (patch.classAdd ? [patch.classAdd] : [])
+  classAdd.forEach((cls) => cls && container.classList.add(String(cls)))
+  const classRemove = Array.isArray(patch.classRemove) ? patch.classRemove : (patch.classRemove ? [patch.classRemove] : [])
+  classRemove.forEach((cls) => cls && container.classList.remove(String(cls)))
+
+  if (content && patch.text != null) content.textContent = String(patch.text)
+  if (content && patch.html != null) content.innerHTML = String(patch.html)
+  if (content && patch.imageSrc) {
+    const img = content.querySelector('img')
+    if (img) img.src = String(patch.imageSrc)
+  }
+
+  if (patch.propertyPath) {
+    const propertyPath = String(patch.propertyPath).trim()
+    if (propertyPath.startsWith('content.') && content) {
+      applyNestedPath(content, propertyPath.slice(8), patch.value)
+    } else if (propertyPath.startsWith('style.')) {
+      applyNestedPath(container.style, propertyPath.slice(6), patch.value)
+    } else {
+      applyNestedPath(container, propertyPath, patch.value)
+    }
+  }
+
+  if (!currentLayout || typeof currentLayout !== 'object') currentLayout = {}
+  if (!currentLayout[componentId]) currentLayout[componentId] = {}
+  currentLayout[componentId] = Object.assign({}, currentLayout[componentId], {
+    x: parseInt(container.style.left || container.offsetLeft || 0, 10),
+    y: parseInt(container.style.top || container.offsetTop || 0, 10),
+    width: container.style.width || `${container.offsetWidth}px`,
+    height: container.style.height || `${container.offsetHeight}px`
+  })
+
+  return true
+}
+
+function applyAutomationCustomEvent(data) {
+  if (!shouldApplyAutomationMessage(data, 'frontend')) return false
+  const eventName = typeof data.eventName === 'string' && data.eventName.trim()
+    ? data.eventName.trim()
+    : 'automation:custom-event'
+  const payload = parseAutomationPatchObject(data.payload)
+  const merged = {
+    ...payload,
+    eventType: eventName,
+    type: eventName
+  }
+  refreshCustomComponentTemplateVars(merged)
+  refreshCustomComponentsByTemplate(merged)
+  return true
+}
+
+function applyCustomComponentContent(container, comp, eventData = {}) {
+  const content = container.querySelector('.custom-component-content')
+  if (!content) return
+
+  const styleId = `custom-css-${comp.id}`
+  const rawCss = typeof comp.customCss === 'string' ? comp.customCss : ''
+  let styleEl = document.getElementById(styleId)
+  if (rawCss) {
+    if (!styleEl) {
+      styleEl = document.createElement('style')
+      styleEl.id = styleId
+      document.head.appendChild(styleEl)
+    }
+    styleEl.textContent = resolveCustomComponentTemplate(rawCss, eventData)
+  } else if (styleEl) {
+    styleEl.remove()
+  }
+
+  let htmlContent = comp.html || '<div style=\"padding: 10px; color: #aaa;\">空组件</div>'
+  htmlContent = resolveCustomComponentTemplate(htmlContent, eventData)
+  let imageFitForComponent = null
+
+  if (comp.type === 'image') {
+    const imgFit =
+      normalizeImageFitOption(currentLayout?.[comp.id]?.imageFit) ||
+      normalizeImageFitOption(comp.objectFit) ||
+      'contain'
+    imageFitForComponent = imgFit
+    if (!currentLayout[comp.id]) currentLayout[comp.id] = {}
+    currentLayout[comp.id] = Object.assign({}, currentLayout[comp.id], { imageFit: imgFit })
+    syncCustomComponentImageFit(comp.id, imgFit)
+
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = htmlContent
+    const img = tempDiv.querySelector('img')
+    if (img) {
+      img.style.width = '100%'
+      img.style.height = '100%'
+      img.style.objectFit = imgFit
+      img.style.display = 'block'
+      if ((!img.src || img.src.includes('null') || img.src.includes('undefined')) && comp.imageData) {
+        img.src = comp.imageData
+      }
+      htmlContent = tempDiv.innerHTML
+    } else if (comp.imageData || comp.imageUrl) {
+      const rawSrc = resolveCustomComponentTemplate(comp.imageData || comp.imageUrl || '', eventData)
+      htmlContent = `<img src=\"${rawSrc}\" style=\"width: 100%; height: 100%; object-fit: ${imgFit}; display: block;\" draggable=\"false\" />`
+    }
+  }
+
+  content.innerHTML = htmlContent
+  if (imageFitForComponent) {
+    applyImageFitToContainer(container, imageFitForComponent)
+  }
+}
 
 // 加载用户自定义组件
 async function loadCustomComponents() {
   try {
-    console.log('[Frontend] 开始加载用户自定义组件...')
+    console.log('[Frontend] 开始加载用户自定义组件，窗口:', currentFrontendWindowId)
     const result = await window.electronAPI.loadLayout()
     if (!result.success || !result.layout || !result.layout.customComponents) {
       console.log('[Frontend] 无用户自定义组件')
@@ -1037,20 +1678,22 @@ async function loadCustomComponents() {
 
     const components = result.layout.customComponents
     customComponentsLoaded = components
+    if (currentLayout && typeof currentLayout === 'object') {
+      currentLayout.customComponents = components
+    }
 
-    // 只渲染目标页面包含 frontend 的组件
-    const frontendComponents = components.filter(c =>
-      c.targetPages && c.targetPages.includes('frontend')
-    )
+    const frontendComponents = components.filter(isComponentTargetForCurrentFrontendWindow)
 
     console.log(`[Frontend] 加载 ${frontendComponents.length} 个用户自定义组件`)
 
     frontendComponents.forEach(comp => {
       createCustomComponent(comp)
     })
+    refreshCustomComponentsByTemplate()
 
     // 监听自定义组件更新事件
-    if (window.electronAPI && window.electronAPI.on) {
+    if (!customComponentUpdateListenerBound && window.electronAPI && window.electronAPI.on) {
+      customComponentUpdateListenerBound = true
       window.electronAPI.on('update-data', (data) => {
         if (data && data.type === 'custom-components-updated') {
           console.log('[Frontend] 收到自定义组件更新通知')
@@ -1075,52 +1718,48 @@ async function refreshCustomComponents(newComponents) {
     }
 
     customComponentsLoaded = newComponents
+    if (currentLayout && typeof currentLayout === 'object') {
+      currentLayout.customComponents = newComponents
+    }
 
-    // 只渲染目标页面包含 frontend 的组件
-    const frontendComponents = newComponents.filter(c =>
-      c.targetPages && c.targetPages.includes('frontend')
-    )
+    const frontendComponents = newComponents.filter(isComponentTargetForCurrentFrontendWindow)
 
     frontendComponents.forEach(comp => {
       createCustomComponent(comp)
     })
+    refreshCustomComponentsByTemplate()
 
-    console.log(`[Frontend] 刷新了 ${frontendComponents.length} 个用户自定义组件`)
+    console.log(`[Frontend] 刷新了 ${frontendComponents.length} 个用户自定义组件，窗口: ${currentFrontendWindowId}`)
   } catch (e) {
     console.error('[Frontend] 刷新自定义组件失败:', e)
   }
 }
 
+function refreshCustomComponentsByTemplate(eventData = lastTemplateEventData) {
+  const resolvedEventData = normalizeTemplateEventData(eventData)
+  if (resolvedEventData && typeof resolvedEventData === 'object') {
+    lastTemplateEventData = resolvedEventData
+  }
+  const components = customComponentsLoaded.filter(isComponentTargetForCurrentFrontendWindow)
+  components.forEach(comp => {
+    const container = document.getElementById(comp.id)
+    if (!container) return
+    applyCustomComponentContent(container, comp, resolvedEventData)
+  })
+}
+
 // 创建自定义组件
 function createCustomComponent(comp) {
-  console.log(`[Frontend] createCustomComponent 被调用，组件ID: ${comp.id}, 类型: ${comp.type}`)
-  console.log(`[Frontend] comp 数据:`, {
-    id: comp.id,
-    name: comp.name,
-    type: comp.type,
-    width: comp.width,
-    height: comp.height,
-    imageData: comp.imageData ? `base64(${comp.imageData.substring(0, 50)}...)` : 'null',
-    imageUrl: comp.imageUrl,
-    html: comp.html ? `${comp.html.substring(0, 100)}...` : 'null'
-  })
-  console.log(`[Frontend] currentLayout[${comp.id}]:`, currentLayout[comp.id])
-
   if (document.getElementById(comp.id)) {
-    console.log(`[Frontend] 组件 ${comp.id} 已存在，更新内容`)
     const container = document.getElementById(comp.id)
-    const content = container.querySelector('.custom-component-content')
-    if (content) content.innerHTML = comp.html || ''
-
-    // 更新布局位置
     const layoutPos = currentLayout[comp.id]
     if (layoutPos) {
-      console.log(`[Frontend] 更新已存在组件的位置:`, layoutPos)
       container.style.left = layoutPos.x + 'px'
       container.style.top = layoutPos.y + 'px'
       container.style.width = layoutPos.width + 'px'
       if (layoutPos.height !== 'auto' && layoutPos.height) container.style.height = layoutPos.height + 'px'
     }
+    applyCustomComponentContent(container, comp, lastTemplateEventData)
     return
   }
 
@@ -1140,14 +1779,12 @@ function createCustomComponent(comp) {
     finalY = layoutData.y
     finalWidth = layoutData.width
     finalHeight = layoutData.height
-    console.log(`[Frontend] 使用 currentLayout 中的位置:`, { x: finalX, y: finalY, width: finalWidth, height: finalHeight })
   } else {
     // 使用默认位置
     finalX = 100
     finalY = 100
     finalWidth = comp.width || 200
     finalHeight = comp.height || 'auto'
-    console.log(`[Frontend] 使用默认/组件定义位置:`, { x: finalX, y: finalY, width: finalWidth, height: finalHeight })
   }
 
   // 处理尺寸值
@@ -1170,8 +1807,6 @@ function createCustomComponent(comp) {
         min-height: 20px;
       `
 
-  console.log(`[Frontend] 容器最终样式:`, container.style.cssText)
-
   // 添加标签（编辑模式显示）
   const label = document.createElement('div')
   label.className = 'control-label'
@@ -1183,62 +1818,9 @@ function createCustomComponent(comp) {
   content.className = 'custom-component-content'
   content.style.cssText = 'width: 100%; height: 100%; overflow: hidden;'
 
-  // 如果有自定义CSS，添加到页面
-  if (comp.customCss) {
-    const styleId = `custom-css-${comp.id}`
-    let styleEl = document.getElementById(styleId)
-    if (!styleEl) {
-      styleEl = document.createElement('style')
-      styleEl.id = styleId
-      document.head.appendChild(styleEl)
-    }
-    styleEl.textContent = comp.customCss
-  }
-
-  // 处理内容和图片修复
-  let htmlContent = comp.html || '<div style="padding: 10px; color: #aaa;">空组件</div>'
-
-  // 对于图片组件，进行更严格的检查和修复，并强制跟随容器大小
-  if (comp.type === 'image') {
-    console.log(`[Frontend] 处理图片组件，imageData 长度: ${comp.imageData ? comp.imageData.length : 0}`)
-
-    // 强制使用 100% 宽高，跟随容器
-    const imgWidth = '100%'
-    const imgHeight = '100%'
-    const imgFit = comp.objectFit || 'contain'
-
-    // 检查是否需要修复 HTML
-    const needsFix = !htmlContent.includes('<img') ||
-      htmlContent.includes('src=""') ||
-      htmlContent.includes('src="undefined"') ||
-      htmlContent.includes('src="null"')
-
-    // 哪怕不需要修复 HTML，我们也要强制修改 IMG 的样式
-    // 创建一个临时容器来解析 HTML
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = htmlContent
-    const img = tempDiv.querySelector('img')
-
-    if (img) {
-      // 找到了 img 标签，重置其样式
-      img.style.width = '100%'
-      img.style.height = '100%'
-      img.style.objectFit = imgFit
-      img.style.display = 'block'
-      // 如果 src 有问题且有 imageData，修复它
-      if ((!img.src || img.src.includes('null') || img.src.includes('undefined')) && comp.imageData) {
-        img.src = comp.imageData
-      }
-      htmlContent = tempDiv.innerHTML
-    } else if (comp.imageData || comp.imageUrl) {
-      // 没找到 img 标签（或者 needsFix 为 true），重建它
-      const src = comp.imageData || comp.imageUrl
-      htmlContent = `<img src="${src}" style="width: 100%; height: 100%; object-fit: ${imgFit}; display: block;" draggable="false" />`
-    }
-  }
-
-  content.innerHTML = htmlContent
+  content.innerHTML = ''
   container.appendChild(content)
+  applyCustomComponentContent(container, comp, lastTemplateEventData)
 
   // 添加调整大小手柄
   const handles = ['nw', 'ne', 'sw', 'se']
@@ -1253,8 +1835,6 @@ function createCustomComponent(comp) {
 
   // 为这个容器添加拖拽支持
   setupContainerDraggable(container)
-
-  console.log(`[Frontend] ✓ 自定义组件创建完成: ${comp.id} (${comp.name})`)
 }
 
 // 创建插件前台组件
@@ -1933,16 +2513,75 @@ function isImageFitContainer(container) {
   return /^(survivor[1-4]|hunter|survivorBans|hunterBans|globalBanSurvivors|globalBanHunters|mapImage|teamALogo|teamBLogo)$/.test(container.id);
 }
 
+const IMAGE_FIT_VALUES = new Set(['contain', 'cover', 'fill', 'none']);
+
+function normalizeImageFitOption(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return IMAGE_FIT_VALUES.has(normalized) ? normalized : null;
+}
+
+function findCustomComponentById(componentId) {
+  if (!componentId) return null;
+  const findIn = (arr) => Array.isArray(arr) ? arr.find(comp => comp && comp.id === componentId) : null;
+  return findIn(customComponentsLoaded) || findIn(currentLayout?.customComponents);
+}
+
+function syncCustomComponentImageFit(componentId, fit) {
+  const normalizedFit = normalizeImageFitOption(fit);
+  if (!normalizedFit || !componentId) return false;
+
+  let updated = false;
+  const patchList = (arr) => {
+    if (!Array.isArray(arr)) return;
+    const comp = arr.find(item => item && item.id === componentId);
+    if (!comp) return;
+    if (comp.objectFit !== normalizedFit) {
+      comp.objectFit = normalizedFit;
+      updated = true;
+    }
+  };
+
+  patchList(customComponentsLoaded);
+  if (currentLayout && Array.isArray(currentLayout.customComponents)) {
+    if (currentLayout.customComponents !== customComponentsLoaded) {
+      patchList(currentLayout.customComponents);
+    }
+  } else if (currentLayout && Array.isArray(customComponentsLoaded)) {
+    currentLayout.customComponents = customComponentsLoaded;
+    updated = true;
+  }
+
+  return updated;
+}
+
 function getImageFitForContainer(container) {
   if (!container || !container.id) return null;
+
   const layout = currentLayout && currentLayout[container.id] ? currentLayout[container.id] : null;
-  return layout && layout.imageFit ? layout.imageFit : null;
+  const layoutFit = normalizeImageFitOption(layout?.imageFit || layout?.objectFit);
+  if (layoutFit) return layoutFit;
+
+  const customComp = findCustomComponentById(container.id);
+  const customFit = normalizeImageFitOption(customComp?.objectFit);
+  if (customFit) return customFit;
+
+  const img = container.querySelector('img');
+  if (img) {
+    const inlineFit = normalizeImageFitOption(img.style.objectFit);
+    if (inlineFit) return inlineFit;
+    const computedFit = normalizeImageFitOption(window.getComputedStyle(img).objectFit);
+    if (computedFit) return computedFit;
+  }
+
+  return null;
 }
 
 function applyImageFitToContainer(container, fit) {
   if (!container) return;
-  const resolved = fit || getImageFitForContainer(container);
+  const resolved = normalizeImageFitOption(fit) || getImageFitForContainer(container);
   if (!resolved) return;
+
+  container.dataset.imageFit = resolved;
   const images = container.querySelectorAll('img');
   const shouldStretch = !/^(survivorBans|hunterBans|globalBanSurvivors|globalBanHunters)$/.test(container.id || '');
   images.forEach(img => {
@@ -1955,10 +2594,13 @@ function applyImageFitToContainer(container, fit) {
 }
 
 async function setImageFitForContainer(container, fit) {
-  if (!container || !fit) return;
+  const normalizedFit = normalizeImageFitOption(fit);
+  if (!container || !normalizedFit) return;
+
   if (!currentLayout[container.id]) currentLayout[container.id] = {};
-  currentLayout[container.id] = Object.assign({}, currentLayout[container.id], { imageFit: fit });
-  applyImageFitToContainer(container, fit);
+  currentLayout[container.id] = Object.assign({}, currentLayout[container.id], { imageFit: normalizedFit });
+  syncCustomComponentImageFit(container.id, normalizedFit);
+  applyImageFitToContainer(container, normalizedFit);
   applyLayout();
   try { await window.electronAPI.saveLayout(currentLayout) } catch (error) { console.error(error) }
 }
@@ -2402,14 +3044,14 @@ function initDraggable() {
       }
 
       const prev = (currentLayout && currentLayout[activeContainer.id]) ? currentLayout[activeContainer.id] : {}
-      currentLayout[activeContainer.id] = {
+      currentLayout[activeContainer.id] = Object.assign({}, prev, {
         x: parseInt(activeContainer.style.left) || activeContainer.offsetLeft,
         y: parseInt(activeContainer.style.top) || activeContainer.offsetTop,
         width: activeContainer.offsetWidth,
         height: activeContainer.offsetHeight,
         hidden: (typeof prev.hidden === 'boolean') ? prev.hidden : false,
         fontFamily: prev.fontFamily || null // Preserve existing font family
-      }
+      })
 
       // Special handling for timerProgressBar colors
       if (activeContainer.id === 'timerProgressBar') {
@@ -2845,8 +3487,11 @@ async function connectToServer() {
       .build()
 
     // 注册事件处理器
-    connection.on('RoomStateUpdated', (state) => {
+    connection.on('RoomStateUpdated', async (state) => {
+      await ensureCharacterAssetOverrides()
       updateDisplay(state)
+      refreshCustomComponentTemplateVars({ type: 'state', state })
+      refreshCustomComponentsByTemplate({ type: 'state', state })
     })
 
     connection.on('CharacterPicked', (data) => {
@@ -2857,8 +3502,11 @@ async function connectToServer() {
       // 会通过RoomStateUpdated更新
     })
 
-    connection.on('PhaseChanged', (state) => {
+    connection.on('PhaseChanged', async (state) => {
+      await ensureCharacterAssetOverrides()
       updateDisplay(state)
+      refreshCustomComponentTemplateVars({ type: 'state', state })
+      refreshCustomComponentsByTemplate({ type: 'state', state })
     })
 
     // 监听抽签结果
@@ -2894,7 +3542,10 @@ async function connectToServer() {
     // 以观众身份加入房间
     const state = await connection.invoke('JoinRoom', roomData.roomId, '', 'spectator')
     if (state) {
+      await ensureCharacterAssetOverrides()
       updateDisplay(state)
+      refreshCustomComponentTemplateVars({ type: 'state', state })
+      refreshCustomComponentsByTemplate({ type: 'state', state })
     }
 
   } catch (error) {
@@ -3209,7 +3860,7 @@ function updateDisplay(state) {
       item.className = 'ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/surHeader/${name}.png`
+      img.src = getCharacterAssetSrc('survivor', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3231,7 +3882,7 @@ function updateDisplay(state) {
       item.className = 'ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/hunHeader/${name}.png`
+      img.src = getCharacterAssetSrc('hunter', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3258,7 +3909,7 @@ function updateDisplay(state) {
       item.className = 'global-ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/surHeader/${name}.png`
+      img.src = getCharacterAssetSrc('survivor', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3282,7 +3933,7 @@ function updateDisplay(state) {
       item.className = 'global-ban-item'
       // item.style.width/height is now handled by CSS and Grid container
       const img = document.createElement('img')
-      img.src = `../assets/hunHeader/${name}.png`
+      img.src = getCharacterAssetSrc('hunter', 'header', name)
       img.alt = name
       img.title = name
       img.onerror = function () {
@@ -3383,11 +4034,26 @@ function updateMapImage(mapName) {
   img.src = url
 }
 
-function updateFromLocalBp(state) {
+async function updateFromLocalBp(state) {
   if (!state) return
+  refreshCustomComponentTemplateVars({ type: 'state', state })
+  await ensureCharacterAssetOverrides()
   const mapped = Object.assign({}, state)
+  if (!mapped.currentMap) {
+    try {
+      const raw = localStorage.getItem('localBp_matchBase')
+      const parsed = raw ? JSON.parse(raw) : null
+      if (parsed && typeof parsed.mapName === 'string' && parsed.mapName.trim()) {
+        mapped.currentMap = parsed.mapName.trim()
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (mapped.mapName && !mapped.currentMap) mapped.currentMap = mapped.mapName
   if (mapped.selectedMap && !mapped.currentMap) mapped.currentMap = mapped.selectedMap
   updateDisplay(mapped)
+  refreshCustomComponentsByTemplate({ type: 'state', state: mapped })
   const idx = Number(state.blinkingSurvivorIndex)
   if (!isNaN(idx) && idx >= 0 && idx <= 3) {
     triggerLocalBlink(idx)
@@ -3468,12 +4134,8 @@ function refreshCharacterImage(boxId) {
 
   const roleType = boxId.startsWith('survivor') ? 'survivor' : 'hunter';
   const displayMode = getCharacterDisplayMode(boxId);
-  // 使用surBig/hunBig作为全身立绘资源
-  const folder = roleType === 'survivor'
-    ? (displayMode === 'full' ? 'surBig' : 'surHalf')
-    : (displayMode === 'full' ? 'hunBig' : 'hunHalf');
-
-  const newSrc = `../assets/${folder}/${characterName}.png`;
+  const variant = displayMode === 'full' ? 'big' : 'half';
+  const newSrc = getCharacterAssetSrc(roleType, variant, characterName);
 
   // 使用淡入淡出效果
   imgEl.style.opacity = '0';
@@ -3486,8 +4148,7 @@ function refreshCharacterImage(boxId) {
       console.warn(`[Frontend] 图片加载失败: ${newSrc}`);
       // 如果全身图加载失败，尝试降级到半身图
       if (displayMode === 'full') {
-        const fallbackFolder = roleType === 'survivor' ? 'surHalf' : 'hunHalf';
-        const fallbackSrc = `../assets/${fallbackFolder}/${characterName}.png`;
+        const fallbackSrc = getCharacterAssetSrc(roleType, 'half', characterName);
         console.log(`[Frontend] 尝试降级到半身图: ${fallbackSrc}`);
         this.src = fallbackSrc;
         this.onerror = function () {
@@ -3522,10 +4183,8 @@ function showImageForCharacter(boxEl, roleType, name) {
 
   // 根据展示模式选择资源文件夹 - 使用surBig/hunBig作为全身立绘
   const displayMode = getCharacterDisplayMode(boxEl.id);
-  const folder = roleType === 'survivor'
-    ? (displayMode === 'full' ? 'surBig' : 'surHalf')
-    : (displayMode === 'full' ? 'hunBig' : 'hunHalf');
-  const src = `../assets/${folder}/${name}.png`;
+  const variant = displayMode === 'full' ? 'big' : 'half';
+  const src = getCharacterAssetSrc(roleType, variant, name);
 
   const previousName = imgEl.getAttribute('data-character')
   const wasVisible = imgEl.style.display !== 'none'

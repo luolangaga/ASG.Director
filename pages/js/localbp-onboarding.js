@@ -1,5 +1,5 @@
 /**
- * ASG Local BP 新手引导系统
+ * Idvevent Local BP 新手引导系统
  * 为首次进入本地BP控制台的用户提供交互式引导教程
  */
 

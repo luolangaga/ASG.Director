@@ -1,5 +1,5 @@
 /**
- * ASG Director 新手引导系统
+ * Idvevent Director 新手引导系统
  * 为首次使用的用户提供交互式引导教程
  */
 
@@ -15,9 +15,9 @@ const ASGOnboarding = {
   steps: [
     {
       id: 'welcome',
-      title: '欢迎使用 ASG Director! 🎉',
+      title: '欢迎使用 Idvevent Director! 🎉',
       content: `
-        <p>感谢您选择 ASG Director 作为您的赛事导播工具！</p>
+        <p>感谢您选择 Idvevent Director 作为您的赛事导播工具！</p>
         <p>接下来我们将带您快速了解核心功能，让您成为专业导播只需 3 分钟！</p>
         <div style="display:flex; gap:20px; margin-top:20px; justify-content:center;">
           <div style="text-align:center;">
@@ -84,7 +84,7 @@ const ASGOnboarding = {
       id: 'edit-mode',
       title: '编辑模式 ✨',
       content: `
-        <p>ASG Director 支持强大的<strong>实时编辑功能</strong>！</p>
+        <p>Idvevent Director 支持强大的<strong>实时编辑功能</strong>！</p>
         <div style="background:linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,140,0,0.1)); padding:16px; border-radius:12px; margin:12px 0; border:1px solid rgba(255,215,0,0.3);">
           <div style="font-weight:bold; margin-bottom:8px;">💡 快捷键提示</div>
           <div style="display:flex; gap:16px; flex-wrap:wrap;">
@@ -674,7 +674,7 @@ const ASGOnboarding = {
       id: 'mmd-intro',
       title: '配置 3D MMD 模型 💃',
       content: `
-              <p>ASG Director 支持加载精美的 MMD (MikuMikuDance) 模型！</p>
+              <p>Idvevent Director 支持加载精美的 MMD (MikuMikuDance) 模型！</p>
               <p>为了让他动起来，您需要准备两个重要的资源目录：</p>
               <ul style="margin:10px 0; padding-left:20px; line-height:1.6;">
                 <li><strong>模型文件 (.pmx)</strong>：角色的 3D 模型文件</li>
@@ -832,7 +832,7 @@ const ASGOnboarding = {
   reset() {
     localStorage.removeItem(this.STORAGE_KEY);
     localStorage.removeItem(this.CURRENT_STEP_KEY);
-    console.log('[ASG Onboarding] 引导已重置');
+    console.log('[Idvevent Onboarding] 引导已重置');
   },
 
   // 启动引导
@@ -851,7 +851,7 @@ const ASGOnboarding = {
       }
     }
 
-    console.log('[ASG Onboarding] 启动新手引导');
+    console.log('[Idvevent Onboarding] 启动新手引导');
     this.createUI();
 
     // 检查是否有中断的进度

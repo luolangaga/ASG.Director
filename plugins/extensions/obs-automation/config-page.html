@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS 自动化配置</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #9f7aea;
+      border-bottom: 1px solid #333;
+      padding-bottom: 8px;
+    }
+    
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #666;
+    }
+    
+    .status-dot.connected {
+      background: #4ade80;
+      box-shadow: 0 0 10px #4ade80;
+    }
+    
+    .status-dot.disconnected {
+      background: #f87171;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #a0aec0;
+    }
+    
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #0f0f23;
+      color: #eee;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #9f7aea;
+    }
+    
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-success {
+      background: linear-gradient(135deg, #38a169, #2f855a);
+      color: white;
+    }
+    
+    .btn-danger {
+      background: linear-gradient(135deg, #e53e3e, #c53030);
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #4a5568;
+      color: white;
+    }
+    
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .rule-item {
+      background: #0f0f23;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #333;
+      transition: border-color 0.2s;
+    }
+    
+    .rule-item:hover {
+      border-color: #9f7aea;
+    }
+    
+    .rule-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    
+    .rule-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .rule-name {
+      font-weight: 600;
+      font-size: 16px;
+    }
+    
+    .rule-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    .badge-enabled {
+      background: #22543d;
+      color: #68d391;
+    }
+    
+    .badge-disabled {
+      background: #742a2a;
+      color: #fc8181;
+    }
+    
+    .rule-description {
+      color: #a0aec0;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    
+    .rule-meta {
+      display: flex;
+      gap: 15px;
+      font-size: 12px;
+      color: #718096;
+    }
+    
+    .rule-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #4a5568;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: #9f7aea;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+    
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+    
+    .modal-overlay.active {
+      display: flex;
+    }
+    
+    .modal {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal h3 {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .action-item {
+      background: #0f0f23;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid #333;
+    }
+    
+    .action-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    
+    .scene-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .scene-btn {
+      padding: 8px 16px;
+      background: #0f0f23;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #eee;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .scene-btn:hover {
+      border-color: #9f7aea;
+      background: #1a1a3e;
+    }
+    
+    .scene-btn.active {
+      border-color: #9f7aea;
+      background: #9f7aea;
+      color: white;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #718096;
+    }
+    
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+    }
+    
+    .tab-btn {
+      padding: 10px 20px;
+      background: transparent;
+      border: none;
+      color: #a0aec0;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      transition: all 0.2s;
+    }
+    
+    .tab-btn:hover {
+      color: #eee;
+      background: rgba(159, 122, 234, 0.1);
+    }
+    
+    .tab-btn.active {
+      color: #9f7aea;
+      background: rgba(159, 122, 234, 0.2);
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .help-text {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 4px;
+    }
+    
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      z-index: 2000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s;
+    }
+    
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    
+    .toast.success {
+      background: #38a169;
+    }
+    
+    .toast.error {
+      background: #e53e3e;
+    }
+    
+    .toast.info {
+      background: #3182ce;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 OBS 自动化配置</h1>
+    
+    <!-- 状态栏 -->
+    <div class="card">
+      <div class="status-bar">
+        <div class="status-item">
+          <div class="status-dot" id="obsStatusDot"></div>
+          <span id="obsStatusText">未连接</span>
+        </div>
+        <div class="status-item">
+          <span>当前场景:</span>
+          <strong id="currentScene">-</strong>
+        </div>
+        <div class="status-item">
+          <span>活动规则:</span>
+          <strong id="activeRuleCount">0</strong> 条
+        </div>
+        <div style="flex: 1;"></div>
+        <div class="button-group">
+          <button class="btn-success" id="connectBtn">连接 OBS</button>
+          <button class="btn-danger" id="disconnectBtn" style="display: none;">断开连接</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 选项卡 -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="connection">连接设置</button>
+      <button class="tab-btn" data-tab="rules">自动化规则</button>
+      <button class="tab-btn" data-tab="scenes">快捷场景</button>
+      <button class="tab-btn" data-tab="test">测试工具</button>
+    </div>
+    
+    <!-- 连接设置 -->
+    <div class="tab-content active" id="tab-connection">
+      <div class="card">
+        <h2>🔗 OBS WebSocket 连接设置</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>服务器地址</label>
+            <input type="text" id="obsHost" value="localhost" placeholder="localhost">
+            <p class="help-text">OBS 所在电脑的 IP 地址，本机使用 localhost</p>
+          </div>
+          <div class="form-group">
+            <label>端口</label>
+            <input type="number" id="obsPort" value="4455" placeholder="4455">
+            <p class="help-text">OBS WebSocket 5.x 默认端口为 4455</p>
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="obsPassword" placeholder="留空表示无密码">
+            <p class="help-text">在 OBS -> 工具 -> WebSocket 服务器设置 中查看</p>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoConnect">
+            <label for="autoConnect" style="margin: 0;">启动时自动连接 OBS</label>
+          </div>
+        </div>
+        <div class="button-group" style="margin-top: 20px;">
+          <button class="btn-primary" id="saveConfigBtn">保存设置</button>
+          <button class="btn-secondary" id="testConnectionBtn">测试连接</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 自动化规则 -->
+    <div class="tab-content" id="tab-rules">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h2 style="margin: 0; border: none; padding: 0;">📋 自动化规则</h2>
+          <div class="button-group">
+            <button class="btn-primary" id="addRuleBtn">➕ 添加规则</button>
+            <button class="btn-secondary" id="importRulesBtn">📥 导入</button>
+            <button class="btn-secondary" id="exportRulesBtn">📤 导出</button>
+          </div>
+        </div>
+        
+        <div class="rules-list" id="rulesList">
+          <!-- 规则列表将通过 JS 动态生成 -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- 快捷场景 -->
+    <div class="tab-content" id="tab-scenes">
+      <div class="card">
+        <h2>🎬 快捷场景切换</h2>
+        <p class="help-text" style="margin-bottom: 15px;">点击下方按钮快速切换 OBS 场景（需要先连接 OBS）</p>
+        <div class="scene-list" id="sceneList">
+          <div class="empty-state">
+            <div class="icon">📺</div>
+            <p>请先连接 OBS 以获取场景列表</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 测试工具 -->
+    <div class="tab-content" id="tab-test">
+      <div class="card">
+        <h2>🧪 事件测试工具</h2>
+        <p class="help-text" style="margin-bottom: 15px;">模拟触发各种事件来测试你的自动化规则</p>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>选择事件类型</label>
+            <select id="testEventType">
+              <optgroup label="BP 事件">
+                <option value="bp:started">BP 开始</option>
+                <option value="bp:ended">BP 结束</option>
+                <option value="bp:hunter-selected">监管者选择完成</option>
+                <option value="bp:survivor-selected">求生者选择</option>
+                <option value="bp:all-survivors-selected">所有求生者选择完成</option>
+                <option value="bp:character-banned">角色被 Ban</option>
+                <option value="bp:round-changed">回合变化</option>
+              </optgroup>
+              <optgroup label="比赛事件">
+                <option value="match:started">比赛开始</option>
+                <option value="match:ended">比赛结束</option>
+                <option value="match:score-updated">比分更新</option>
+                <option value="match:map-changed">地图变化</option>
+              </optgroup>
+              <optgroup label="房间事件">
+                <option value="room:connected">房间连接</option>
+                <option value="room:disconnected">房间断开</option>
+                <option value="room:updated">房间数据更新</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>事件数据 (JSON)</label>
+          <textarea id="testEventData" rows="5" placeholder='{"hunter": "红蝶", "survivors": ["医生", "空军", "前锋", "调香师"]}'></textarea>
+        </div>
+        
+        <div class="button-group">
+          <button class="btn-primary" id="triggerTestBtn">🚀 触发测试事件</button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>📜 事件日志</h2>
+        <div id="eventLog" style="background: #0f0f23; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 13px;">
+          <p style="color: #718096;">等待事件...</p>
+        </div>
+        <button class="btn-secondary btn-sm" id="clearLogBtn" style="margin-top: 10px;">清空日志</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 规则编辑模态框 -->
+  <div class="modal-overlay" id="ruleModal">
+    <div class="modal">
+      <h3 id="ruleModalTitle">添加规则</h3>
+      
+      <div class="form-group">
+        <label>规则名称</label>
+        <input type="text" id="ruleName" placeholder="例如：监管者选完切场景">
+      </div>
+      
+      <div class="form-group">
+        <label>规则描述</label>
+        <input type="text" id="ruleDescription" placeholder="描述这个规则的作用">
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>触发事件</label>
+          <select id="ruleTriggerType">
+            <optgroup label="BP 事件">
+              <option value="bp:started">BP 开始</option>
+              <option value="bp:ended">BP 结束</option>
+              <option value="bp:hunter-selected">监管者选择完成</option>
+              <option value="bp:survivor-selected">求生者选择</option>
+              <option value="bp:all-survivors-selected">所有求生者选择完成</option>
+              <option value="bp:character-banned">角色被 Ban</option>
+              <option value="bp:round-changed">回合变化</option>
+            </optgroup>
+            <optgroup label="比赛事件">
+              <option value="match:started">比赛开始</option>
+              <option value="match:ended">比赛结束</option>
+              <option value="match:score-updated">比分更新</option>
+              <option value="match:map-changed">地图变化</option>
+            </optgroup>
+            <optgroup label="房间事件">
+              <option value="room:connected">房间连接</option>
+              <option value="room:disconnected">房间断开</option>
+              <option value="room:updated">房间数据更新</option>
+            </optgroup>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>冷却时间 (毫秒)</label>
+          <input type="number" id="ruleCooldown" value="0" min="0" placeholder="0">
+          <p class="help-text">防止规则频繁触发，0 表示无冷却</p>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label style="margin: 0;">操作列表</label>
+          <button class="btn-secondary btn-sm" id="addActionBtn">➕ 添加操作</button>
+        </div>
+        <div id="actionsList">
+          <!-- 操作列表将通过 JS 动态生成 -->
+        </div>
+      </div>
+      
+      <div class="button-group" style="margin-top: 20px; justify-content: flex-end;">
+        <button class="btn-secondary" id="cancelRuleBtn">取消</button>
+        <button class="btn-primary" id="saveRuleBtn">保存规则</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Toast 通知 -->
+  <div class="toast" id="toast"></div>
+  
+  <script>
+    // 数据存储
+    let config = {
+      host: 'localhost',
+      port: 4455,
+      password: '',
+      autoConnect: false
+    }
+    let rules = []
+    let scenes = []
+    let connected = false
+    let currentScene = null
+    let editingRuleId = null
+    let currentActions = []
+    
+    // DOM 元素
+    const elements = {
+      obsStatusDot: document.getElementById('obsStatusDot'),
+      obsStatusText: document.getElementById('obsStatusText'),
+      currentScene: document.getElementById('currentScene'),
+      activeRuleCount: document.getElementById('activeRuleCount'),
+      connectBtn: document.getElementById('connectBtn'),
+      disconnectBtn: document.getElementById('disconnectBtn'),
+      obsHost: document.getElementById('obsHost'),
+      obsPort: document.getElementById('obsPort'),
+      obsPassword: document.getElementById('obsPassword'),
+      autoConnect: document.getElementById('autoConnect'),
+      rulesList: document.getElementById('rulesList'),
+      sceneList: document.getElementById('sceneList'),
+      eventLog: document.getElementById('eventLog'),
+      ruleModal: document.getElementById('ruleModal'),
+      toast: document.getElementById('toast')
+    }
+    
+    // 初始化
+    function init() {
+      setupTabs()
+      setupEventListeners()
+      
+      // 监听来自主进程的消息
+      if (window.electronAPI) {
+        window.electronAPI.onPluginMessage?.('obs-automation:init', (data) => {
+          config = data.config || config
+          rules = data.rules || []
+          connected = data.connected
+          scenes = data.scenes || []
+          currentScene = data.currentScene
+          
+          updateUI()
+        })
+        
+        window.electronAPI.onPluginMessage?.('obs-automation:status', (data) => {
+          connected = data.connected
+          currentScene = data.currentScene
+          scenes = data.scenes || scenes
+          updateConnectionStatus()
+          renderScenes()
+        })
+        
+        window.electronAPI.onPluginMessage?.('obs-automation:log', (message) => {
+          appendLog(message)
+        })
+      }
+    }
+    
+    // 设置选项卡
+    function setupTabs() {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tabId = btn.dataset.tab
+          
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'))
+          
+          btn.classList.add('active')
+          document.getElementById(`tab-${tabId}`).classList.add('active')
+        })
+      })
+    }
+    
+    // 设置事件监听
+    function setupEventListeners() {
+      // 连接按钮
+      elements.connectBtn.addEventListener('click', connectOBS)
+      elements.disconnectBtn.addEventListener('click', disconnectOBS)
+      
+      // 保存配置
+      document.getElementById('saveConfigBtn').addEventListener('click', saveConfig)
+      document.getElementById('testConnectionBtn').addEventListener('click', testConnection)
+      
+      // 规则操作
+      document.getElementById('addRuleBtn').addEventListener('click', () => openRuleModal())
+      document.getElementById('importRulesBtn').addEventListener('click', importRules)
+      document.getElementById('exportRulesBtn').addEventListener('click', exportRules)
+      
+      // 模态框
+      document.getElementById('cancelRuleBtn').addEventListener('click', closeRuleModal)
+      document.getElementById('saveRuleBtn').addEventListener('click', saveRule)
+      document.getElementById('addActionBtn').addEventListener('click', addAction)
+      
+      // 测试工具
+      document.getElementById('triggerTestBtn').addEventListener('click', triggerTestEvent)
+      document.getElementById('clearLogBtn').addEventListener('click', clearLog)
+    }
+    
+    // 更新 UI
+    function updateUI() {
+      // 更新表单
+      elements.obsHost.value = config.host || 'localhost'
+      elements.obsPort.value = config.port || 4455
+      elements.obsPassword.value = config.password || ''
+      elements.autoConnect.checked = config.autoConnect || false
+      
+      updateConnectionStatus()
+      renderRules()
+      renderScenes()
+    }
+    
+    // 更新连接状态
+    function updateConnectionStatus() {
+      if (connected) {
+        elements.obsStatusDot.className = 'status-dot connected'
+        elements.obsStatusText.textContent = '已连接'
+        elements.connectBtn.style.display = 'none'
+        elements.disconnectBtn.style.display = 'inline-block'
+      } else {
+        elements.obsStatusDot.className = 'status-dot disconnected'
+        elements.obsStatusText.textContent = '未连接'
+        elements.connectBtn.style.display = 'inline-block'
+        elements.disconnectBtn.style.display = 'none'
+      }
+      
+      elements.currentScene.textContent = currentScene || '-'
+      elements.activeRuleCount.textContent = rules.filter(r => r.enabled).length
+    }
+    
+    // 渲染规则列表
+    function renderRules() {
+      if (rules.length === 0) {
+        elements.rulesList.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📋</div>
+            <p>暂无规则，点击"添加规则"创建你的第一条自动化规则</p>
+          </div>
+        `
+        return
+      }
+      
+      elements.rulesList.innerHTML = rules.map(rule => `
+        <div class="rule-item" data-id="${rule.id}">
+          <div class="rule-header">
+            <div class="rule-title">
+              <span class="rule-name">${escapeHtml(rule.name)}</span>
+              <span class="rule-badge ${rule.enabled ? 'badge-enabled' : 'badge-disabled'}">
+                ${rule.enabled ? '启用' : '禁用'}
+              </span>
+            </div>
+            <div class="rule-actions">
+              <label class="toggle-switch">
+                <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleRule('${rule.id}', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+              <button class="btn-secondary btn-sm" onclick="editRule('${rule.id}')">编辑</button>
+              <button class="btn-danger btn-sm" onclick="deleteRule('${rule.id}')">删除</button>
+            </div>
+          </div>
+          <div class="rule-description">${escapeHtml(rule.description || '无描述')}</div>
+          <div class="rule-meta">
+            <span>触发: ${getTriggerTypeLabel(rule.triggerType)}</span>
+            <span>操作: ${rule.actions?.length || 0} 个</span>
+            ${rule.cooldown > 0 ? `<span>冷却: ${rule.cooldown}ms</span>` : ''}
+          </div>
+        </div>
+      `).join('')
+      
+      elements.activeRuleCount.textContent = rules.filter(r => r.enabled).length
+    }
+    
+    // 渲染场景列表
+    function renderScenes() {
+      if (!connected || scenes.length === 0) {
+        elements.sceneList.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📺</div>
+            <p>${connected ? '未找到场景' : '请先连接 OBS 以获取场景列表'}</p>
+          </div>
+        `
+        return
+      }
+      
+      elements.sceneList.innerHTML = scenes.map(scene => `
+        <button class="scene-btn ${scene === currentScene ? 'active' : ''}" onclick="switchScene('${escapeHtml(scene)}')">
+          ${escapeHtml(scene)}
+        </button>
+      `).join('')
+    }
+    
+    // 连接 OBS
+    async function connectOBS() {
+      showToast('正在连接...', 'info')
+      
+      if (window.electronAPI) {
+        try {
+          await window.electronAPI.executePluginCommand('obsAutomation.connect', {
+            host: elements.obsHost.value,
+            port: parseInt(elements.obsPort.value),
+            password: elements.obsPassword.value
+          })
+        } catch (e) {
+          showToast('连接失败: ' + e.message, 'error')
+        }
+      }
+    }
+    
+    // 断开 OBS
+    function disconnectOBS() {
+      if (window.electronAPI) {
+        window.electronAPI.executePluginCommand('obsAutomation.disconnect')
+      }
+    }
+    
+    // 保存配置
+    function saveConfig() {
+      config = {
+        host: elements.obsHost.value,
+        port: parseInt(elements.obsPort.value),
+        password: elements.obsPassword.value,
+        autoConnect: elements.autoConnect.checked
+      }
+      
+      if (window.electronAPI) {
+        window.electronAPI.sendPluginMessage('obs-automation:saveConfig', config)
+      }
+      
+      showToast('配置已保存', 'success')
+    }
+    
+    // 测试连接
+    async function testConnection() {
+      showToast('正在测试连接...', 'info')
+      await connectOBS()
+    }
+    
+    // 切换场景
+    function switchScene(sceneName) {
+      if (window.electronAPI) {
+        window.electronAPI.executePluginCommand('obsAutomation.switchScene', sceneName)
+        showToast(`正在切换到: ${sceneName}`, 'info')
+      }
+    }
+    
+    // 打开规则模态框
+    function openRuleModal(ruleId = null) {
+      editingRuleId = ruleId
+      
+      if (ruleId) {
+        const rule = rules.find(r => r.id === ruleId)
+        if (rule) {
+          document.getElementById('ruleModalTitle').textContent = '编辑规则'
+          document.getElementById('ruleName').value = rule.name
+          document.getElementById('ruleDescription').value = rule.description || ''
+          document.getElementById('ruleTriggerType').value = rule.triggerType
+          document.getElementById('ruleCooldown').value = rule.cooldown || 0
+          currentActions = [...(rule.actions || [])]
+        }
+      } else {
+        document.getElementById('ruleModalTitle').textContent = '添加规则'
+        document.getElementById('ruleName').value = ''
+        document.getElementById('ruleDescription').value = ''
+        document.getElementById('ruleTriggerType').value = 'bp:hunter-selected'
+        document.getElementById('ruleCooldown').value = 0
+        currentActions = []
+      }
+      
+      renderActions()
+      elements.ruleModal.classList.add('active')
+    }
+    
+    // 关闭规则模态框
+    function closeRuleModal() {
+      elements.ruleModal.classList.remove('active')
+      editingRuleId = null
+      currentActions = []
+    }
+    
+    // 渲染操作列表
+    function renderActions() {
+      const container = document.getElementById('actionsList')
+      
+      if (currentActions.length === 0) {
+        container.innerHTML = '<p style="color: #718096; text-align: center; padding: 20px;">暂无操作，点击"添加操作"</p>'
+        return
+      }
+      
+      container.innerHTML = currentActions.map((action, index) => `
+        <div class="action-item">
+          <div class="action-header">
+            <span>操作 ${index + 1}: ${getActionTypeLabel(action.type)}</span>
+            <button class="btn-danger btn-sm" onclick="removeAction(${index})">删除</button>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>操作类型</label>
+              <select onchange="updateActionType(${index}, this.value)">
+                <option value="switch-scene" ${action.type === 'switch-scene' ? 'selected' : ''}>切换场景</option>
+                <option value="delay" ${action.type === 'delay' ? 'selected' : ''}>延迟等待</option>
+                <option value="set-text" ${action.type === 'set-text' ? 'selected' : ''}>设置文本</option>
+                <option value="set-browser-url" ${action.type === 'set-browser-url' ? 'selected' : ''}>设置浏览器源 URL</option>
+                <option value="refresh-browser" ${action.type === 'refresh-browser' ? 'selected' : ''}>刷新浏览器源</option>
+                <option value="start-stream" ${action.type === 'start-stream' ? 'selected' : ''}>开始推流</option>
+                <option value="stop-stream" ${action.type === 'stop-stream' ? 'selected' : ''}>停止推流</option>
+                <option value="start-record" ${action.type === 'start-record' ? 'selected' : ''}>开始录制</option>
+                <option value="stop-record" ${action.type === 'stop-record' ? 'selected' : ''}>停止录制</option>
+              </select>
+            </div>
+            ${renderActionParams(action, index)}
+          </div>
+        </div>
+      `).join('')
+    }
+    
+    // 渲染操作参数
+    function renderActionParams(action, index) {
+      switch (action.type) {
+        case 'switch-scene':
+          return `
+            <div class="form-group">
+              <label>场景名称</label>
+              <input type="text" value="${escapeHtml(action.params?.sceneName || '')}" 
+                     onchange="updateActionParam(${index}, 'sceneName', this.value)"
+                     placeholder="输入 OBS 中的场景名称">
+            </div>
+          `
+        case 'delay':
+          return `
+            <div class="form-group">
+              <label>延迟时间 (毫秒)</label>
+              <input type="number" value="${action.params?.duration || 1000}" 
+                     onchange="updateActionParam(${index}, 'duration', parseInt(this.value))"
+                     min="0" placeholder="1000">
+            </div>
+          `
+        case 'set-text':
+          return `
+            <div class="form-group">
+              <label>文本源名称</label>
+              <input type="text" value="${escapeHtml(action.params?.sourceName || '')}" 
+                     onchange="updateActionParam(${index}, 'sourceName', this.value)"
+                     placeholder="OBS 中的文本源名称">
+            </div>
+            <div class="form-group">
+              <label>文本内容</label>
+              <input type="text" value="${escapeHtml(action.params?.text || '')}" 
+                     onchange="updateActionParam(${index}, 'text', this.value)"
+                     placeholder="支持 {{变量}} 语法">
+            </div>
+          `
+        case 'set-browser-url':
+          return `
+            <div class="form-group">
+              <label>浏览器源名称</label>
+              <input type="text" value="${escapeHtml(action.params?.sourceName || '')}" 
+                     onchange="updateActionParam(${index}, 'sourceName', this.value)">
+            </div>
+            <div class="form-group">
+              <label>URL</label>
+              <input type="text" value="${escapeHtml(action.params?.url || '')}" 
+                     onchange="updateActionParam(${index}, 'url', this.value)">
+            </div>
+          `
+        case 'refresh-browser':
+          return `
+            <div class="form-group">
+              <label>浏览器源名称</label>
+              <input type="text" value="${escapeHtml(action.params?.sourceName || '')}" 
+                     onchange="updateActionParam(${index}, 'sourceName', this.value)">
+            </div>
+          `
+        default:
+          return ''
+      }
+    }
+    
+    // 添加操作
+    function addAction() {
+      currentActions.push({
+        type: 'switch-scene',
+        delay: 0,
+        params: {},
+        enabled: true
+      })
+      renderActions()
+    }
+    
+    // 移除操作
+    function removeAction(index) {
+      currentActions.splice(index, 1)
+      renderActions()
+    }
+    
+    // 更新操作类型
+    function updateActionType(index, type) {
+      currentActions[index].type = type
+      currentActions[index].params = {}
+      renderActions()
+    }
+    
+    // 更新操作参数
+    function updateActionParam(index, key, value) {
+      if (!currentActions[index].params) {
+        currentActions[index].params = {}
+      }
+      currentActions[index].params[key] = value
+    }
+    
+    // 保存规则
+    function saveRule() {
+      const name = document.getElementById('ruleName').value.trim()
+      if (!name) {
+        showToast('请输入规则名称', 'error')
+        return
+      }
+      
+      if (currentActions.length === 0) {
+        showToast('请至少添加一个操作', 'error')
+        return
+      }
+      
+      const rule = {
+        id: editingRuleId || `rule-${Date.now()}`,
+        name,
+        description: document.getElementById('ruleDescription').value.trim(),
+        triggerType: document.getElementById('ruleTriggerType').value,
+        cooldown: parseInt(document.getElementById('ruleCooldown').value) || 0,
+        actions: currentActions,
+        enabled: editingRuleId ? rules.find(r => r.id === editingRuleId)?.enabled : true
+      }
+      
+      if (editingRuleId) {
+        const index = rules.findIndex(r => r.id === editingRuleId)
+        if (index !== -1) {
+          rules[index] = rule
+        }
+      } else {
+        rules.push(rule)
+      }
+      
+      // 保存到主进程
+      if (window.electronAPI) {
+        window.electronAPI.sendPluginMessage('obs-automation:saveRules', rules)
+      }
+      
+      renderRules()
+      closeRuleModal()
+      showToast('规则已保存', 'success')
+    }
+    
+    // 切换规则启用状态
+    function toggleRule(ruleId, enabled) {
+      const rule = rules.find(r => r.id === ruleId)
+      if (rule) {
+        rule.enabled = enabled
+        
+        if (window.electronAPI) {
+          window.electronAPI.sendPluginMessage('obs-automation:saveRules', rules)
+        }
+        
+        renderRules()
+      }
+    }
+    
+    // 编辑规则
+    function editRule(ruleId) {
+      openRuleModal(ruleId)
+    }
+    
+    // 删除规则
+    function deleteRule(ruleId) {
+      if (confirm('确定要删除这条规则吗？')) {
+        rules = rules.filter(r => r.id !== ruleId)
+        
+        if (window.electronAPI) {
+          window.electronAPI.sendPluginMessage('obs-automation:saveRules', rules)
+        }
+        
+        renderRules()
+        showToast('规则已删除', 'success')
+      }
+    }
+    
+    // 导入规则
+    function importRules() {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = '.json'
+      input.onchange = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            try {
+              const imported = JSON.parse(e.target.result)
+              if (Array.isArray(imported)) {
+                rules = [...rules, ...imported]
+                
+                if (window.electronAPI) {
+                  window.electronAPI.sendPluginMessage('obs-automation:saveRules', rules)
+                }
+                
+                renderRules()
+                showToast(`已导入 ${imported.length} 条规则`, 'success')
+              }
+            } catch (e) {
+              showToast('导入失败: 无效的 JSON 文件', 'error')
+            }
+          }
+          reader.readAsText(file)
+        }
+      }
+      input.click()
+    }
+    
+    // 导出规则
+    function exportRules() {
+      const json = JSON.stringify(rules, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'obs-automation-rules.json'
+      a.click()
+      URL.revokeObjectURL(url)
+      showToast('规则已导出', 'success')
+    }
+    
+    // 触发测试事件
+    function triggerTestEvent() {
+      const eventType = document.getElementById('testEventType').value
+      let eventData = {}
+      
+      try {
+        const dataStr = document.getElementById('testEventData').value.trim()
+        if (dataStr) {
+          eventData = JSON.parse(dataStr)
+        }
+      } catch (e) {
+        showToast('事件数据格式错误', 'error')
+        return
+      }
+      
+      appendLog(`🚀 触发测试事件: ${eventType}`)
+      appendLog(`   数据: ${JSON.stringify(eventData)}`)
+      
+      if (window.electronAPI) {
+        window.electronAPI.executePluginCommand('obsAutomation.testTrigger', eventType, eventData)
+      }
+    }
+    
+    // 添加日志
+    function appendLog(message) {
+      const log = elements.eventLog
+      const time = new Date().toLocaleTimeString()
+      const entry = document.createElement('div')
+      entry.textContent = `[${time}] ${message}`
+      entry.style.marginBottom = '4px'
+      
+      // 移除空状态提示
+      if (log.querySelector('p')) {
+        log.innerHTML = ''
+      }
+      
+      log.appendChild(entry)
+      log.scrollTop = log.scrollHeight
+    }
+    
+    // 清空日志
+    function clearLog() {
+      elements.eventLog.innerHTML = '<p style="color: #718096;">等待事件...</p>'
+    }
+    
+    // 显示 Toast
+    function showToast(message, type = 'info') {
+      elements.toast.textContent = message
+      elements.toast.className = `toast ${type} show`
+      
+      setTimeout(() => {
+        elements.toast.classList.remove('show')
+      }, 3000)
+    }
+    
+    // 辅助函数
+    function escapeHtml(str) {
+      if (!str) return ''
+      return str.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+    }
+    
+    function getTriggerTypeLabel(type) {
+      const labels = {
+        'bp:started': 'BP 开始',
+        'bp:ended': 'BP 结束',
+        'bp:hunter-selected': '监管者选择完成',
+        'bp:survivor-selected': '求生者选择',
+        'bp:all-survivors-selected': '所有求生者选择完成',
+        'bp:character-banned': '角色被 Ban',
+        'bp:round-changed': '回合变化',
+        'match:started': '比赛开始',
+        'match:ended': '比赛结束',
+        'match:score-updated': '比分更新',
+        'match:map-changed': '地图变化',
+        'room:connected': '房间连接',
+        'room:disconnected': '房间断开',
+        'room:updated': '房间数据更新'
+      }
+      return labels[type] || type
+    }
+    
+    function getActionTypeLabel(type) {
+      const labels = {
+        'switch-scene': '切换场景',
+        'delay': '延迟等待',
+        'set-text': '设置文本',
+        'set-browser-url': '设置浏览器源 URL',
+        'refresh-browser': '刷新浏览器源',
+        'start-stream': '开始推流',
+        'stop-stream': '停止推流',
+        'start-record': '开始录制',
+        'stop-record': '停止录制'
+      }
+      return labels[type] || type
+    }
+    
+    // 启动
+    init()
+  </script>
+</body>
+</html>

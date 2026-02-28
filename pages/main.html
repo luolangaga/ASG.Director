@@ -5,16 +5,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <title>ASG导播端</title>
+  <title>Idvevent导播端</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="./css/main.css">
 </head>
 
-<body>
+<body class="app-booting" aria-busy="true">
+  <div id="startupOverlay" class="startup-overlay" role="status" aria-live="polite">
+    <div class="startup-overlay-card">
+      <div class="startup-overlay-spinner" aria-hidden="true"></div>
+      <div class="startup-overlay-title">正在启动导播端</div>
+      <div id="startupOverlayHint" class="startup-overlay-hint">正在并行加载登录状态与 3D 配置...</div>
+    </div>
+  </div>
+
   <div class="app-sidebar">
     <div class="sidebar-header">
-      <div class="app-logo">ASG Director</div>
+      <div class="app-logo">Idvevent Director</div>
       <span id="versionBadge" class="status-badge" onclick="checkUpdate()" style="cursor:pointer">v1.0.0</span>
     </div>
 
@@ -27,6 +35,9 @@
       </button>
       <button class="nav-item" id="nav-settings" onclick="switchView('settings')">
         <span class="nav-icon">⚙️</span> 设置中心
+      </button>
+      <button class="nav-item" id="nav-partners" onclick="switchView('partners')">
+        <span class="nav-icon">🏆</span> 使用该软件的赛事
       </button>
 
       <div style="height:1px; background:var(--border-color); margin: 8px 16px;"></div>
@@ -134,7 +145,50 @@
               <div>优势：无需打开前台窗口也能录制，资源占用更低，捕获更稳定。</div>
             </div>
 
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <button class="btn btn-primary" onclick="openLocalPageAiModal()">AI 生成单页 HTML</button>
+              <div style="font-size:12px; color:var(--text-secondary);">
+                支持 OpenAI 兼容接口；生成后会自动加入页面列表并热更新。
+              </div>
+            </div>
+
             <div id="localPagesList" style="margin-top:12px;"></div>
+          </div>
+        </div>
+
+        <!-- View: Partners -->
+        <div id="view-partners" class="view-section">
+          <div class="section-header">
+            <h1 class="section-title">使用该软件的赛事</h1>
+            <p class="section-desc">已接入赛事合作伙伴信息（Logo、简介、官网）。</p>
+          </div>
+          <div class="partners-contact-tip">
+            如果需要加入你们赛事，可以联系邮件：<a href="mailto:luolan233@outlook.com">luolan233@outlook.com</a>
+          </div>
+          <div style="margin-top: 18px;">
+            <div class="feature-card partner-hub-card">
+              <div class="partner-hub-header">
+                <div>
+                  <h3>赛事名单</h3>
+                  <p>来自 ASG.API 的赛事合作伙伴信息（Logo、简介、官网）。</p>
+                </div>
+                <button class="btn btn-secondary" id="refreshPartnersBtn" onclick="loadPublicPartners()">
+                  🔄 刷新
+                </button>
+              </div>
+
+              <div class="partners-toolbar">
+                <input type="text" id="partnerSearchInput" class="form-input partners-search-input"
+                  placeholder="搜索赛事名称 / 简介 / 类型" oninput="onPartnerSearchInput()">
+                <span id="partnersCount" class="status-badge partners-count-badge">0 条</span>
+              </div>
+
+              <div id="partnersList">
+                <div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px;">
+                  正在加载...
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -235,6 +289,18 @@
             </div>
 
             <div class="feature-card" style="margin-top:20px;">
+              <h3>OBS 自动化（内置）</h3>
+              <p>无需下载插件，直接用本地 BP 事件触发 OBS 场景/源操作。</p>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+                <button class="btn btn-primary" onclick="openObsAutomationEditor()">打开规则编辑器</button>
+                <button class="btn btn-secondary" onclick="openObsAutomationTutorial()">打开教程</button>
+              </div>
+              <div style="margin-top:10px; font-size:12px; color:var(--text-secondary);">
+                已移除联网 BP 触发，仅保留本地 BP 事件（含“选求生者1/2/3/4”）。
+              </div>
+            </div>
+
+            <div class="feature-card" style="margin-top:20px;">
               <h3>布局管理</h3>
               <p>导入或导出您的 BP 布局包，或重置为默认值。</p>
               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
@@ -290,6 +356,8 @@
                 <input type="number" id="frontendResHeight" class="form-input" placeholder="H">
               </div>
               <p id="frontendResHint" style="font-size:12px; color:var(--text-secondary); margin:10px 0;">...</p>
+              <!-- ⚠️ 重要提示：不懂不要乱改哦 (๑•̀ㅂ•́)و✧ -->
+              <p style="font-size:12px; color:#ff4d4f; margin-bottom:10px;">如果你不懂修改这个会造成什么后果的情况下请不要修改</p>
               <button class="btn btn-primary" onclick="applyFrontendResolution()">应用分辨率</button>
 
               <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
@@ -315,6 +383,60 @@
                     <input type="checkbox" id="transparentBackgroundToggle" onchange="toggleTransparentBackground()">
                     <span class="slider"></span>
                   </label>
+                </div>
+              </div>
+
+              <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;" onclick="onBpStartupWindowAnimationRowClick(event)">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <h4>启动炫酷窗口动画</h4>
+                    <p style="font-size:12px; color:var(--text-secondary);">进入本地BP时先平铺展示所有已打开窗口，再平滑回到当前布局（默认关闭）</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="bpStartupWindowAnimationToggle" onchange="toggleBpStartupWindowAnimation()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
+                <h4>本地BP控制台背景</h4>
+                <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 12px;">直接控制 `local-bp.html` 背景，修改后立即生效。</p>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn btn-secondary" onclick="selectLocalBpConsoleBackgroundFromSettings()">选择图片</button>
+                  <button class="btn btn-secondary" onclick="clearLocalBpConsoleBackgroundFromSettings()">清除背景</button>
+                </div>
+                <div id="localBpConsoleBackgroundPathSetting" class="form-input"
+                  style="margin-top:10px; user-select:text; overflow:hidden; text-overflow:ellipsis;">未设置</div>
+
+                <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-size:13px; color:var(--text-primary);">自动压缩过大图片</div>
+                    <div style="font-size:12px; color:var(--text-secondary);">建议开启，自动处理超大 JPG/PNG，减少渲染压力</div>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="localBpConsoleBackgroundAutoCompressSetting"
+                      onchange="onLocalBpConsoleBackgroundInput(true)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="control-group" style="margin-top:14px;">
+                  <label class="control-label">白色遮罩透明度 <span id="localBpConsoleBackgroundMaskValueSetting">25%</span></label>
+                  <input type="range" id="localBpConsoleBackgroundMaskSetting" min="0" max="100" step="1" style="width:100%;"
+                    oninput="onLocalBpConsoleBackgroundInput()" onchange="onLocalBpConsoleBackgroundInput(true)">
+                </div>
+
+                <div class="control-group" style="margin-top:10px;">
+                  <label class="control-label">背景模糊度 <span id="localBpConsoleBackgroundBlurValueSetting">0px</span></label>
+                  <input type="range" id="localBpConsoleBackgroundBlurSetting" min="0" max="40" step="1" style="width:100%;"
+                    oninput="onLocalBpConsoleBackgroundInput()" onchange="onLocalBpConsoleBackgroundInput(true)">
+                </div>
+
+                <div class="control-group" style="margin-top:10px;">
+                  <label class="control-label">后台卡片透明度 <span id="localBpConsoleBackgroundCardOpacityValueSetting">100%</span></label>
+                  <input type="range" id="localBpConsoleBackgroundCardOpacitySetting" min="0" max="100" step="1" style="width:100%;"
+                    oninput="onLocalBpConsoleBackgroundInput()" onchange="onLocalBpConsoleBackgroundInput(true)">
                 </div>
               </div>
             </div>
@@ -372,6 +494,73 @@
                     <span class="slider"></span>
                   </label>
                 </div>
+                <div style="grid-column: 1 / -1; margin-top: 2px;">
+                  <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">自定义前台窗口</div>
+                  <div id="localBpAutoOpenCustomWindowsList" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="feature-card" id="directorSyncCard" style="margin-top:20px;">
+              <h3>跨设备 ASG.Director 同步</h3>
+              <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+                连接另一台导播端后，BP状态、比分与地图信息会自动同步。
+              </p>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="font-size:13px; font-weight:600;">主端（被连接端）</div>
+                    <label class="switch">
+                      <input type="checkbox" id="directorSyncServerEnabled">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="control-group">
+                    <label class="control-label">监听端口</label>
+                    <input type="number" id="directorSyncListenPort" class="form-input" min="1024" max="65535" value="19625">
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="font-size:13px; font-weight:600;">连接端（主动连接）</div>
+                    <label class="switch">
+                      <input type="checkbox" id="directorSyncClientEnabled">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="control-group">
+                    <label class="control-label">远端设备 IP / 主机名</label>
+                    <input type="text" id="directorSyncRemoteHost" class="form-input" placeholder="例如 192.168.1.88">
+                  </div>
+
+                  <div class="control-group" style="margin-top:10px;">
+                    <label class="control-label">远端端口</label>
+                    <input type="number" id="directorSyncRemotePort" class="form-input" min="1024" max="65535" value="19625">
+                  </div>
+
+                  <div class="control-group" style="margin-top:10px;">
+                    <label class="control-label">自动重连</label>
+                    <label class="switch">
+                      <input type="checkbox" id="directorSyncAutoConnect" checked>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:12px; padding:10px; border:1px solid var(--border-color); border-radius:8px; background: rgba(255,255,255,0.03);">
+                <div style="font-size:13px; font-weight:600;">状态：<span id="directorSyncStatusText">未初始化</span></div>
+                <div id="directorSyncStatusMeta" style="font-size:12px; color:var(--text-secondary); margin-top:6px;">-</div>
+              </div>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                <button class="btn btn-primary" onclick="directorSyncApplySettings()">保存并应用</button>
+                <button class="btn btn-secondary" onclick="directorSyncReconnectNow()">立即连接</button>
+                <button class="btn btn-ghost" onclick="directorSyncDisconnectNow()">断开连接</button>
+                <button class="btn btn-ghost" onclick="refreshDirectorSyncStatus()">刷新状态</button>
               </div>
             </div>
           </div>
@@ -480,6 +669,62 @@
 
   <div id="statusToast" class="status-toast"></div>
 
+  <div class="modal" id="localPageEditorModal">
+    <div class="modal-content editor-modal">
+      <div class="editor-modal-header">
+        <div id="localPageEditorTitle" class="editor-modal-title">编辑页面</div>
+        <div class="editor-modal-actions">
+          <button class="btn btn-secondary" onclick="closeLocalPageEditor()">取消</button>
+          <button class="btn btn-primary" onclick="saveLocalPageEditor()">保存</button>
+        </div>
+      </div>
+      <textarea id="localPageEditorContent" class="editor-textarea" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="modal" id="localPageAiModal">
+    <div class="modal-content editor-modal" style="height:min(84vh, 860px);">
+      <div class="editor-modal-header">
+        <div class="editor-modal-title">AI 生成单页 HTML</div>
+        <div class="editor-modal-actions">
+          <button class="btn btn-secondary" onclick="closeLocalPageAiModal()">取消</button>
+          <button class="btn btn-primary" id="localPageAiGenerateBtn" onclick="generateLocalPageWithAI()">生成并写入</button>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="control-group" style="margin:0;">
+          <label class="control-label">API 地址</label>
+          <input id="localPageAiApiUrl" class="form-input" placeholder="https://api.openai.com/v1">
+        </div>
+        <div class="control-group" style="margin:0;">
+          <label class="control-label">API Key</label>
+          <input id="localPageAiApiKey" type="password" class="form-input" placeholder="sk-...">
+        </div>
+        <div class="control-group" style="margin:0;">
+          <label class="control-label">模型</label>
+          <input id="localPageAiModel" class="form-input" placeholder="gpt-4o-mini">
+        </div>
+        <div class="control-group" style="margin:0;">
+          <label class="control-label">文件名（留空自动 AI 生成）</label>
+          <input id="localPageAiFileName" class="form-input" placeholder="my-overlay.html">
+        </div>
+        <div class="control-group" style="margin:0; grid-column:1 / -1;">
+          <label class="control-label">页面标题（留空自动 AI 生成）</label>
+          <input id="localPageAiTitle" class="form-input" placeholder="我的自定义页面">
+        </div>
+      </div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+        提示：生成结果会直接写入本地页面目录，已打开同名页面会自动刷新。
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+        <button class="btn btn-ghost" type="button" onclick="applyLocalPageAiPromptPreset('obsTransparent')">OBS 透明叠加</button>
+        <button class="btn btn-ghost" type="button" onclick="applyLocalPageAiPromptPreset('urlParams')">支持 URL 参数</button>
+        <button class="btn btn-ghost" type="button" onclick="applyLocalPageAiPromptPreset('scoreOverlay')">赛事信息条</button>
+      </div>
+      <textarea id="localPageAiPrompt" class="editor-textarea" spellcheck="false" placeholder="请输入你想生成的页面需求，例如：制作一个透明背景的选手姓名条，左下角显示选手名和战队，支持 query 参数 name/team/color，动画从左滑入。"></textarea>
+    </div>
+  </div>
+
   <div class="modal" id="loginModal">
     <div class="modal-content">
       <h3 style="margin-bottom:20px; text-align:center;">登录账号</h3>
@@ -494,6 +739,7 @@
   </div>
 
   <script src="./js/main-logic.js"></script>
+  <script src="./js/director-sync-settings.js"></script>
   <script src="./js/signalr.min.js"></script>
   <script src="./js/onboarding.js"></script>
   <script>
@@ -503,8 +749,11 @@
     let myEvents = []
     let selectedEventId = null
     let eventMatches = []
+    let publicPartners = []
+    let partnerSearchKeyword = ''
     let roomHistory = [] // 房间历史记录
     let currentRoomId = null // 当前活动的房间ID
+    const ASG_API_BASE_URL = 'https://api.idvevent.cn'
 
     const serverUrlInput = document.getElementById('serverUrl')
     const eventIdInput = document.getElementById('eventId')
@@ -801,6 +1050,137 @@
       }
     }
 
+    function normalizeAsgAssetUrl(url) {
+      if (!url || typeof url !== 'string') return ''
+      const value = url.trim()
+      if (!value) return ''
+      if (/^https?:\/\//i.test(value) || value.startsWith('data:')) return value
+      const base = ASG_API_BASE_URL.endsWith('/') ? ASG_API_BASE_URL : `${ASG_API_BASE_URL}/`
+      return new URL(value.replace(/^\//, ''), base).toString()
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    function onPartnerSearchInput() {
+      const input = document.getElementById('partnerSearchInput')
+      partnerSearchKeyword = (input?.value || '').trim().toLowerCase()
+      renderPublicPartners()
+    }
+
+    function updatePartnersCount(filteredCount, totalCount) {
+      const countEl = document.getElementById('partnersCount')
+      if (!countEl) return
+      const filtered = Number.isFinite(filteredCount) ? filteredCount : 0
+      const total = Number.isFinite(totalCount) ? totalCount : 0
+      countEl.textContent = filtered === total ? `${total} 条` : `${filtered}/${total} 条`
+    }
+
+    async function loadPublicPartners() {
+      const btn = document.getElementById('refreshPartnersBtn')
+      const list = document.getElementById('partnersList')
+      if (!list) return
+
+      try {
+        if (btn) {
+          btn.disabled = true
+          btn.textContent = '⏳ 加载中...'
+        }
+
+        updatePartnersCount(0, 0)
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px;">正在获取赛事名单...</div>'
+
+        const result = await window.electronAPI.getPublicPartners()
+        if (!result || !result.success) {
+          throw new Error(result?.error || '获取失败')
+        }
+
+        publicPartners = Array.isArray(result.data) ? result.data : []
+        renderPublicPartners()
+      } catch (e) {
+        console.error('加载合作伙伴失败:', e)
+        updatePartnersCount(0, 0)
+        list.innerHTML = `<div style="text-align:center; padding:20px; color:#e57373; font-size:13px;">加载失败：${e.message || e}</div>`
+      } finally {
+        if (btn) {
+          btn.disabled = false
+          btn.textContent = '🔄 刷新'
+        }
+      }
+    }
+
+    function renderPublicPartners() {
+      const list = document.getElementById('partnersList')
+      if (!list) return
+
+      if (!publicPartners.length) {
+        updatePartnersCount(0, 0)
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px;">暂无赛事名单信息</div>'
+        return
+      }
+
+      const keyword = (partnerSearchKeyword || '').trim().toLowerCase()
+      const sortedPartners = [...publicPartners].sort((a, b) => {
+        const aName = (a?.name || '').toString()
+        const bName = (b?.name || '').toString()
+        return aName.localeCompare(bName, 'zh-CN')
+      })
+      const filteredPartners = keyword
+        ? sortedPartners.filter(p => {
+          const text = `${p?.name || ''} ${p?.description || ''} ${p?.type || ''}`.toLowerCase()
+          return text.includes(keyword)
+        })
+        : sortedPartners
+
+      updatePartnersCount(filteredPartners.length, publicPartners.length)
+
+      if (!filteredPartners.length) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px;">未找到匹配的赛事名单，请调整关键字</div>'
+        return
+      }
+
+      list.innerHTML = `
+        <div class="partners-grid">
+          ${filteredPartners.map(p => {
+        const name = escapeHtml(p?.name || '未命名合作伙伴')
+        const desc = escapeHtml(p?.description || '暂无简介')
+        const typeText = escapeHtml(p?.type || 'Partner')
+        const logoUrl = normalizeAsgAssetUrl(p?.logoUrl || '')
+        const websiteUrlRaw = typeof p?.websiteUrl === 'string' ? p.websiteUrl.trim() : ''
+        const websiteUrl = websiteUrlRaw && /^https?:\/\//i.test(websiteUrlRaw) ? websiteUrlRaw : (websiteUrlRaw ? `https://${websiteUrlRaw}` : '')
+        const websiteHref = websiteUrl ? encodeURI(websiteUrl) : ''
+        const websiteTag = websiteHref
+          ? `<a class="partner-link" href="${websiteHref}" target="_blank" rel="noopener noreferrer">官网</a>`
+          : '<span class="partner-tag">暂无官网</span>'
+        return `
+              <div class="partner-item">
+                <div class="partner-logo-wrap ${logoUrl ? '' : 'fallback'}">
+                  ${logoUrl
+            ? `<img class="partner-logo" src="${logoUrl}" alt="${name}" onerror="this.style.display='none'; this.parentElement.classList.add('fallback')">`
+            : ''}
+                  <span class="partner-logo-fallback">🏆</span>
+                </div>
+                <div class="partner-content">
+                  <div class="partner-title">${name}</div>
+                  <div class="partner-desc">${desc}</div>
+                  <div class="partner-footer">
+                    <span class="partner-tag">${typeText}</span>
+                    ${websiteTag}
+                  </div>
+                </div>
+              </div>
+            `
+      }).join('')}
+        </div>
+      `
+    }
+
     // Theme toggle: persist to localStorage and notify other windows
     function getSystemTheme() {
       try {
@@ -1078,7 +1458,7 @@
     // 打开帮助
     function openHelp() {
       const helpContent = `
-        【ASG导播端使用指南】
+        【Idvevent导播端使用指南】
         
         1️⃣ 创建房间
         - 点击"创建房间"按钮
@@ -1264,6 +1644,269 @@
       toggleTransparentBackground()
     }
 
+    // ==================== 启动炫酷窗口动画 ====================
+    async function loadBpStartupWindowAnimationSetting() {
+      try {
+        const result = await window.electronAPI.getBpStartupWindowAnimation()
+        if (result && result.success) {
+          const toggle = document.getElementById('bpStartupWindowAnimationToggle')
+          if (toggle) {
+            toggle.checked = !!result.enabled
+          }
+        }
+      } catch (e) {
+        console.warn('加载启动炫酷窗口动画设置失败:', e)
+      }
+    }
+
+    async function toggleBpStartupWindowAnimation() {
+      const toggle = document.getElementById('bpStartupWindowAnimationToggle')
+      const enabled = toggle ? toggle.checked : true
+      try {
+        const result = await window.electronAPI.setBpStartupWindowAnimation(enabled)
+        if (result && result.success) {
+          showStatus(enabled ? '✅ 已开启启动炫酷窗口动画' : '✅ 已关闭启动炫酷窗口动画', 'success')
+        } else {
+          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
+          if (toggle) toggle.checked = !enabled
+        }
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+        if (toggle) toggle.checked = !enabled
+      }
+    }
+
+    function onBpStartupWindowAnimationRowClick(e) {
+      const toggle = document.getElementById('bpStartupWindowAnimationToggle')
+      if (!toggle) return
+      const target = e?.target
+      if (target === toggle) return
+      if (target && typeof target.closest === 'function' && target.closest('.switch')) return
+      toggle.checked = !toggle.checked
+      toggleBpStartupWindowAnimation()
+    }
+
+    // ==================== 本地BP控制台背景设置 ====================
+    const LOCAL_BP_CONSOLE_BG_DEFAULTS = Object.freeze({
+      imagePath: null,
+      maskOpacity: 0.25,
+      blur: 0,
+      autoCompressLargeImage: true,
+      cardOpacity: 1
+    })
+    let localBpConsoleBgState = { ...LOCAL_BP_CONSOLE_BG_DEFAULTS }
+    let localBpConsoleBgLoaded = false
+    let localBpConsoleBgSaveTimer = null
+
+    function clampLocalBpConsoleBgNumber(value, min, max, fallback) {
+      const num = Number(value)
+      if (!Number.isFinite(num)) return fallback
+      return Math.min(max, Math.max(min, num))
+    }
+
+    function normalizeLocalBpConsoleBgState(raw) {
+      const base = raw && typeof raw === 'object' ? raw : {}
+      const imagePath = (typeof base.imagePath === 'string' && base.imagePath.trim())
+        ? base.imagePath.trim()
+        : null
+      const maskOpacity = clampLocalBpConsoleBgNumber(base.maskOpacity, 0, 1, LOCAL_BP_CONSOLE_BG_DEFAULTS.maskOpacity)
+      const blur = clampLocalBpConsoleBgNumber(base.blur, 0, 40, LOCAL_BP_CONSOLE_BG_DEFAULTS.blur)
+      const autoCompressLargeImage = base.autoCompressLargeImage !== false
+      const cardOpacity = clampLocalBpConsoleBgNumber(base.cardOpacity, 0, 1, LOCAL_BP_CONSOLE_BG_DEFAULTS.cardOpacity)
+      return { imagePath, maskOpacity, blur, autoCompressLargeImage, cardOpacity }
+    }
+
+    function formatLocalBpConsoleBgFileSize(bytes) {
+      const num = Number(bytes)
+      if (!Number.isFinite(num) || num <= 0) return '0 B'
+      const units = ['B', 'KB', 'MB', 'GB']
+      let value = num
+      let unitIndex = 0
+      while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024
+        unitIndex++
+      }
+      const precision = unitIndex === 0 ? 0 : 1
+      return `${value.toFixed(precision)} ${units[unitIndex]}`
+    }
+
+    function updateLocalBpConsoleBackgroundPathLabel(path) {
+      const el = document.getElementById('localBpConsoleBackgroundPathSetting')
+      if (!el) return
+      if (!path) {
+        el.textContent = '未设置'
+        el.title = ''
+        return
+      }
+      const normalized = String(path).replace(/\\/g, '/')
+      const fileName = normalized.split('/').pop() || path
+      el.textContent = fileName
+      el.title = String(path)
+    }
+
+    function updateLocalBpConsoleBackgroundValueLabels() {
+      const maskInput = document.getElementById('localBpConsoleBackgroundMaskSetting')
+      const blurInput = document.getElementById('localBpConsoleBackgroundBlurSetting')
+      const cardOpacityInput = document.getElementById('localBpConsoleBackgroundCardOpacitySetting')
+      const maskValue = document.getElementById('localBpConsoleBackgroundMaskValueSetting')
+      const blurValue = document.getElementById('localBpConsoleBackgroundBlurValueSetting')
+      const cardOpacityValue = document.getElementById('localBpConsoleBackgroundCardOpacityValueSetting')
+
+      if (maskInput && maskValue) {
+        const val = parseInt(maskInput.value, 10) || 0
+        maskValue.textContent = `${val}%`
+      }
+      if (blurInput && blurValue) {
+        const val = parseInt(blurInput.value, 10) || 0
+        blurValue.textContent = `${val}px`
+      }
+      if (cardOpacityInput && cardOpacityValue) {
+        const val = parseInt(cardOpacityInput.value, 10) || 100
+        cardOpacityValue.textContent = `${val}%`
+      }
+    }
+
+    function syncLocalBpConsoleBackgroundSettingsUI(state) {
+      const maskInput = document.getElementById('localBpConsoleBackgroundMaskSetting')
+      const blurInput = document.getElementById('localBpConsoleBackgroundBlurSetting')
+      const autoCompressInput = document.getElementById('localBpConsoleBackgroundAutoCompressSetting')
+      const cardOpacityInput = document.getElementById('localBpConsoleBackgroundCardOpacitySetting')
+
+      if (maskInput) maskInput.value = String(Math.round(state.maskOpacity * 100))
+      if (blurInput) blurInput.value = String(Math.round(state.blur))
+      if (autoCompressInput) autoCompressInput.checked = state.autoCompressLargeImage !== false
+      if (cardOpacityInput) cardOpacityInput.value = String(Math.round(state.cardOpacity * 100))
+      updateLocalBpConsoleBackgroundPathLabel(state.imagePath)
+      updateLocalBpConsoleBackgroundValueLabels()
+    }
+
+    function collectLocalBpConsoleBackgroundFromUI() {
+      const maskInput = document.getElementById('localBpConsoleBackgroundMaskSetting')
+      const blurInput = document.getElementById('localBpConsoleBackgroundBlurSetting')
+      const autoCompressInput = document.getElementById('localBpConsoleBackgroundAutoCompressSetting')
+      const cardOpacityInput = document.getElementById('localBpConsoleBackgroundCardOpacitySetting')
+      const maskPercent = clampLocalBpConsoleBgNumber(maskInput ? parseInt(maskInput.value, 10) : 25, 0, 100, 25)
+      const blur = clampLocalBpConsoleBgNumber(blurInput ? parseInt(blurInput.value, 10) : 0, 0, 40, 0)
+      const cardOpacityPercent = clampLocalBpConsoleBgNumber(cardOpacityInput ? parseInt(cardOpacityInput.value, 10) : 100, 0, 100, 100)
+      return {
+        imagePath: localBpConsoleBgState.imagePath,
+        maskOpacity: maskPercent / 100,
+        blur,
+        autoCompressLargeImage: autoCompressInput ? autoCompressInput.checked : true,
+        cardOpacity: cardOpacityPercent / 100
+      }
+    }
+
+    async function loadLocalBpConsoleBackgroundSettings() {
+      if (!window.electronAPI || !window.electronAPI.getLocalBpConsoleBackground) return
+      try {
+        const result = await window.electronAPI.getLocalBpConsoleBackground()
+        if (!result || !result.success) return
+        localBpConsoleBgState = normalizeLocalBpConsoleBgState(result.settings)
+        syncLocalBpConsoleBackgroundSettingsUI(localBpConsoleBgState)
+        localBpConsoleBgLoaded = true
+      } catch (e) {
+        console.warn('加载本地BP控制台背景设置失败:', e)
+      }
+    }
+
+    async function saveLocalBpConsoleBackgroundSettings(patch = {}, options = {}) {
+      if (!window.electronAPI || !window.electronAPI.setLocalBpConsoleBackground) {
+        throw new Error('当前版本不支持此设置')
+      }
+
+      const merged = {
+        ...localBpConsoleBgState,
+        ...patch
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'imagePath')) {
+        merged.imagePath = (typeof patch.imagePath === 'string' && patch.imagePath.trim()) ? patch.imagePath.trim() : null
+      }
+      const next = normalizeLocalBpConsoleBgState(merged)
+
+      const result = await window.electronAPI.setLocalBpConsoleBackground(next)
+      if (!result || !result.success) {
+        throw new Error(result?.error || '保存失败')
+      }
+
+      localBpConsoleBgState = normalizeLocalBpConsoleBgState(result.settings || next)
+      syncLocalBpConsoleBackgroundSettingsUI(localBpConsoleBgState)
+
+      if (options.showToast) {
+        showStatus(options.toastMessage || '✅ 本地BP控制台背景已更新', 'success')
+      }
+    }
+
+    function onLocalBpConsoleBackgroundInput(immediate = false) {
+      updateLocalBpConsoleBackgroundValueLabels()
+      if (!localBpConsoleBgLoaded) return
+
+      if (localBpConsoleBgSaveTimer) {
+        clearTimeout(localBpConsoleBgSaveTimer)
+        localBpConsoleBgSaveTimer = null
+      }
+
+      const delay = immediate ? 0 : 180
+      localBpConsoleBgSaveTimer = setTimeout(async () => {
+        try {
+          const draft = collectLocalBpConsoleBackgroundFromUI()
+          await saveLocalBpConsoleBackgroundSettings(draft)
+        } catch (e) {
+          if (immediate) {
+            showStatus('设置失败: ' + e.message, 'error')
+          } else {
+            console.warn('实时更新本地BP控制台背景失败:', e)
+          }
+        }
+      }, delay)
+    }
+
+    async function selectLocalBpConsoleBackgroundFromSettings() {
+      if (!window.electronAPI || !window.electronAPI.selectLocalBpConsoleBackground) {
+        showStatus('当前版本不支持此设置', 'error')
+        return
+      }
+      try {
+        const result = await window.electronAPI.selectLocalBpConsoleBackground({
+          autoCompressLargeImage: localBpConsoleBgState.autoCompressLargeImage !== false
+        })
+        if (!result || !result.success) {
+          if (!result?.canceled) {
+            showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
+          }
+          return
+        }
+
+        const imagePath = result.path ? String(result.path) : ''
+        if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(imagePath)) {
+          showStatus('请选择常见图片格式（PNG/JPG/JPEG/GIF/WEBP/BMP）', 'warning')
+          return
+        }
+
+        const draft = collectLocalBpConsoleBackgroundFromUI()
+        draft.imagePath = imagePath
+        const compressed = result.compressed === true
+        const originalSize = Number(result.originalSize) || 0
+        const finalSize = Number(result.finalSize) || 0
+        const toastMessage = compressed && originalSize > 0 && finalSize > 0
+          ? `✅ 本地BP控制台背景已更新（自动压缩 ${formatLocalBpConsoleBgFileSize(originalSize)} -> ${formatLocalBpConsoleBgFileSize(finalSize)}）`
+          : '✅ 本地BP控制台背景已更新'
+        await saveLocalBpConsoleBackgroundSettings(draft, { showToast: true, toastMessage })
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+      }
+    }
+
+    async function clearLocalBpConsoleBackgroundFromSettings() {
+      try {
+        const draft = collectLocalBpConsoleBackgroundFromUI()
+        draft.imagePath = null
+        await saveLocalBpConsoleBackgroundSettings(draft, { showToast: true })
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+      }
+    }
+
     async function connectToServer() {
       const serverUrl = serverUrlInput.value.trim()
       if (!serverUrl) {
@@ -1381,6 +2024,14 @@
         const result = await window.electronAPI.invoke('open-local-bp')
         if (result.success) {
           showStatus('本地BP窗口已打开', 'success')
+          try {
+            const animationSetting = await window.electronAPI.getBpStartupWindowAnimation()
+            if (animationSetting && animationSetting.success && animationSetting.enabled) {
+              showStatus('提示：启动炫酷窗口动画可在【设置中心 -> 启动炫酷窗口动画】关闭', 'warning')
+            }
+          } catch (e) {
+            console.warn('读取启动动画设置失败:', e)
+          }
         } else {
           showStatus(`打开失败: ${result.error}`, 'error')
         }
@@ -1811,6 +2462,40 @@
       }
     }
 
+    function setStartupLockState(locked) {
+      const overlay = document.getElementById('startupOverlay')
+      document.body.classList.toggle('app-booting', !!locked)
+      document.body.setAttribute('aria-busy', locked ? 'true' : 'false')
+      if (!overlay) return
+      overlay.classList.toggle('hidden', !locked)
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (!document.body.classList.contains('app-booting')) return
+      event.preventDefault()
+      event.stopPropagation()
+    }, true)
+
+    async function bootstrapInteractiveState() {
+      setStartupLockState(true)
+      const hint = document.getElementById('startupOverlayHint')
+      if (hint) hint.textContent = '正在并行加载登录状态与 3D 配置...'
+      try {
+        await Promise.allSettled([
+          checkAuthStatus(),
+          loadModel3dSettings()
+        ])
+      } finally {
+        await new Promise(requestAnimationFrame)
+        setStartupLockState(false)
+        try {
+          await window.electronAPI?.notifyMainUiBootstrapReady?.()
+        } catch (e) {
+          console.warn('notifyMainUiBootstrapReady failed:', e)
+        }
+      }
+    }
+
     // 页面加载时检查登录状态和房间历史
     if (window.electronAPI && window.electronAPI.on) {
       window.electronAPI.on('auth-expired', (data) => {
@@ -1831,18 +2516,19 @@
       })
     }
 
-    checkAuthStatus()
+    bootstrapInteractiveState()
+    loadPublicPartners()
     loadRoomHistory()
     initVersionDisplay()
     loadFrontendResolution()
     loadFrontendResizeLockSetting()
     loadTransparentBackgroundSetting()
-
+    loadBpStartupWindowAnimationSetting()
+    loadLocalBpConsoleBackgroundSettings()
     // 加载插件组件
     loadPluginComponents()
     restoreModel3dCardState()
     initModel3dCardToggle()
-    loadModel3dSettings()
     bindModel3dAutoApply()
     initOfficialModelsDownloadProgress()
 
@@ -2149,6 +2835,28 @@
       }
     }
 
+    async function openObsAutomationEditor() {
+      try {
+        if (window.electronAPI && window.electronAPI.openObsAutomationEditor) {
+          await window.electronAPI.openObsAutomationEditor()
+        }
+      } catch (e) {
+        console.error('打开 OBS 自动化编辑器失败:', e)
+        showStatus('打开 OBS 自动化编辑器失败: ' + e.message, 'error')
+      }
+    }
+
+    async function openObsAutomationTutorial() {
+      try {
+        if (window.electronAPI && window.electronAPI.openObsAutomationTutorial) {
+          await window.electronAPI.openObsAutomationTutorial()
+        }
+      } catch (e) {
+        console.error('打开 OBS 自动化教程失败:', e)
+        showStatus('打开 OBS 自动化教程失败: ' + e.message, 'error')
+      }
+    }
+
     // ========= Idvevent 赛程导入功能 =========
 
     // 配置
@@ -2297,7 +3005,7 @@
       }).join('')
     }
 
-    // 导入对局信息到ASG API
+    // 导入对局信息到Idvevent API
     async function importMatchToASG(matchId) {
       try {
         showStatus('⏳ 正在导入对局信息...', 'info')
@@ -2534,7 +3242,7 @@
         const formData = new FormData()
         formData.append('logo', logoBlob, 'logo.png')
 
-        // 上传到ASG API
+        // 上传到Idvevent API
         const uploadResponse = await fetch(`${IDVEVENT_CONFIG.asgApiBaseUrl}/teams/${teamId}/logo`, {
           method: 'POST',
           headers: {

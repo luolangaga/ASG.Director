@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ASG导播 - 赛后数据</title>
+  <title>Idvevent导播 - 赛后数据</title>
   
   <link rel="stylesheet" href="./css/postmatch.css">
 </head>
@@ -15,118 +15,138 @@
   <img id="backgroundImage" alt="背景" />
 
   <!-- 标题区域 -->
-  <div id="titleContainer" class="draggable" style="left: 30px; top: 50px; width: 860px;">
+  <div id="titleContainer" class="draggable" data-component-name="主标题" style="left: 30px; top: 50px; width: 420px;">
     <div class="title" id="titleText">赛后数据</div>
+  </div>
+
+  <div id="subTitleContainer" class="draggable" data-component-name="副标题" style="left: 30px; top: 95px; width: 420px;">
     <div class="subtitle" id="subTitleText">MATCH STATS</div>
-    <div class="resize-handle nw" data-dir="nw"></div>
-    <div class="resize-handle n" data-dir="n"></div>
-    <div class="resize-handle ne" data-dir="ne"></div>
-    <div class="resize-handle e" data-dir="e"></div>
-    <div class="resize-handle se" data-dir="se"></div>
-    <div class="resize-handle s" data-dir="s"></div>
-    <div class="resize-handle sw" data-dir="sw"></div>
-    <div class="resize-handle w" data-dir="w"></div>
   </div>
 
-  <!-- 队伍条 -->
-  <div id="teamBarContainer" class="draggable" style="left: 30px; top: 140px; width: 1220px;">
-    <div class="team-bar">
-      <div class="team-card team-a">
-        <img id="teamALogo" class="team-logo" alt="A队logo" />
-        <div>
-          <div class="team-name" id="teamAName">A队</div>
-          <div class="team-meta" id="teamAMeta">W 0 &nbsp; D 0</div>
-        </div>
-        <div class="team-score" id="teamAScore">0</div>
-      </div>
-
-      <div class="center-card">
-        <div>
-          <div class="label" id="gameLabel">GAME 1</div>
-          <div class="map" id="mapName">地图</div>
-        </div>
-        <div class="label" id="centerNote">赛后数据</div>
-      </div>
-
-      <div class="team-card team-b">
-        <div class="team-score" id="teamBScore" style="justify-self: start;">0</div>
-        <div style="text-align: right;">
-          <div class="team-name" id="teamBName">B队</div>
-          <div class="team-meta" id="teamBMeta">W 0 &nbsp; D 0</div>
-        </div>
-        <img id="teamBLogo" class="team-logo" alt="B队logo" />
-      </div>
-    </div>
-
-    <div class="resize-handle nw" data-dir="nw"></div>
-    <div class="resize-handle n" data-dir="n"></div>
-    <div class="resize-handle ne" data-dir="ne"></div>
-    <div class="resize-handle e" data-dir="e"></div>
-    <div class="resize-handle se" data-dir="se"></div>
-    <div class="resize-handle s" data-dir="s"></div>
-    <div class="resize-handle sw" data-dir="sw"></div>
-    <div class="resize-handle w" data-dir="w"></div>
+  <div id="teamAContainer" class="draggable" data-component-name="A队Logo" style="left: 30px; top: 142px; width: 90px;">
+    <img id="teamALogo" class="team-logo" alt="A队logo" />
   </div>
 
-  <!-- 主体区域：求生者表 + 监管者卡 -->
-  <div id="statsContainer" class="draggable" style="left: 30px; top: 260px; width: 1220px;">
-    <div class="layout-grid">
+  <div id="teamANameContainer" class="draggable" data-component-name="A队名称" style="left: 130px; top: 140px; width: 220px;">
+    <div class="team-name team-a-color" id="teamAName">A队</div>
+    <div class="team-meta" id="teamAMeta">W 0 &nbsp; D 0</div>
+  </div>
+
+  <div id="teamAScoreContainer" class="draggable" data-component-name="A队比分" style="left: 360px; top: 136px; width: 60px;">
+    <div class="team-score team-a-color" id="teamAScore">0</div>
+  </div>
+
+  <div id="centerInfoContainer" class="draggable" data-component-name="中央信息" style="left: 438px; top: 140px; width: 404px;">
+    <div class="center-card">
       <div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th style="width: 220px;">ID</th>
-              <th>破译进度</th>
-              <th>砸板命中次数</th>
-              <th>救人次数</th>
-              <th>治疗次数</th>
-              <th>牵制监管者/秒</th>
-            </tr>
-          </thead>
-          <tbody id="survivorTableBody"></tbody>
-        </table>
+        <div class="label" id="gameLabel">GAME 1</div>
+        <div class="map" id="mapName">地图</div>
       </div>
+      <div class="label" id="centerNote">赛后数据</div>
+    </div>
+  </div>
 
-      <div class="hunter-card">
-        <div class="hunter-header">
-          <div style="flex: 1;">
-            <div class="hunter-name" id="hunterName">监管者</div>
-            <div class="hunter-role" id="hunterRole">角色</div>
-          </div>
+  <div id="teamBScoreContainer" class="draggable" data-component-name="B队比分" style="left: 860px; top: 136px; width: 60px;">
+    <div class="team-score team-b-color team-score-left" id="teamBScore">0</div>
+  </div>
+
+  <div id="teamBNameContainer" class="draggable" data-component-name="B队名称" style="left: 930px; top: 140px; width: 220px;">
+    <div style="text-align: right;">
+      <div class="team-name team-b-color" id="teamBName">B队</div>
+      <div class="team-meta" id="teamBMeta">W 0 &nbsp; D 0</div>
+    </div>
+  </div>
+
+  <div id="teamBContainer" class="draggable" data-component-name="B队Logo" style="left: 1160px; top: 142px; width: 90px;">
+    <img id="teamBLogo" class="team-logo" alt="B队logo" />
+  </div>
+
+  <div id="survivorTableContainer" class="draggable" data-component-name="求生者表头" style="left: 30px; top: 260px; width: 860px;">
+    <div class="survivor-row survivor-header">
+      <div style="width: 220px;">ID</div>
+      <div>破译进度</div>
+      <div>砸板命中次数</div>
+      <div>救人次数</div>
+      <div>治疗次数</div>
+      <div>牵制监管者/秒</div>
+    </div>
+  </div>
+
+  <div id="survivorRow1Container" class="draggable" data-component-name="求生者行1" style="left: 30px; top: 308px; width: 860px;">
+    <div class="survivor-row">
+      <div class="player-name" id="survivor1Name"></div>
+      <div class="stat" id="survivor1DecodeProgress"></div>
+      <div class="stat" id="survivor1PalletHit"></div>
+      <div class="stat" id="survivor1Rescue"></div>
+      <div class="stat" id="survivor1Heal"></div>
+      <div class="stat" id="survivor1ChaseSeconds"></div>
+    </div>
+  </div>
+
+  <div id="survivorRow2Container" class="draggable" data-component-name="求生者行2" style="left: 30px; top: 353px; width: 860px;">
+    <div class="survivor-row">
+      <div class="player-name" id="survivor2Name"></div>
+      <div class="stat" id="survivor2DecodeProgress"></div>
+      <div class="stat" id="survivor2PalletHit"></div>
+      <div class="stat" id="survivor2Rescue"></div>
+      <div class="stat" id="survivor2Heal"></div>
+      <div class="stat" id="survivor2ChaseSeconds"></div>
+    </div>
+  </div>
+
+  <div id="survivorRow3Container" class="draggable" data-component-name="求生者行3" style="left: 30px; top: 398px; width: 860px;">
+    <div class="survivor-row">
+      <div class="player-name" id="survivor3Name"></div>
+      <div class="stat" id="survivor3DecodeProgress"></div>
+      <div class="stat" id="survivor3PalletHit"></div>
+      <div class="stat" id="survivor3Rescue"></div>
+      <div class="stat" id="survivor3Heal"></div>
+      <div class="stat" id="survivor3ChaseSeconds"></div>
+    </div>
+  </div>
+
+  <div id="survivorRow4Container" class="draggable" data-component-name="求生者行4" style="left: 30px; top: 443px; width: 860px;">
+    <div class="survivor-row">
+      <div class="player-name" id="survivor4Name"></div>
+      <div class="stat" id="survivor4DecodeProgress"></div>
+      <div class="stat" id="survivor4PalletHit"></div>
+      <div class="stat" id="survivor4Rescue"></div>
+      <div class="stat" id="survivor4Heal"></div>
+      <div class="stat" id="survivor4ChaseSeconds"></div>
+    </div>
+  </div>
+
+  <div id="hunterContainer" class="draggable" data-component-name="监管者数据" style="left: 910px; top: 260px; width: 340px;">
+    <div class="hunter-card">
+      <div class="hunter-header">
+        <div style="flex: 1;">
+          <div class="hunter-name" id="hunterName">监管者</div>
+          <div class="hunter-role" id="hunterRole">角色</div>
         </div>
-        <div class="hunter-stats">
-          <div class="kv">
-            <div class="k">剩余密码机数量</div>
-            <div class="v" id="hunterRemainingCiphers">0</div>
-          </div>
-          <div class="kv">
-            <div class="k">破坏板子数</div>
-            <div class="v" id="hunterPalletDestroy">0</div>
-          </div>
-          <div class="kv">
-            <div class="k">命中求生者次数</div>
-            <div class="v" id="hunterHit">0</div>
-          </div>
-          <div class="kv">
-            <div class="k">恐惧震慑次数</div>
-            <div class="v" id="hunterTerrorShock">0</div>
-          </div>
-          <div class="kv">
-            <div class="k">击倒次数</div>
-            <div class="v" id="hunterDown">0</div>
-          </div>
+      </div>
+      <div class="hunter-stats">
+        <div class="kv">
+          <div class="k">剩余密码机数量</div>
+          <div class="v" id="hunterRemainingCiphers">0</div>
+        </div>
+        <div class="kv">
+          <div class="k">破坏板子数</div>
+          <div class="v" id="hunterPalletDestroy">0</div>
+        </div>
+        <div class="kv">
+          <div class="k">命中求生者次数</div>
+          <div class="v" id="hunterHit">0</div>
+        </div>
+        <div class="kv">
+          <div class="k">恐惧震慑次数</div>
+          <div class="v" id="hunterTerrorShock">0</div>
+        </div>
+        <div class="kv">
+          <div class="k">击倒次数</div>
+          <div class="v" id="hunterDown">0</div>
         </div>
       </div>
     </div>
-
-    <div class="resize-handle nw" data-dir="nw"></div>
-    <div class="resize-handle n" data-dir="n"></div>
-    <div class="resize-handle ne" data-dir="ne"></div>
-    <div class="resize-handle e" data-dir="e"></div>
-    <div class="resize-handle se" data-dir="se"></div>
-    <div class="resize-handle s" data-dir="s"></div>
-    <div class="resize-handle sw" data-dir="sw"></div>
-    <div class="resize-handle w" data-dir="w"></div>
   </div>
 
   <div id="snapLineV" class="snap-line snap-line-v"></div>

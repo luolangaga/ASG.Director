@@ -22,6 +22,21 @@ const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.sv
 
 // 支持的字体扩展名
 const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2']
+const LAYOUT_JSON_AUTHORITATIVE_KEYS = [
+  'postMatchLayout',
+  'scoreboardLayouts',
+  'scoreboardOverviewLayout',
+  'windowBounds',
+  'fontConfig',
+  'transparentBackground',
+  'characterDisplayLayout',
+  'localBpConsoleBackground',
+  'localBpCharacterDisplayLayout',
+  'localBpGameRecord',
+  'localBpScore',
+  'localBpMapPool',
+  'localBpCurrentMap'
+]
 
 /**
  * 确保必要的目录存在
@@ -164,13 +179,24 @@ function mergeCharacterDisplayLayout(layout) {
   return layout
 }
 
+function mergeAuthoritativeLayoutFields(targetLayout, sourceLayout) {
+  const target = (targetLayout && typeof targetLayout === 'object') ? targetLayout : {}
+  if (!sourceLayout || typeof sourceLayout !== 'object') return target
+
+  for (const key of LAYOUT_JSON_AUTHORITATIVE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(sourceLayout, key)) continue
+    target[key] = sourceLayout[key]
+  }
+  return target
+}
+
 /**
  * 收集当前布局包数据
- * @param {object} windowRefs - 窗口引用对象 { frontendWindow, scoreboardWindowA, scoreboardWindowB }
+ * @param {object} windowRefs - 窗口引用对象 { frontendWindow, scoreboardWindowA, scoreboardWindowB, scoreboardOverviewWindow, postMatchWindow }
  * @returns {Promise<object>}
  */
 async function collectPackData(windowRefs = {}) {
-  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, postMatchWindow } = windowRefs
+  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, scoreboardOverviewWindow, postMatchWindow } = windowRefs
   const packData = {}
 
   // 保存窗口大小
@@ -186,10 +212,18 @@ async function collectPackData(windowRefs = {}) {
 
   if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
     packData.scoreboardABounds = scoreboardWindowA.getBounds()
+    // 兼容旧字段
+    packData.scoreboardLayoutA = packData.scoreboardABounds
   }
 
   if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
     packData.scoreboardBBounds = scoreboardWindowB.getBounds()
+    // 兼容旧字段
+    packData.scoreboardLayoutB = packData.scoreboardBBounds
+  }
+
+  if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+    packData.scoreboardOverviewBounds = scoreboardOverviewWindow.getBounds()
   }
 
   if (postMatchWindow && !postMatchWindow.isDestroyed()) {
@@ -211,6 +245,7 @@ async function prepareExportDir(options = {}) {
 
   const files = []
   let hasValidLayout = false
+  let layoutRoot = null
 
   // 复制布局文件
   if (fs.existsSync(layoutPath)) {
@@ -219,6 +254,7 @@ async function prepareExportDir(options = {}) {
       if (content && content.trim().length > 0) {
         const layout = JSON.parse(content)
         if (layout && typeof layout === 'object' && Object.keys(layout).length > 0) {
+          layoutRoot = layout
           const destLayoutPath = path.join(tempDir, 'layout.json')
           fs.copyFileSync(layoutPath, destLayoutPath)
           files.push('layout.json')
@@ -236,11 +272,15 @@ async function prepareExportDir(options = {}) {
     try {
       const content = fs.readFileSync(layoutV2Path, 'utf8')
       if (content && content.trim().length > 0) {
-        JSON.parse(content)
+        let v2Layout = JSON.parse(content)
+        if (layoutRoot && typeof layoutRoot === 'object') {
+          // 防止 layout-v2 中旧字段覆盖 layout.json 最新值（例如 postMatchLayout）
+          v2Layout = mergeAuthoritativeLayoutFields(v2Layout, layoutRoot)
+        }
         const destLayoutV2Path = path.join(tempDir, 'layout-v2.json')
-        fs.copyFileSync(layoutV2Path, destLayoutV2Path)
+        fs.writeFileSync(destLayoutV2Path, JSON.stringify(v2Layout, null, 2))
         files.push('layout-v2.json')
-        console.log('[PackManager] V2 布局文件已复制')
+        console.log('[PackManager] V2 布局文件已导出并同步关键字段')
       }
     } catch (e) {
       console.warn('[PackManager] V2 布局文件无效，跳过导出:', e.message)
@@ -455,7 +495,20 @@ async function importPack(options = {}) {
         console.log('[PackManager] 发现 V2 布局文件，大小:', content.length, '字节')
 
         if (content) {
-          const v2Layout = mergeCharacterDisplayLayout(remapLayoutAssetPaths(JSON.parse(content)))
+          let v2Layout = JSON.parse(content)
+          // 若包内同时携带 layout.json，则用其关键字段覆盖 v2，避免 postMatchLayout 等丢失
+          if (fs.existsSync(layoutFile)) {
+            try {
+              const legacyRaw = fs.readFileSync(layoutFile, 'utf8').trim()
+              if (legacyRaw) {
+                const legacyLayout = JSON.parse(legacyRaw)
+                v2Layout = mergeAuthoritativeLayoutFields(v2Layout, legacyLayout)
+              }
+            } catch (e) {
+              console.warn('[PackManager] 同步 layout.json -> layout-v2 关键字段失败:', e.message)
+            }
+          }
+          v2Layout = mergeCharacterDisplayLayout(remapLayoutAssetPaths(v2Layout))
           fs.writeFileSync(layoutV2Path, JSON.stringify(v2Layout, null, 2))
           fs.writeFileSync(layoutPath, JSON.stringify(v2Layout, null, 2))
           console.log('[PackManager] V2 布局文件已导入，包含页面:',
@@ -573,7 +626,7 @@ async function importPack(options = {}) {
     await applyPackData(packData, windowRefs)
 
     // 通知窗口重新加载布局
-    const { frontendWindow, scoreboardWindowA, scoreboardWindowB, postMatchWindow } = windowRefs
+    const { frontendWindow, scoreboardWindowA, scoreboardWindowB, scoreboardOverviewWindow, postMatchWindow } = windowRefs
     if (frontendWindow && !frontendWindow.isDestroyed()) {
       console.log('[PackManager] 通知前台窗口重新加载布局')
       frontendWindow.webContents.send('reload-layout-from-pack')
@@ -583,6 +636,9 @@ async function importPack(options = {}) {
     }
     if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
       scoreboardWindowB.webContents.send('reload-layout-from-pack')
+    }
+    if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+      scoreboardOverviewWindow.webContents.send('reload-layout-from-pack')
     }
     if (postMatchWindow && !postMatchWindow.isDestroyed()) {
       postMatchWindow.webContents.send('reload-layout-from-pack')
@@ -603,7 +659,9 @@ async function importPack(options = {}) {
  * @param {object} windowRefs - 窗口引用
  */
 async function applyPackData(packData, windowRefs) {
-  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, postMatchWindow } = windowRefs
+  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, scoreboardOverviewWindow, postMatchWindow } = windowRefs
+  const scoreboardABounds = packData?.scoreboardABounds || packData?.scoreboardLayoutA
+  const scoreboardBBounds = packData?.scoreboardBBounds || packData?.scoreboardLayoutB
 
   // 应用前台窗口大小
   if (packData.frontendBounds && frontendWindow && !frontendWindow.isDestroyed()) {
@@ -624,11 +682,14 @@ async function applyPackData(packData, windowRefs) {
   }
 
   // 应用比分板窗口大小
-  if (packData.scoreboardABounds && scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
-    scoreboardWindowA.setBounds(packData.scoreboardABounds)
+  if (scoreboardABounds && scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
+    scoreboardWindowA.setBounds(scoreboardABounds)
   }
-  if (packData.scoreboardBBounds && scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
-    scoreboardWindowB.setBounds(packData.scoreboardBBounds)
+  if (scoreboardBBounds && scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
+    scoreboardWindowB.setBounds(scoreboardBBounds)
+  }
+  if (packData.scoreboardOverviewBounds && scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+    scoreboardOverviewWindow.setBounds(packData.scoreboardOverviewBounds)
   }
 
   if (packData.postMatchBounds && postMatchWindow && !postMatchWindow.isDestroyed()) {
@@ -674,7 +735,7 @@ async function installFromStore(packFilePath, packInfo, options = {}) {
  * @param {object} windowRefs - 窗口引用
  */
 async function refreshWindows(windowRefs) {
-  const { frontendWindow, scoreboardWindowA, scoreboardWindowB } = windowRefs
+  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, scoreboardOverviewWindow, postMatchWindow } = windowRefs
 
   const refresh = async (win, name) => {
     if (win && !win.isDestroyed()) {
@@ -689,6 +750,8 @@ async function refreshWindows(windowRefs) {
     await refresh(frontendWindow, '前台窗口')
     await refresh(scoreboardWindowA, '比分板A')
     await refresh(scoreboardWindowB, '比分板B')
+    await refresh(scoreboardOverviewWindow, '总览比分板')
+    await refresh(postMatchWindow, '赛后数据')
   }, 500)
 }
 
@@ -745,7 +808,7 @@ function getInstalledPacks() {
  * @param {object} windowRefs - 窗口引用
  */
 async function resetLayout(windowRefs = {}) {
-  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, postMatchWindow } = windowRefs
+  const { frontendWindow, scoreboardWindowA, scoreboardWindowB, scoreboardOverviewWindow, postMatchWindow } = windowRefs
 
   try {
     // 删除布局文件
@@ -794,6 +857,9 @@ async function resetLayout(windowRefs = {}) {
     }
     if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
       scoreboardWindowB.webContents.send('reload-layout-from-pack')
+    }
+    if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+      scoreboardOverviewWindow.webContents.send('reload-layout-from-pack')
     }
 
     // 通知赛后数据窗口重新加载

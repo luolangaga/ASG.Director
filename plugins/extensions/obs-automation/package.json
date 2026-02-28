@@ -1,0 +1,95 @@
+{
+  "name": "obs-automation",
+  "displayName": "OBS 自动化控制",
+  "description": "通过 OBS WebSocket 实现赛事直播自动化控制，支持 BP 事件触发场景切换等功能",
+  "version": "1.1.0",
+  "author": "ASG Team",
+  "license": "MIT",
+  "main": "index.js",
+  "engines": {
+    "asg-director": ">=1.4.0"
+  },
+  "activationEvents": [
+    "onStartup"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "obsAutomation.openConfig",
+        "title": "OBS自动化：打开配置面板",
+        "icon": "settings"
+      },
+      {
+        "command": "obsAutomation.connect",
+        "title": "OBS自动化：连接OBS",
+        "icon": "link"
+      },
+      {
+        "command": "obsAutomation.disconnect",
+        "title": "OBS自动化：断开OBS连接",
+        "icon": "link_off"
+      },
+      {
+        "command": "obsAutomation.switchScene",
+        "title": "OBS自动化：切换场景",
+        "icon": "tv"
+      },
+      {
+        "command": "obsAutomation.testTrigger",
+        "title": "OBS自动化：测试触发器",
+        "icon": "bug_report"
+      }
+    ],
+    "menus": {
+      "tools": [
+        {
+          "command": "obsAutomation.openConfig",
+          "group": "obs",
+          "order": 1
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OBS 自动化设置",
+      "properties": {
+        "obsAutomation.host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "OBS WebSocket 服务器地址"
+        },
+        "obsAutomation.port": {
+          "type": "number",
+          "default": 4455,
+          "description": "OBS WebSocket 端口（v5默认4455，v4默认4444）"
+        },
+        "obsAutomation.password": {
+          "type": "string",
+          "default": "",
+          "description": "OBS WebSocket 密码"
+        },
+        "obsAutomation.autoConnect": {
+          "type": "boolean",
+          "default": false,
+          "description": "启动时自动连接 OBS"
+        },
+        "obsAutomation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用自动化功能"
+        }
+      }
+    }
+  },
+  "keywords": [
+    "asg",
+    "plugin",
+    "obs",
+    "websocket",
+    "automation",
+    "streaming",
+    "esports"
+  ],
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS 自动化（内置）- 积木规则编辑器</title>
+  <link rel="stylesheet" href="./obs-automation-editor.css">
+</head>
+
+<body>
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="title">OBS 自动化（内置）- 积木规则编辑器</div>
+      <div id="obsStatus" class="status-pill">OBS 未连接</div>
+    </div>
+    <div class="toolbar-right">
+      <button id="btnSaveAllTop" class="btn primary">保存全部规则</button>
+      <button id="btnOpenTutorialTop" class="btn">打开教程</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="left">
+      <section class="card">
+        <div class="card-title">OBS 连接</div>
+        <div class="field">
+          <label for="host">主机</label>
+          <input id="host" type="text" placeholder="localhost">
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="port">端口</label>
+            <input id="port" type="number" placeholder="4455">
+          </div>
+          <div class="field">
+            <label for="password">密码</label>
+            <input id="password" type="password" placeholder="可留空">
+          </div>
+        </div>
+        <label class="checkbox-row">
+          <input id="autoConnect" type="checkbox">
+          启动时自动连接
+        </label>
+        <div class="btn-row">
+          <button id="btnConnect" class="btn primary">连接</button>
+          <button id="btnDisconnect" class="btn">断开</button>
+          <button id="btnSaveConfig" class="btn">保存设置</button>
+        </div>
+      </section>
+
+      <section class="rules-header">
+        <div class="card-title head-title">规则列表</div>
+        <button id="btnNewRule" class="btn">+ 新建</button>
+      </section>
+
+      <div id="rulesList" class="rules-list"></div>
+    </aside>
+
+    <main class="right">
+      <div id="editorEmpty" class="editor-empty">选择一条规则，或点击左侧“+ 新建”开始配置。</div>
+
+      <div id="editor" class="editor">
+        <section class="editor-top">
+          <div class="editor-top-grid">
+            <div>
+              <div class="field">
+                <label for="ruleName">规则名称</label>
+                <input id="ruleName" type="text" placeholder="例如：第一个求生者选择后切场景">
+              </div>
+              <div class="field">
+                <label for="ruleDescription">备注</label>
+                <textarea id="ruleDescription" placeholder="可选说明"></textarea>
+              </div>
+              <label class="checkbox-row">
+                <input id="ruleEnabled" type="checkbox" checked>
+                规则启用
+              </label>
+            </div>
+
+            <div>
+              <div class="field">
+                <label for="ruleTriggerType">触发事件</label>
+                <select id="ruleTriggerType"></select>
+              </div>
+              <div id="ruleTriggerHint" class="hint"></div>
+              <div class="field interval-row" id="intervalRow">
+                <label for="ruleInterval">定时间隔（支持 30s / 2m / 01:30 / 01:02:03）</label>
+                <input id="ruleInterval" type="text" placeholder="30s">
+              </div>
+            </div>
+
+            <div>
+              <div class="field">
+                <label for="ruleDelay">规则延迟（支持 ms/s/m/h/d 与 mm:ss / hh:mm:ss）</label>
+                <input id="ruleDelay" type="text" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="ruleCooldown">触发冷却</label>
+                <input id="ruleCooldown" type="text" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="ruleMaxTriggers">最大触发次数（0 为不限）</label>
+                <input id="ruleMaxTriggers" type="number" min="0" placeholder="0">
+              </div>
+              <div class="field">
+                <label for="ruleCondition">高级条件 JS（可选，变量示例：vars.bpSurvivorSelectedCount）</label>
+                <input id="ruleCondition" type="text" placeholder="例如：vars.bpSurvivorSelectedCount >= 2">
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="editor-actions">
+          <button id="btnSaveRule" class="btn primary">保存当前规则</button>
+          <button id="btnTestRule" class="btn">测试触发</button>
+          <button id="btnDeleteRule" class="btn danger">删除规则</button>
+          <button id="btnSaveAll" class="btn warning">保存全部规则</button>
+        </section>
+
+        <section class="mode-switch">
+          <button id="btnModeClassic" class="btn mode-btn active">经典积木模式</button>
+          <button id="btnModeScratch" class="btn mode-btn">Scratch 3 积木模式</button>
+          <div class="mode-tip">Scratch 模式支持自定义积木，可调用自定义 API、广播事件、实时修改自定义组件属性，参数支持模板语法（如 {{bpHunter}}）</div>
+        </section>
+
+        <section id="workspaceClassic" class="workspace">
+          <aside class="palette">
+            <div class="card-title palette-title">动作积木库</div>
+            <div id="paletteRoot"></div>
+          </aside>
+          <div id="canvas" class="canvas"></div>
+        </section>
+
+        <section id="workspaceScratch" class="workspace workspace-scratch" style="display:none;">
+          <aside class="scratch-sidebar">
+            <div class="card-title palette-title">Scratch 积木配置</div>
+            <p class="scratch-help">触发器在顶部“当触发”积木中设置。动作能力与现有 OBS 自动化完全一致。</p>
+            <div class="btn-row">
+              <button id="btnNewCustomBlock" class="btn">+ 新建自定义积木</button>
+              <button id="btnExportCustomBlocks" class="btn">导出自定义积木</button>
+              <button id="btnImportCustomBlocks" class="btn">导入自定义积木</button>
+            </div>
+            <div id="scratchCustomBlockList" class="scratch-custom-list"></div>
+          </aside>
+          <div id="scratchWorkspace" class="scratch-workspace"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="../node_modules/blockly/blockly_compressed.js"></script>
+  <script src="../node_modules/blockly/blocks_compressed.js"></script>
+  <script src="../node_modules/blockly/msg/zh-hans.js"></script>
+  <script src="./obs-automation-editor.js"></script>
+</body>
+
+</html>

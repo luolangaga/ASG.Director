@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lower Third</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --accent: #4f8cff;
+        --bg: rgba(10, 14, 24, 0.72);
+        --text: #f8fafc;
+        --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+        font-family: "Manrope", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+      }
+      #stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      .widget {
+        position: absolute;
+        left: 4%;
+        bottom: 8%;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 18px 26px;
+        border-radius: 16px;
+        background: var(--bg);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transform: translateY(30px);
+        opacity: 0;
+        transition: transform 0.5s ease, opacity 0.5s ease;
+      }
+      .widget.visible {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .accent-bar {
+        width: 6px;
+        align-self: stretch;
+        border-radius: 8px;
+        background: linear-gradient(180deg, var(--accent), rgba(79, 140, 255, 0.25));
+      }
+      .text-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .name {
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+      .title {
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.7);
+        letter-spacing: 0.4px;
+      }
+      .badge {
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.75);
+      }
+      .theme-solid {
+        --bg: rgba(13, 17, 26, 0.92);
+      }
+      .theme-neon {
+        --bg: rgba(10, 10, 20, 0.6);
+        --shadow: 0 0 40px rgba(79, 140, 255, 0.35);
+        border: 1px solid rgba(79, 140, 255, 0.4);
+      }
+      .align-center {
+        left: 50%;
+        transform: translate(-50%, 30px);
+      }
+      .align-center.visible {
+        transform: translate(-50%, 0);
+      }
+      .align-right {
+        right: 4%;
+        left: auto;
+      }
+      .controls {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 270px;
+        padding: 14px;
+        border-radius: 14px;
+        background: rgba(14, 18, 30, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(14px);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.75);
+      }
+      .controls.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-10px);
+      }
+      .control-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      label {
+        font-size: 11px;
+        letter-spacing: 0.5px;
+      }
+      input, select {
+        background: rgba(5, 8, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: #e2e8f0;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        flex: 1;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: white;
+        background: var(--accent);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .toggle {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.8);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="widget" class="widget visible theme-glass align-left">
+        <div class="accent-bar"></div>
+        <div class="text-group">
+          <div class="name" id="nameText">解说 · Lynn</div>
+          <div class="title" id="titleText">主舞台 / 赛事直播</div>
+        </div>
+        <div class="badge" id="badgeText">LIVE</div>
+      </div>
+      <button id="toggleControls" class="toggle">控件</button>
+      <div id="controls" class="controls">
+        <div class="control-row">
+          <label>姓名</label>
+          <input id="nameInput" type="text" />
+        </div>
+        <div class="control-row">
+          <label>副标题</label>
+          <input id="titleInput" type="text" />
+        </div>
+        <div class="control-row">
+          <label>徽标</label>
+          <input id="badgeInput" type="text" />
+        </div>
+        <div class="control-row">
+          <label>对齐</label>
+          <select id="alignSelect">
+            <option value="left">左侧</option>
+            <option value="center">居中</option>
+            <option value="right">右侧</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label>主题</label>
+          <select id="themeSelect">
+            <option value="glass">玻璃</option>
+            <option value="solid">深色</option>
+            <option value="neon">霓虹</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label>主色</label>
+          <input id="accentInput" type="color" />
+        </div>
+        <div class="btn-row">
+          <button id="toggleVisibility">隐藏</button>
+          <button class="secondary" id="resetBtn">重置</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const query = new URLSearchParams(window.location.search);
+      const instanceId = (query.get("id") || "default").trim() || "default";
+      const storageKey = `lower_third_state_v2_${instanceId}`;
+      const defaults = {
+        name: "解说 · Lynn",
+        title: "主舞台 / 赛事直播",
+        badge: "LIVE",
+        align: "left",
+        theme: "glass",
+        accent: "#4f8cff",
+        visible: true,
+        controlsHidden: false
+      };
+      function safeReadState() {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey)) || {};
+        } catch {
+          return {};
+        }
+      }
+      function parseBool(value) {
+        if (value === null || value === undefined) return null;
+        const normalized = String(value).trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) return true;
+        if (["0", "false", "no", "off"].includes(normalized)) return false;
+        return null;
+      }
+      function parseColor(value) {
+        if (typeof value !== "string") return null;
+        const normalized = value.trim();
+        if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) return normalized;
+        return null;
+      }
+      const state = { ...defaults, ...safeReadState() };
+      const queryState = {};
+      const nameParam = query.get("name");
+      if (nameParam !== null) queryState.name = nameParam;
+      const titleParam = query.get("title");
+      if (titleParam !== null) queryState.title = titleParam;
+      const badgeParam = query.get("badge");
+      if (badgeParam !== null) queryState.badge = badgeParam;
+      const alignParam = query.get("align");
+      if (["left", "center", "right"].includes(alignParam || "")) queryState.align = alignParam;
+      const themeParam = query.get("theme");
+      if (["glass", "solid", "neon"].includes(themeParam || "")) queryState.theme = themeParam;
+      const accentParam = parseColor(query.get("accent"));
+      if (accentParam) queryState.accent = accentParam;
+      const visibleParam = parseBool(query.get("visible"));
+      if (visibleParam !== null) queryState.visible = visibleParam;
+      const controlsHiddenParam = parseBool(query.get("controlsHidden"));
+      if (controlsHiddenParam !== null) queryState.controlsHidden = controlsHiddenParam;
+      Object.assign(state, queryState);
+      const widget = document.getElementById("widget");
+      const nameText = document.getElementById("nameText");
+      const titleText = document.getElementById("titleText");
+      const badgeText = document.getElementById("badgeText");
+      const nameInput = document.getElementById("nameInput");
+      const titleInput = document.getElementById("titleInput");
+      const badgeInput = document.getElementById("badgeInput");
+      const alignSelect = document.getElementById("alignSelect");
+      const themeSelect = document.getElementById("themeSelect");
+      const accentInput = document.getElementById("accentInput");
+      const toggleVisibility = document.getElementById("toggleVisibility");
+      const resetBtn = document.getElementById("resetBtn");
+      const controls = document.getElementById("controls");
+      const toggleControls = document.getElementById("toggleControls");
+      function persist() {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      }
+      function apply() {
+        nameText.textContent = state.name;
+        titleText.textContent = state.title;
+        badgeText.textContent = state.badge || "";
+        widget.classList.toggle("visible", state.visible);
+        widget.classList.remove("align-left", "align-center", "align-right");
+        widget.classList.add(`align-${state.align}`);
+        widget.classList.remove("theme-glass", "theme-solid", "theme-neon");
+        widget.classList.add(`theme-${state.theme}`);
+        document.documentElement.style.setProperty("--accent", state.accent);
+        nameInput.value = state.name;
+        titleInput.value = state.title;
+        badgeInput.value = state.badge;
+        alignSelect.value = state.align;
+        themeSelect.value = state.theme;
+        accentInput.value = state.accent;
+        toggleVisibility.textContent = state.visible ? "隐藏" : "显示";
+        controls.classList.toggle("hidden", state.controlsHidden);
+      }
+      nameInput.addEventListener("input", (e) => {
+        state.name = e.target.value;
+        persist();
+        apply();
+      });
+      titleInput.addEventListener("input", (e) => {
+        state.title = e.target.value;
+        persist();
+        apply();
+      });
+      badgeInput.addEventListener("input", (e) => {
+        state.badge = e.target.value;
+        persist();
+        apply();
+      });
+      alignSelect.addEventListener("change", (e) => {
+        state.align = e.target.value;
+        persist();
+        apply();
+      });
+      themeSelect.addEventListener("change", (e) => {
+        state.theme = e.target.value;
+        persist();
+        apply();
+      });
+      accentInput.addEventListener("input", (e) => {
+        state.accent = e.target.value;
+        persist();
+        apply();
+      });
+      toggleVisibility.addEventListener("click", () => {
+        state.visible = !state.visible;
+        persist();
+        apply();
+      });
+      resetBtn.addEventListener("click", () => {
+        Object.assign(state, defaults);
+        persist();
+        apply();
+      });
+      toggleControls.addEventListener("click", () => {
+        state.controlsHidden = !state.controlsHidden;
+        persist();
+        apply();
+      });
+      if (Object.keys(queryState).length > 0) {
+        persist();
+      }
+      apply();
+    </script>
+  </body>
+</html>

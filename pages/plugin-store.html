@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ASG插件商店</title>
+  <title>Idvevent插件商店</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -229,8 +229,8 @@
   <div class="container">
     <div class="header">
       <div>
-        <h1>🧩 ASG插件商店</h1>
-        <div class="subtitle">浏览并安装插件包（安装/更新后将提示重启）</div>
+        <h1>🧩 Idvevent插件商店</h1>
+        <div class="subtitle">发现并管理 Idvevent Director 的扩展插件</div>
       </div>
       <div class="badge" id="envBadge">环境：-</div>
     </div>
@@ -561,7 +561,7 @@
     async function ensureLoggedIn(actionName) {
       const auth = await window.electronAPI.getAuthStatus()
       if (!auth?.isLoggedIn) {
-        toast(`请先登录 ASG 账号再${actionName || '进行此操作'}`, 'error')
+        toast(`请先登录 Idvevent 账号再${actionName || '进行此操作'}`, 'error')
         return false
       }
       return true
@@ -676,7 +676,7 @@
         toast(res.message || '插件已安装/更新', 'success')
 
         if (res.requiresRestart) {
-          openRestart('插件已安装/更新完成，需要重启 ASG.Director 才会生效。')
+          openRestart('插件已安装/更新完成，需要重启 Idvevent Director 才会生效。')
         }
       } catch (e) {
         toast(e.message || String(e), 'error')
@@ -702,7 +702,7 @@
         toast(res.removed ? '插件已卸载' : '插件不存在或已卸载', 'success')
 
         if (res.requiresRestart) {
-          openRestart('插件已卸载，需要重启 ASG.Director 才会彻底生效。')
+          openRestart('插件已卸载，需要重启 Idvevent Director 才会彻底生效。')
         }
       } catch (e) {
         toast(e.message || String(e), 'error')

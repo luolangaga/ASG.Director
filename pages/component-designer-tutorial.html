@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>组件积木 API 教程</title>
+  <style>
+    :root {
+      --bg: #12131a;
+      --card: #1d1f2a;
+      --card-2: #25283a;
+      --line: #343850;
+      --text: #f4f6ff;
+      --muted: #b8bfd8;
+      --accent: #ffd86b;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top right, #1b2340, #12131a 42%);
+      color: var(--text);
+      font-family: "Outfit", "Microsoft YaHei", "Segoe UI", sans-serif;
+      line-height: 1.62;
+    }
+
+    .wrap {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 20px 16px 38px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      font-size: 30px;
+      letter-spacing: 0.4px;
+    }
+
+    h2 {
+      font-size: 20px;
+      color: #ffe79d;
+      margin-top: 18px;
+    }
+
+    h3 {
+      font-size: 16px;
+      color: #f9dc90;
+      margin-top: 12px;
+    }
+
+    p,
+    li {
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+
+    code {
+      background: #2a2f46;
+      border: 1px solid #3f4668;
+      border-radius: 6px;
+      padding: 1px 6px;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    pre {
+      margin: 8px 0 0;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #171927;
+      color: #eaf1ff;
+      padding: 12px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .hero {
+      border: 1px solid #3d4363;
+      border-radius: 14px;
+      padding: 16px 18px;
+      background: linear-gradient(150deg, #2a2d40 0%, #1d2031 100%);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      padding: 12px 14px;
+    }
+
+    .tip {
+      border: 1px solid #4b4f6d;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #e7ecff;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tip.ok {
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(34, 197, 94, 0.14);
+      color: #c9f7db;
+    }
+
+    .tip.warn {
+      border-color: rgba(245, 158, 11, 0.55);
+      background: rgba(245, 158, 11, 0.14);
+      color: #fde9b2;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--card-2);
+      color: #f6f7ff;
+    }
+
+    .section {
+      margin-top: 12px;
+    }
+
+    @media (max-width: 980px) {
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>组件设计器 · 积木 API 完整教程</h1>
+      <p>本页覆盖你现在这套“组件积木模式”的全部 API：触发器、动作参数、模板变量、Patch 字段，以及可直接照抄的完整示例。</p>
+      <p class="muted">打开方式：组件设计器顶部 <code>📘 API教程</code> 按钮。</p>
+      <div class="tip ok">目标能力：通过积木直接做“事件驱动 UI”，包括调用 API、触发事件、修改组件属性、执行自定义命令。</div>
+    </section>
+
+    <div class="row">
+      <section class="card">
+        <h2>1. 30 秒上手</h2>
+        <ol>
+          <li>进入 <code>组件设计器</code>，新建组件并分配到某个前台窗口。</li>
+          <li>切到 <code>🧩 积木</code> 页签。</li>
+          <li>新建规则：选触发器 -> 添加动作 -> 填参数。</li>
+          <li>点击右上角 <code>保存全部</code>，打开前台窗口验证。</li>
+        </ol>
+        <div class="tip">编辑模式按 <code>F2</code> 切换；自定义窗口有边缘框和进场动画，可直接预览行为。</div>
+      </section>
+
+      <section class="card">
+        <h2>2. 数据模型</h2>
+        <p class="muted">每个组件包含 <code>behavior.rules</code>。结构如下：</p>
+        <pre><code>{
+  "behavior": {
+    "version": 1,
+    "rules": [
+      {
+        "id": "rule_xxx",
+        "name": "点击后改字",
+        "enabled": true,
+        "triggerType": "component:click",
+        "triggerEventName": "",
+        "actions": [
+          {
+            "id": "act_xxx",
+            "type": "SET_COMPONENT_PROPERTY",
+            "enabled": true,
+            "delay": "",
+            "params": { "componentId": "", "patchJson": "{\"text\":\"Hello\"}" }
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+      </section>
+    </div>
+
+    <section class="card section">
+      <h2>3. 触发器 API（TriggerType）</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>触发器</th>
+            <th>含义</th>
+            <th>典型 eventData 字段</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>component:init</code></td>
+            <td>组件刚渲染完成时触发一次</td>
+            <td><code>componentId</code></td>
+          </tr>
+          <tr>
+            <td><code>component:click</code></td>
+            <td>鼠标点击组件</td>
+            <td><code>x</code> <code>y</code> <code>button</code></td>
+          </tr>
+          <tr>
+            <td><code>component:dblclick</code></td>
+            <td>鼠标双击组件</td>
+            <td><code>x</code> <code>y</code></td>
+          </tr>
+          <tr>
+            <td><code>component:mouseenter</code></td>
+            <td>鼠标进入组件</td>
+            <td><code>x</code> <code>y</code></td>
+          </tr>
+          <tr>
+            <td><code>component:mouseleave</code></td>
+            <td>鼠标离开组件</td>
+            <td><code>x</code> <code>y</code></td>
+          </tr>
+          <tr>
+            <td><code>custom:event</code></td>
+            <td>由动作 <code>EMIT_CUSTOM_EVENT</code> 或 API 回调继续触发</td>
+            <td><code>eventName</code> + 你自定义的 payload</td>
+          </tr>
+          <tr>
+            <td><code>bp:hunter-selected</code></td>
+            <td>BP 监管者确认</td>
+            <td><code>hunter</code> <code>character</code></td>
+          </tr>
+          <tr>
+            <td><code>bp:survivor-selected</code></td>
+            <td>BP 任意求生者确认</td>
+            <td><code>survivor</code> <code>selectedCount</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:state-updated</code></td>
+            <td>本地 BP 状态变化</td>
+            <td><code>state</code> <code>mapName</code> <code>teamA/teamB</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:score-updated</code></td>
+            <td>比分变化</td>
+            <td><code>scoreData</code> <code>matchScoreA/B</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card section">
+      <h2>4. 动作 API（ActionType）</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>动作</th>
+            <th>核心参数</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>DELAY</code></td>
+            <td><code>duration</code></td>
+            <td>等待时长。支持 <code>500ms</code> / <code>1.2s</code> / <code>01:30</code>。</td>
+          </tr>
+          <tr>
+            <td><code>SET_COMPONENT_PROPERTY</code></td>
+            <td><code>componentId</code> <code>patchJson</code></td>
+            <td>改组件可见性、位置、大小、文本、HTML、样式等（见下一节 Patch API）。</td>
+          </tr>
+          <tr>
+            <td><code>CALL_CUSTOM_API</code></td>
+            <td><code>url</code> <code>method</code> <code>headersJson</code> <code>bodyJson</code> <code>timeoutMs</code> <code>saveAs</code> <code>resultEventName</code></td>
+            <td>发 HTTP 请求。结果写入 <code>{{runtime.变量名}}</code>，可选择继续触发事件。</td>
+          </tr>
+          <tr>
+            <td><code>EMIT_CUSTOM_EVENT</code></td>
+            <td><code>eventName</code> <code>payloadJson</code></td>
+            <td>广播到积木运行时，用于动作链拆分和复用。</td>
+          </tr>
+          <tr>
+            <td><code>EXECUTE_COMMAND</code></td>
+            <td><code>command</code> <code>argsJson</code></td>
+            <td>发送命令风格事件（事件名为 <code>command:xxx</code>）。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card section">
+      <h2>5. Patch API（SET_COMPONENT_PROPERTY 的 patchJson）</h2>
+      <p class="muted">常见字段如下，全部可混合使用：</p>
+      <table>
+        <thead>
+          <tr>
+            <th>字段</th>
+            <th>类型</th>
+            <th>作用</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>visible</code></td><td>boolean</td><td>显示/隐藏组件</td></tr>
+          <tr><td><code>x</code> <code>y</code></td><td>number/string</td><td>绝对定位（支持数字或 CSS 长度）</td></tr>
+          <tr><td><code>width</code> <code>height</code></td><td>number/string</td><td>宽高</td></tr>
+          <tr><td><code>zIndex</code></td><td>number/string</td><td>层级</td></tr>
+          <tr><td><code>opacity</code></td><td>number/string</td><td>透明度</td></tr>
+          <tr><td><code>style</code></td><td>object</td><td>合并到容器 style</td></tr>
+          <tr><td><code>contentStyle</code></td><td>object</td><td>合并到内容层 style</td></tr>
+          <tr><td><code>attrs</code></td><td>object</td><td>设置/移除 HTML 属性</td></tr>
+          <tr><td><code>classAdd</code> <code>classRemove</code></td><td>string/array</td><td>增删 class</td></tr>
+          <tr><td><code>text</code></td><td>string</td><td>写入纯文本（覆盖内容）</td></tr>
+          <tr><td><code>html</code></td><td>string</td><td>写入 HTML</td></tr>
+          <tr><td><code>imageSrc</code></td><td>string</td><td>替换内部 img 的 src</td></tr>
+          <tr><td><code>propertyPath</code> + <code>value</code></td><td>string + any</td><td>按路径写入属性，如 <code>style.transform</code>。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Patch 示例</h3>
+      <pre><code>{
+  "visible": true,
+  "x": 120,
+  "y": 40,
+  "width": 420,
+  "style": { "border": "2px solid #ffd700", "background": "rgba(0,0,0,.38)" },
+  "text": "当前监管者：{{bpHunter}}"
+}</code></pre>
+    </section>
+
+    <section class="card section">
+      <h2>6. 模板变量 API</h2>
+      <p>所有字符串参数均支持 <code>{{变量}}</code> 模板语法，动作执行时替换。</p>
+
+      <h3>6.1 常用 BP / 比赛变量</h3>
+      <p><code>{{bpHunter}}</code> <code>{{bpSurvivors.0}}</code> <code>{{bpSurvivorsText}}</code> <code>{{bpBannedHuntersText}}</code> <code>{{matchTitle}}</code> <code>{{matchScore}}</code> <code>{{roomId}}</code></p>
+
+      <h3>6.2 事件变量</h3>
+      <p>通过 <code>{{eventData.xxx}}</code> 读取当前触发事件字段，比如 <code>{{eventData.mapName}}</code>。</p>
+
+      <h3>6.3 API 结果变量（CALL_CUSTOM_API）</h3>
+      <p>当 <code>saveAs = playerApi</code> 时，可读取：</p>
+      <p><code>{{runtime.playerApi.ok}}</code> <code>{{runtime.playerApi.status}}</code> <code>{{runtime.playerApi.body.name}}</code></p>
+    </section>
+
+    <section class="card section">
+      <h2>7. 可直接用的完整实例</h2>
+
+      <h3>实例 A：点击组件切换文本</h3>
+      <pre><code>触发器: component:click
+动作1: SET_COMPONENT_PROPERTY
+componentId: ""
+patchJson:
+{
+  "text": "已点击 {{eventData.componentId}}",
+  "style": { "color": "#ffd86b" }
+}</code></pre>
+
+      <h3>实例 B：初始化时拉接口并渲染名字</h3>
+      <pre><code>触发器: component:init
+动作1: CALL_CUSTOM_API
+url: https://api.example.com/player/current
+method: GET
+headersJson: {}
+bodyJson: {}
+timeoutMs: 8000
+saveAs: playerApi
+resultEventName: player:loaded
+
+触发器: custom:event
+triggerEventName: player:loaded
+动作1: SET_COMPONENT_PROPERTY
+patchJson:
+{
+  "text": "选手：{{runtime.playerApi.body.name}}",
+  "visible": true
+}</code></pre>
+
+      <h3>实例 C：BP 选人后自动高亮组件</h3>
+      <pre><code>触发器: bp:survivor-selected
+动作1: SET_COMPONENT_PROPERTY
+patchJson:
+{
+  "text": "已选求生者：{{eventData.survivor}}",
+  "style": {
+    "transform": "scale(1.05)",
+    "transition": "all .2s ease"
+  }
+}</code></pre>
+
+      <h3>实例 D：自定义命令链</h3>
+      <pre><code>触发器: component:dblclick
+动作1: EXECUTE_COMMAND
+command: play-next-animation
+argsJson: {"speed": 1.2}
+
+触发器: custom:event
+triggerEventName: command:play-next-animation
+动作1: SET_COMPONENT_PROPERTY
+patchJson:
+{
+  "text": "已执行动画命令",
+  "classAdd": "anim-running"
+}</code></pre>
+    </section>
+
+    <section class="card section">
+      <h2>8. 调试与排错</h2>
+      <ul>
+        <li><strong>没生效：</strong>先确认规则 <code>enabled=true</code>，且组件确实投放到当前窗口。</li>
+        <li><strong>JSON 报错：</strong><code>patchJson / headersJson / bodyJson / payloadJson / argsJson</code> 必须是合法 JSON。</li>
+        <li><strong>变量为空：</strong>确认事件里有该字段，或改用 <code>{{eventData.xxx}}</code> 调试。</li>
+        <li><strong>API 超时：</strong>增大 <code>timeoutMs</code>，检查 URL 和证书环境。</li>
+        <li><strong>避免死循环：</strong><code>custom:event</code> 链式触发要控制次数和层级。</li>
+      </ul>
+      <div class="tip warn">建议先做最小链路：一个触发器 + 一个动作，确认后再叠加。</div>
+    </section>
+
+    <section class="card section">
+      <h2>9. 推荐工程实践</h2>
+      <ul>
+        <li>规则命名按“触发-目标-动作”：例如 <code>click-title-setText</code>。</li>
+        <li>一个规则做一类事，复杂流程拆成多个 <code>custom:event</code>。</li>
+        <li>API 统一封装返回结构，方便模板直接取值。</li>
+        <li>样式类操作优先用 <code>classAdd/classRemove</code>，长期维护更稳。</li>
+      </ul>
+    </section>
+  </div>
+</body>
+
+</html>

@@ -71,6 +71,9 @@
       <button class="menu-tab active" data-page="bp" onclick="switchPage('bp')">
         <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-game"></use></svg>BP控制
       </button>
+      <button class="menu-tab" data-page="ocr" onclick="switchPage('ocr')">
+        <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-security"></use></svg>OCR控制台
+      </button>
       <button class="menu-tab" data-page="baseinfo" onclick="switchPage('baseinfo')">
         <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-map"></use></svg>对局基础信息
       </button>
@@ -87,9 +90,18 @@
     <button class="menu-tab menu-action menu-action-first" onclick="openBpGuideWindow()" title="BP引导">
       <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-explore"></use></svg>BP引导
     </button>
+    <button id="layoutEditToggleBtn" class="menu-tab menu-action" onclick="toggleLocalBpLayoutEditMode()" title="布局编辑">
+      <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-map"></use></svg>布局编辑
+    </button>
     <button class="menu-tab menu-action" onclick="LocalBPOnboarding.forceStart()" title="新手引导">
       <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-help"></use></svg>帮助
     </button>
+  </div>
+
+  <div id="localBpLayoutEditBar" class="localbp-layout-edit-bar" style="display:none;">
+    <div class="localbp-layout-edit-hint">布局编辑中：拖拽模块标题排序，右下角可缩放，可切换目标Tab</div>
+    <button class="btn btn-secondary btn-small" onclick="resetLocalBpModuleLayout()">重置布局</button>
+    <button class="btn btn-primary btn-small" onclick="toggleLocalBpLayoutEditMode(false)">完成编辑</button>
   </div>
 
   <div class="main-wrapper">
@@ -130,10 +142,11 @@
                   class="player-name-input timer-duration-input">
               </div>
             </div>
+
           </div>
         </div>
 
-        <div class="scroll-container">
+        <div class="scroll-container" id="bp-main-scroll-module">
           <div class="bp-grid">
             <!-- 左侧：选角与名字 -->
             <div class="bp-col-left">
@@ -298,11 +311,74 @@
     </div>
     <!-- 选角通过“点击卡槽→弹窗选择”完成 -->
     <!-- page-bp end -->
+    <!-- ========== OCR控制台 ========== -->
+    <div id="page-ocr" class="page-content">
+      <div class="container">
+        <h1>OCR控制台</h1>
+        <p class="local-ocr-page-intro">本页仅用于本地BP OCR：选窗口、框区域、设置间隔并自动填充 BP 选择。</p>
+        <div class="scroll-container" id="ocr-main-scroll-module">
+          <div class="local-ocr-panel local-ocr-panel-tab">
+            <div class="local-ocr-header">
+              <div class="local-ocr-title">本地BP OCR识别</div>
+              <div id="localBpOcrStatus" class="local-ocr-status idle">待机</div>
+            </div>
+
+            <div class="local-ocr-row">
+              <label for="localBpOcrWindowSelect">目标窗口</label>
+              <select id="localBpOcrWindowSelect" class="player-name-input local-ocr-select"></select>
+              <button class="btn btn-secondary btn-small" id="localBpOcrRefreshWindowsBtn">刷新窗口</button>
+              <button class="btn btn-primary btn-small" id="localBpOcrCaptureBtn">抓取预览</button>
+            </div>
+
+            <div class="local-ocr-row">
+              <label for="localBpOcrEngine">OCR引擎</label>
+              <select id="localBpOcrEngine" class="player-name-input local-ocr-select">
+                <option value="windows">Windows OCR（推荐）</option>
+                <option value="paddleocr">PaddleOCR（高精度）</option>
+              </select>
+              <button class="btn btn-secondary btn-small" id="localBpOcrInstallPaddleBtn">一键安装 PaddleOCR</button>
+              <span id="localBpOcrInstallHint" class="local-ocr-hint">可选增强引擎，首次安装较慢。</span>
+            </div>
+
+            <div class="local-ocr-row">
+              <label for="localBpOcrInterval">识别间隔(秒)</label>
+              <input id="localBpOcrInterval" type="number" min="1" max="30" value="4"
+                class="player-name-input local-ocr-interval">
+              <button class="btn btn-success btn-small" id="localBpOcrStartBtn">开始识别</button>
+              <button class="btn btn-warning btn-small" id="localBpOcrStopBtn">停止</button>
+              <button class="btn btn-primary btn-small" id="localBpOcrRunOnceBtn">识别一次</button>
+            </div>
+
+            <div class="local-ocr-row local-ocr-region-row">
+              <span class="local-ocr-label">区域标注:</span>
+              <button class="btn btn-small local-ocr-region-btn active" id="localBpOcrRegionSurvivors"
+                data-region="survivors">求生者选择(4人)</button>
+              <button class="btn btn-small local-ocr-region-btn" id="localBpOcrRegionHunter"
+                data-region="hunter">监管者选择</button>
+              <button class="btn btn-small local-ocr-region-btn" id="localBpOcrRegionSurvivorBans"
+                data-region="survivorBans">求生者Ban</button>
+              <button class="btn btn-small local-ocr-region-btn" id="localBpOcrRegionHunterBans"
+                data-region="hunterBans">监管者Ban</button>
+            </div>
+
+            <div class="local-ocr-preview-wrap">
+              <div id="localBpOcrPreviewStage" class="local-ocr-preview-stage">
+                <img id="localBpOcrPreviewImage" class="local-ocr-preview-image" alt="窗口预览">
+                <div id="localBpOcrPreviewOverlay" class="local-ocr-preview-overlay"></div>
+                <div id="localBpOcrPreviewPlaceholder" class="local-ocr-preview-placeholder">请先选择窗口并点击“抓取预览”</div>
+              </div>
+            </div>
+
+            <div id="localBpOcrResult" class="local-ocr-result">识别结果将显示在这里</div>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- ========== 天赋与技能页 ========== -->
     <div id="page-talents" class="page-content">
       <div class="container">
         <h1>天赋与技能设置</h1>
-        <div class="scroll-container">
+        <div class="scroll-container" id="talents-main-scroll-module">
           <div id="talent-skill-section" class="talent-skill-section">
             <!-- 求生者天赋 -->
             <div class="talent-panel">
@@ -498,7 +574,7 @@
           </div>
         </div>
 
-        <div class="scroll-container">
+        <div class="scroll-container" id="baseinfo-main-scroll-module">
           <!-- 地图设置 -->
           <div class="section-title">地图</div>
           <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;">
@@ -523,7 +599,6 @@
               </div>
             </div>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin:10px 0 12px;">
-              <div id="lineup-mode-container"></div>
               <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;">
                 <div>
                   <span style="color:#6b7280;font-size:12px;">求生者：</span>
@@ -598,7 +673,7 @@
     <div class="container">
       <h1>比分管理</h1>
 
-      <div class="controls" style="margin-bottom: 12px;">
+      <div class="controls" id="score-controls" style="margin-bottom: 12px;">
         <button class="btn btn-primary" onclick="addBo()">新增BO</button>
         <button class="btn btn-primary" onclick="saveScoreData()">保存</button>
         <button class="btn btn-danger" onclick="resetScore()">重置</button>
@@ -609,7 +684,7 @@
           <svg class="icon-inline icon-svg" aria-hidden="true"><use href="#icon-insights"></use></svg>总览比分板</button>
       </div>
 
-      <div class="scroll-container">
+      <div class="scroll-container" id="score-main-scroll-module">
         <div style="display:flex;gap:10px;margin-bottom:10px;">
           <div style="flex:1;">
             <label>A队 <span style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></label>
@@ -623,31 +698,28 @@
           </div>
         </div>
 
-        <!-- 新增：展示控制区域 -->
+        <!-- 展示控制区域 -->
         <div
           style="background: rgba(102, 126, 234, 0.08); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; padding: 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;">
+          <div style="min-width: 170px;">
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">自动模式</label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;">
+              <input type="checkbox" id="displayAutoModeToggle" onchange="updateScoreboardDisplayConfig()">
+              <span style="font-size:12px; color:#555;">开启后自动跟随当前进程</span>
+            </label>
+          </div>
           <div style="flex: 1; min-width: 150px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">当前展示BO</label>
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">手动模式：BO</label>
             <select id="displayRoundSelect" class="player-name-input" onchange="updateScoreboardDisplayConfig()"
               style="width: 100%;">
             </select>
           </div>
           <div style="flex: 1; min-width: 150px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">前台展示模式</label>
-            <select id="displayModeSelect" class="player-name-input" onchange="updateScoreboardDisplayConfig()"
-              style="width: 100%;">
-              <option value="auto">自动 (根据比赛进度)</option>
-              <option value="upper">固定显示 上半局</option>
-              <option value="lower">固定显示 下半局</option>
-            </select>
-          </div>
-          <div style="flex: 1; min-width: 150px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">当前局势
-              (Auto时使用)</label>
+            <label style="display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px;">手动模式：半局</label>
             <select id="displayHalfSelect" class="player-name-input" onchange="updateScoreboardDisplayConfig()"
               style="width: 100%;">
-              <option value="1">上半局</option>
-              <option value="2">下半局</option>
+              <option value="upper">上半局</option>
+              <option value="lower">下半局</option>
             </select>
           </div>
         </div>
@@ -676,13 +748,13 @@
     <div class="container">
       <h1>赛后数据</h1>
 
-      <div class="controls" style="margin-bottom: 12px;">
+      <div class="controls" id="postmatch-controls" style="margin-bottom: 12px;">
         <button class="btn btn-primary" onclick="savePostMatch()">保存</button>
         <button class="btn btn-danger" onclick="resetPostMatch()">重置</button>
         <button class="btn btn-success" onclick="openPostMatchWindow()">打开窗口</button>
       </div>
 
-      <div class="scroll-container">
+      <div class="scroll-container" id="postmatch-main-scroll-module">
         <div class="section">
           <div class="section-title">基本信息</div>
           <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;">
@@ -691,18 +763,27 @@
             </div>
             <div><label>局标识</label><input type="text" id="pmGameLabel" class="player-name-input" value="GAME 1"></div>
             <div style="grid-column: span 2;"><label>地图 <span
-                  style="font-size:10px; color:#999; font-weight:normal;">(同步自对局基础信息)</span></label>
-              <select id="pmMapName" class="player-name-input" disabled
-                style="background:#f0f0f0; cursor:not-allowed; color:#666;"></select>
+                  style="font-size:10px; color:#999; font-weight:normal;">(来自事件状态)</span></label>
+              <div id="pmMapNameDisplay" class="player-name-input"
+                style="background:#f0f0f0; cursor:not-allowed; color:#666; min-height: 32px; display:flex; align-items:center; padding: 0 10px;">
+              </div>
             </div>
           </div>
 
           <div
             style="margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(102,126,234,0.05); border: 1px solid rgba(102,126,234,0.1);">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+              <select id="pmOcrWindowSelect" class="player-name-input" style="flex:1; min-width: 0;">
+                <option value="">请选择要截图识别的窗口</option>
+              </select>
+              <button class="btn btn-secondary btn-small" onclick="refreshPostMatchOcrWindows()">刷新窗口</button>
+              <button class="btn btn-success btn-small" id="pmOcrCaptureBtn" onclick="ocrFillPostMatchFromWindow()">快速截图OCR</button>
+            </div>
             <div style="display: flex; gap: 8px; align-items: center;">
               <input type="file" id="pmOcrFile" accept="image/*" style="font-size:11px; flex:1;">
-              <button class="btn btn-primary btn-small" id="pmOcrBtn" onclick="ocrFillPostMatch()">OCR识别</button>
+              <button class="btn btn-primary btn-small" id="pmOcrBtn" onclick="ocrFillPostMatch()">文件OCR</button>
             </div>
+            <div id="pmOcrWindowHint" style="margin-top: 6px; font-size: 11px; color: #666;">提示：推荐先选窗口后使用“快速截图OCR”。</div>
           </div>
         </div>
 
@@ -716,7 +797,8 @@
                 style="background:#eeeeee; cursor:not-allowed; color:#666;">
               <div style="display:flex;gap:5px;margin-top:5px;">
                 <input type="text" id="pmTeamAMeta" class="player-name-input" placeholder="备注" style="flex:2;">
-                <input type="number" id="pmTeamAScore" class="player-name-input" value="0" style="flex:1;">
+                <input type="number" id="pmTeamAScore" class="player-name-input" value="0" readonly
+                  style="flex:1; background:#eeeeee; cursor:not-allowed; color:#666;">
               </div>
             </div>
             <div style="background:#f7fafc;border:2px solid #e2e8f0;border-radius:8px;padding:8px;">
@@ -726,7 +808,8 @@
                 style="background:#eeeeee; cursor:not-allowed; color:#666;">
               <div style="display:flex;gap:5px;margin-top:5px;">
                 <input type="text" id="pmTeamBMeta" class="player-name-input" placeholder="备注" style="flex:2;">
-                <input type="number" id="pmTeamBScore" class="player-name-input" value="0" style="flex:1;">
+                <input type="number" id="pmTeamBScore" class="player-name-input" value="0" readonly
+                  style="flex:1; background:#eeeeee; cursor:not-allowed; color:#666;">
               </div>
             </div>
           </div>

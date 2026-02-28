@@ -26,7 +26,8 @@ class MatchBaseManager {
             },
             // The active lineup for the current match
             matchConfig: {
-                mode: 'AvsB_Surv_Hunter', // 'AvsB_Surv_Hunter' (A=Surv, B=Hunt) or 'BvsA_Surv_Hunter' (B=Surv, A=Hunt)
+                // Fixed mode: A = 求生者, B = 监管者. Side swap is handled only by AB team rotation.
+                mode: 'AvsB_Surv_Hunter',
                 survivors: [],  // Array of names
                 hunter: null    // Name
             },
@@ -113,7 +114,7 @@ class MatchBaseManager {
                 roster: normalizeRoster(loaded.teamB || {})
             },
             matchConfig: {
-                mode: loaded.matchConfig?.mode || 'AvsB_Surv_Hunter',
+                mode: 'AvsB_Surv_Hunter',
                 survivors: Array.isArray(loaded.matchConfig?.survivors) ? loaded.matchConfig.survivors : [],
                 hunter: loaded.matchConfig?.hunter || null
             },
@@ -126,6 +127,14 @@ class MatchBaseManager {
     setMap(name) {
         this.state.mapName = name;
         this.save();
+        // 选图后立即同步到本地BP状态，避免前台重开时因防抖延迟拿到旧地图
+        try {
+            if (window.syncMatchBaseToFrontend) {
+                window.syncMatchBaseToFrontend();
+            }
+        } catch (e) {
+            console.warn('[MatchBaseManager] setMap immediate sync failed:', e?.message || e);
+        }
         // No full render needed
     }
 
@@ -197,6 +206,19 @@ class MatchBaseManager {
 
         this.save();
         this.render();
+        if (typeof window.swapScoreTeamsData === 'function') {
+            window.swapScoreTeamsData();
+        }
+        if (typeof window.swapAutoGlobalBanRoundsByTeamRotation === 'function') {
+            Promise.resolve(window.swapAutoGlobalBanRoundsByTeamRotation()).catch(() => { });
+        }
+        // 轮换后强制同步一次全局BP展示信息（含对局记录meta）
+        if (typeof window.syncMatchBaseToFrontend === 'function') {
+            Promise.resolve(window.syncMatchBaseToFrontend()).catch(() => { });
+        }
+        if (typeof window.syncMatchBaseToScoreAndPostMatch === 'function') {
+            Promise.resolve(window.syncMatchBaseToScoreAndPostMatch()).catch(() => { });
+        }
         alert('AB队信息已互换 (阵容已重置)');
     }
 
@@ -210,9 +232,8 @@ class MatchBaseManager {
     // --- Matches / Lineup ---
 
     setMatchMode(mode) {
-        this.state.matchConfig.mode = mode;
-        this.state.matchConfig.survivors = [];
-        this.state.matchConfig.hunter = null;
+        // Mode switch is deprecated. Keep a stable single mode to avoid conflicts with AB swap.
+        this.state.matchConfig.mode = 'AvsB_Surv_Hunter';
         this.save();
         this.renderRoster('A');
         this.renderRoster('B');
@@ -311,8 +332,7 @@ class MatchBaseManager {
 
         container.innerHTML = '';
 
-        const mode = this.state.matchConfig?.mode || 'AvsB_Surv_Hunter';
-        const isSurvTeam = mode.startsWith('A') ? teamKey === 'A' : teamKey === 'B';
+        const isSurvTeam = teamKey === 'A';
         const isHuntTeam = !isSurvTeam;
 
         team.roster.forEach((name, index) => {
@@ -380,24 +400,10 @@ class MatchBaseManager {
     }
 
     renderLineupSection() {
-        const mode = this.state.matchConfig.mode;
         const container = document.getElementById('lineup-mode-container');
         if (container) {
-            container.innerHTML = `
-                <div style="font-weight:bold;margin-bottom:6px;">对阵模式</div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <label class="mode-card ${mode === 'AvsB_Surv_Hunter' ? 'active' : ''}" 
-                           onclick="baseManager.setMatchMode('AvsB_Surv_Hunter')"
-                           style="padding:8px;border:2px solid ${mode === 'AvsB_Surv_Hunter' ? '#667eea' : '#e2e8f0'};border-radius:8px;cursor:pointer;background:${mode === 'AvsB_Surv_Hunter' ? '#eff6ff' : '#fff'};flex:1;min-width:180px;">
-                        <span style="color:#2563eb;font-weight:bold;">${this.state.teamA.name}</span> (人) vs <span style="color:#dc2626;font-weight:bold;">${this.state.teamB.name}</span> (屠)
-                    </label>
-                    <label class="mode-card ${mode === 'BvsA_Surv_Hunter' ? 'active' : ''}" 
-                           onclick="baseManager.setMatchMode('BvsA_Surv_Hunter')"
-                           style="padding:8px;border:2px solid ${mode === 'BvsA_Surv_Hunter' ? '#667eea' : '#e2e8f0'};border-radius:8px;cursor:pointer;background:${mode === 'BvsA_Surv_Hunter' ? '#eff6ff' : '#fff'};flex:1;min-width:180px;">
-                        <span style="color:#2563eb;font-weight:bold;">${this.state.teamB.name}</span> (人) vs <span style="color:#dc2626;font-weight:bold;">${this.state.teamA.name}</span> (屠)
-                    </label>
-                </div>
-            `;
+            container.innerHTML = '';
+            container.style.display = 'none';
         }
 
         const sDisplay = document.getElementById('currentSurvivorsDisplay');

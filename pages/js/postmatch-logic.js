@@ -80,6 +80,9 @@ let editMode = false
 let layout = {}
 let availableFonts = []
 let activeFontContainerId = null
+let currentPostMatchData = null
+let latestEventState = null
+let latestScoreData = null
 
 function rgbToHex(color) {
   if (!color) return '#ffffff'
@@ -90,6 +93,70 @@ function rgbToHex(color) {
     const hex = parseInt(x, 10).toString(16)
     return hex.length === 1 ? '0' + hex : hex
   }).join('')
+}
+
+function parseScoreNumber(v) {
+  const n = parseInt(v, 10)
+  return Number.isFinite(n) ? n : 0
+}
+
+function normalizeDisplayHalf(value) {
+  return value === 'lower' ? 'lower' : 'upper'
+}
+
+function getDisplayConfigFromScoreData(raw) {
+  const d = raw && typeof raw === 'object' ? raw : {}
+  const modeLegacy = d?.scoreboardDisplay?.teamA || 'auto'
+  const cfg = (d.displayConfig && typeof d.displayConfig === 'object') ? d.displayConfig : null
+  const auto = (typeof cfg?.auto === 'boolean') ? cfg.auto : (modeLegacy === 'auto')
+  const round = parseInt(cfg?.round, 10) || parseInt(d.currentRound, 10) || 1
+  const halfFromLegacy = modeLegacy === 'upper' || modeLegacy === 'lower'
+    ? modeLegacy
+    : ((parseInt(d.currentHalf, 10) || 1) === 2 ? 'lower' : 'upper')
+  const half = normalizeDisplayHalf(cfg?.half || halfFromLegacy)
+  return { auto, round, half }
+}
+
+function getCurrentSmallScoreFromScoreData(raw) {
+  const d = raw && typeof raw === 'object' ? raw : {}
+  const bos = Array.isArray(d.bos) ? d.bos : []
+  if (!bos.length) return { teamA: 0, teamB: 0 }
+
+  const cfg = getDisplayConfigFromScoreData(d)
+  let targetBo = null
+  let targetHalf = 'upper'
+
+  if (cfg.auto) {
+    for (let i = bos.length - 1; i >= 0; i--) {
+      const bo = bos[i]
+      const hasLower = (parseScoreNumber(bo?.lower?.teamA) > 0) || (parseScoreNumber(bo?.lower?.teamB) > 0)
+      const hasUpper = (parseScoreNumber(bo?.upper?.teamA) > 0) || (parseScoreNumber(bo?.upper?.teamB) > 0)
+      if (hasLower) {
+        targetBo = bo
+        targetHalf = 'lower'
+        break
+      }
+      if (hasUpper) {
+        targetBo = bo
+        targetHalf = 'upper'
+        break
+      }
+    }
+    if (!targetBo) {
+      targetBo = bos[0]
+      targetHalf = 'upper'
+    }
+  } else {
+    const idx = Math.min(bos.length - 1, Math.max(0, cfg.round - 1))
+    targetBo = bos[idx]
+    targetHalf = cfg.half
+  }
+
+  const halfData = targetBo?.[targetHalf] || {}
+  return {
+    teamA: parseScoreNumber(halfData.teamA),
+    teamB: parseScoreNumber(halfData.teamB)
+  }
 }
 
 // Font selection logic
@@ -231,7 +298,7 @@ async function __applyFontConfig() {
     }
     const labelFont = c.labelFont || c.controlLabelFont
     if (labelFont) {
-      css += `.table th,.k,.center-card .label{font-family:"${labelFont}",'Microsoft YaHei',sans-serif !important;}`
+      css += `.table th,.survivor-row.survivor-header>div,.k,.center-card .label{font-family:"${labelFont}",'Microsoft YaHei',sans-serif !important;}`
     }
     if (c.elements) {
       for (const sel in c.elements) {
@@ -299,17 +366,20 @@ function setupOBSMode() {
     // 从SSE事件更新数据
     window.addEventListener('asg-state-update', (e) => {
       const data = e.detail
+      if (!isPostMatchRelatedUpdate(data)) return
+      applyIncomingUpdateData(data)
       if (data && data.postMatchData) {
-        render(data.postMatchData)
+        currentPostMatchData = data.postMatchData
       }
+      renderWithEventData()
     })
 
     // 初始获取状态
     fetch('/api/current-state').then(r => r.json()).then(data => {
-      if (data && data.roomData && data.roomData.roomId) {
-        roomId = data.roomData.roomId
-        loadData()
-      }
+      if (data && data.roomData && data.roomData.roomId) roomId = data.roomData.roomId
+      applyIncomingUpdateData(data)
+      if (data && data.postMatchData) currentPostMatchData = data.postMatchData
+      loadData()
     }).catch(() => { })
   }
 }
@@ -348,6 +418,103 @@ function getDefaultData() {
       terrorShock: 0,
       down: 0
     }
+  }
+}
+
+function loadScoreSnapshotFromStorage() {
+  const keys = []
+  if (roomId) keys.push(`score_${roomId}`)
+  keys.push('localBp_score')
+  for (const key of keys) {
+    const raw = localStorage.getItem(key)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        latestScoreData = parsed
+        return
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function applyIncomingUpdateData(data) {
+  if (!data || typeof data !== 'object') return
+  if (data.type === 'state' && data.state && typeof data.state === 'object') latestEventState = data.state
+  else if (data.state && typeof data.state === 'object') latestEventState = data.state
+
+  if (data.type === 'score' && data.scoreData && typeof data.scoreData === 'object') latestScoreData = data.scoreData
+  else if (data.scoreData && typeof data.scoreData === 'object') latestScoreData = data.scoreData
+}
+
+function isPostMatchRelatedUpdate(data) {
+  if (!data || typeof data !== 'object') return false
+  return !!(
+    data.type === 'state' ||
+    data.type === 'score' ||
+    data.type === 'postmatch' ||
+    data.state ||
+    data.scoreData ||
+    data.postMatchData
+  )
+}
+
+function mergeEventFields(baseRaw) {
+  const defaults = getDefaultData()
+  const base = baseRaw && typeof baseRaw === 'object' ? baseRaw : {}
+  const merged = {
+    ...defaults,
+    ...base,
+    teamA: { ...defaults.teamA, ...(base.teamA || {}) },
+    teamB: { ...defaults.teamB, ...(base.teamB || {}) },
+    hunter: { ...defaults.hunter, ...(base.hunter || {}) }
+  }
+
+  // 地图和队伍信息优先来自事件状态
+  if (latestEventState && typeof latestEventState === 'object') {
+    const eventMap = typeof latestEventState.mapName === 'string' ? latestEventState.mapName.trim() : ''
+    if (eventMap) merged.mapName = eventMap
+
+    if (latestEventState.teamA && typeof latestEventState.teamA === 'object') {
+      if (typeof latestEventState.teamA.name === 'string') merged.teamA.name = latestEventState.teamA.name
+      if (typeof latestEventState.teamA.logo === 'string') merged.teamA.logo = latestEventState.teamA.logo
+      if (typeof latestEventState.teamA.meta === 'string') merged.teamA.meta = latestEventState.teamA.meta
+    }
+    if (latestEventState.teamB && typeof latestEventState.teamB === 'object') {
+      if (typeof latestEventState.teamB.name === 'string') merged.teamB.name = latestEventState.teamB.name
+      if (typeof latestEventState.teamB.logo === 'string') merged.teamB.logo = latestEventState.teamB.logo
+      if (typeof latestEventState.teamB.meta === 'string') merged.teamB.meta = latestEventState.teamB.meta
+    }
+  }
+
+  // 顶部比分优先来自比分管理
+  if (latestScoreData && typeof latestScoreData === 'object') {
+    const small = getCurrentSmallScoreFromScoreData(latestScoreData)
+    merged.teamA.score = small.teamA
+    merged.teamB.score = small.teamB
+  }
+
+  return merged
+}
+
+function renderWithEventData() {
+  const source = currentPostMatchData || getDefaultData()
+  render(mergeEventFields(source))
+}
+
+async function initEventSnapshot() {
+  if (window.__ASG_OBS_MODE__) return
+  if (!window.electronAPI || !window.electronAPI.invoke) return
+  try {
+    const result = await window.electronAPI.invoke('localBp:getState')
+    if (result && result.success && result.data && typeof result.data === 'object') {
+      latestEventState = result.data
+      renderWithEventData()
+    }
+  } catch (e) {
+    console.warn('[PostMatch] 获取初始化事件状态失败:', e?.message || e)
   }
 }
 
@@ -396,7 +563,8 @@ function loadData() {
     data = getDefaultData()
   }
 
-  render(data)
+  currentPostMatchData = data
+  renderWithEventData()
 }
 
 function render(data) {
@@ -432,23 +600,22 @@ function render(data) {
     teamBLogo.style.display = 'none'
   }
 
-  const body = document.getElementById('survivorTableBody')
-  body.innerHTML = ''
-
   const survivors = Array.isArray(data.survivors) ? data.survivors : []
   const list = survivors.length ? survivors : getDefaultData().survivors
 
-  for (const s of list) {
-    const tr = document.createElement('tr')
-    tr.innerHTML = `
-          <td class="player-name">${escapeHtml(s.name || '')}</td>
-          <td class="stat">${formatPercent(s.decodeProgress)}</td>
-          <td class="stat">${formatInt(s.palletHit)}</td>
-          <td class="stat">${formatInt(s.rescue)}</td>
-          <td class="stat">${formatInt(s.heal)}</td>
-          <td class="stat">${formatSeconds(s.chaseSeconds)}</td>
-        `
-    body.appendChild(tr)
+  for (let i = 0; i < 4; i++) {
+    const s = list[i] || {}
+    const idx = i + 1
+    const setText = (id, value) => {
+      const el = document.getElementById(id)
+      if (el) el.textContent = value
+    }
+    setText(`survivor${idx}Name`, String(s.name || ''))
+    setText(`survivor${idx}DecodeProgress`, formatPercent(s.decodeProgress))
+    setText(`survivor${idx}PalletHit`, formatInt(s.palletHit))
+    setText(`survivor${idx}Rescue`, formatInt(s.rescue))
+    setText(`survivor${idx}Heal`, formatInt(s.heal))
+    setText(`survivor${idx}ChaseSeconds`, formatSeconds(s.chaseSeconds))
   }
 
   const hunter = data.hunter || {}
@@ -625,6 +792,20 @@ function applyLayout() {
     }
   }
   applyOne('titleContainer')
+  applyOne('subTitleContainer')
+  applyOne('teamAContainer')
+  applyOne('teamANameContainer')
+  applyOne('teamAScoreContainer')
+  applyOne('centerInfoContainer')
+  applyOne('teamBScoreContainer')
+  applyOne('teamBNameContainer')
+  applyOne('teamBContainer')
+  applyOne('survivorTableContainer')
+  applyOne('survivorRow1Container')
+  applyOne('survivorRow2Container')
+  applyOne('survivorRow3Container')
+  applyOne('survivorRow4Container')
+  applyOne('hunterContainer')
   applyOne('teamBarContainer')
   applyOne('statsContainer')
 }
@@ -642,6 +823,21 @@ function toggleEditMode() {
   editMode = !editMode
   document.body.classList.toggle('edit-mode', editMode)
   applyLayout()
+}
+
+function ensureResizeHandlesForDraggables() {
+  const dirs = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+  const draggables = document.querySelectorAll('.draggable')
+  draggables.forEach((el) => {
+    const hasHandle = !!el.querySelector('.resize-handle')
+    if (hasHandle) return
+    dirs.forEach((dir) => {
+      const handle = document.createElement('div')
+      handle.className = `resize-handle ${dir}`
+      handle.dataset.dir = dir
+      el.appendChild(handle)
+    })
+  })
 }
 
 // 统一右键菜单
@@ -1040,6 +1236,19 @@ function init() {
   initFontStyleControls()
 
   loadLayout()
+  loadScoreSnapshotFromStorage()
+  initEventSnapshot()
+
+  if (window.electronAPI && window.electronAPI.onUpdateData) {
+    window.electronAPI.onUpdateData((data) => {
+      if (!isPostMatchRelatedUpdate(data)) return
+      applyIncomingUpdateData(data)
+      if (data && data.postMatchData) {
+        currentPostMatchData = data.postMatchData
+      }
+      renderWithEventData()
+    })
+  }
 
   // 首次加载数据
   console.log('[PostMatch] 首次加载数据...')
@@ -1047,6 +1256,8 @@ function init() {
 
   // 加载自定义组件
   loadCustomComponents()
+
+  ensureResizeHandlesForDraggables()
 
   // 每秒轮询数据更新（不依赖storage事件）
   let pollCount = 0
@@ -1152,6 +1363,7 @@ function createCustomComponent(comp, fullLayout) {
   container.id = comp.id
   container.className = 'draggable custom-component'
   container.dataset.type = 'custom'
+  container.dataset.componentName = comp.name || comp.label || comp.id
 
   // 获取位置
   // 1. 优先从 postmatch 专属 layout 获取

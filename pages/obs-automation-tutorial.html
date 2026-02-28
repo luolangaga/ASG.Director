@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS 自动化（内置）教程</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252525;
+      --panel-2: #2d2d2d;
+      --line: #3a3a3a;
+      --text: #f2f2f2;
+      --muted: #b0b0b0;
+      --accent: #bdbdbd;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Outfit", "Microsoft YaHei", "Segoe UI", sans-serif;
+      line-height: 1.65;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 22px 18px 30px;
+    }
+
+    h1,
+    h2 {
+      margin: 0 0 10px;
+      color: var(--text);
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    h3 {
+      margin: 14px 0 8px;
+      font-size: 15px;
+      color: #e6e6e6;
+    }
+
+    ul {
+      margin: 6px 0 0 18px;
+      padding: 0;
+    }
+
+    li,
+    p {
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    code {
+      background: #333;
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid #454545;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    .hero p {
+      margin: 6px 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .card p {
+      color: var(--muted);
+      margin: 6px 0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    .table th,
+    .table td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .table th {
+      background: var(--panel-2);
+      color: #e8e8e8;
+      font-weight: 600;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tip {
+      margin-top: 10px;
+      border: 1px solid #4a4a4a;
+      background: #2a2a2a;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #e5e5e5;
+      font-size: 13px;
+    }
+
+    .ok {
+      color: #bbf7d0;
+      border-color: rgba(34, 197, 94, 0.4);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .warn {
+      color: #fde68a;
+      border-color: rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.12);
+    }
+
+    .section {
+      margin-top: 12px;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid #4a4a4a;
+      border-radius: 5px;
+      background: #2f2f2f;
+      font-size: 12px;
+      color: #f0f0f0;
+    }
+
+    @media (max-width: 960px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>OBS 自动化（内置）实用教程</h1>
+      <p>这套功能已经内置，不需要下载 <code>plugins/extensions/obs-automation</code>。</p>
+      <p>目标：用“本地 BP 事件”自动驱动 OBS 场景、文本、图片、浏览器源和滤镜。</p>
+      <div class="tip warn">联网 BP 触发已移除：<code>match:*</code>、<code>room:*</code> 不再可用。</div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>1. 30 秒上手</h2>
+        <ul>
+          <li>在 <code>设置中心</code> 打开 <code>OBS 自动化（内置）</code>。</li>
+          <li>连接 OBS：<code>localhost:4455</code> + 你的 WebSocket 密码。</li>
+          <li>新建规则：选触发事件 -> 拖一个动作 -> 填参数 -> 保存。</li>
+          <li>在本地 BP 页面操作选人/禁用，观察 OBS 是否自动变化。</li>
+        </ul>
+        <div class="tip ok">建议先做一个最小规则：<code>选求生者1 -> 切换场景</code>。</div>
+      </section>
+
+      <section class="card">
+        <h2>2. 规则执行模型</h2>
+        <ul>
+          <li>规则 = <code>触发事件</code> + <code>条件</code> + <code>动作链</code>。</li>
+          <li>动作链按顺序执行，支持每个动作单独延迟。</li>
+          <li>规则支持冷却时间、最大触发次数、定时触发。</li>
+          <li>变量模板会在动作执行时自动替换。</li>
+        </ul>
+        <p class="muted">模板语法：<code>{{bpHunter}}</code>、<code>{{eventData.mapName}}</code>。</p>
+      </section>
+    </div>
+
+    <section class="card section">
+      <h2>3. 触发事件清单（内置）</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>事件</th>
+            <th>说明</th>
+            <th>常用字段</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>bp:hunter-selected</code></td>
+            <td>监管者确定时触发</td>
+            <td><code>character</code> <code>hunter</code></td>
+          </tr>
+          <tr>
+            <td><code>bp:survivor-selected</code></td>
+            <td>任意求生者选中时触发</td>
+            <td><code>survivor</code> <code>slot</code> <code>selectedCount</code></td>
+          </tr>
+          <tr>
+            <td><code>bp:survivor-1-selected</code> ~ <code>bp:survivor-4-selected</code></td>
+            <td>选求生者1/2/3/4 顺序事件</td>
+            <td><code>survivor</code> <code>survivorSlot</code> <code>selectedCount</code></td>
+          </tr>
+          <tr>
+            <td><code>bp:all-survivors-selected</code></td>
+            <td>四位求生者全部选完</td>
+            <td><code>survivors</code> <code>selectedCount</code></td>
+          </tr>
+          <tr>
+            <td><code>bp:character-banned</code></td>
+            <td>角色被禁用</td>
+            <td><code>character</code> <code>scope</code> <code>type</code></td>
+          </tr>
+          <tr>
+            <td><code>bp:round-changed</code></td>
+            <td>回合变化</td>
+            <td><code>round/currentRound</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:state-updated</code></td>
+            <td>本地 BP 任意状态变化</td>
+            <td><code>hunter</code> <code>survivors</code> <code>mapName</code> <code>teamA/teamB</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:map-changed</code></td>
+            <td>地图变化</td>
+            <td><code>previousMap</code> <code>mapName</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:team-changed</code></td>
+            <td>队伍信息变化</td>
+            <td><code>teamA</code> <code>teamB</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:score-updated</code></td>
+            <td>比分变化（大比分/小比分）</td>
+            <td><code>scoreData</code> <code>teamA/teamB</code> <code>mapName</code></td>
+          </tr>
+          <tr>
+            <td><code>localbp:reset</code></td>
+            <td>从有数据变为空状态</td>
+            <td><code>reason</code> <code>timestamp</code></td>
+          </tr>
+          <tr>
+            <td><code>obs:sidebar-manual-trigger</code></td>
+            <td>OBS 侧边栏手动触发规则</td>
+            <td><code>source</code> <code>ruleId</code> <code>timestamp</code></td>
+          </tr>
+          <tr>
+            <td><code>obs:music-control</code></td>
+            <td>OBS 侧边栏音乐控制事件</td>
+            <td><code>trackId</code> <code>trackName</code> <code>selectedTrack</code></td>
+          </tr>
+          <tr>
+            <td><code>timer:interval</code></td>
+            <td>按规则间隔周期触发</td>
+            <td><code>intervalMs</code> <code>timerRuleName</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card section">
+      <h2>4. 变量速查（可直接放进动作参数）</h2>
+      <p class="muted">已按你写的变量文档（<code>plugins/extensions/obs-automation/VARIABLES.md</code>）和当前内置实现同步。</p>
+
+      <h3>4.1 BP 变量</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>变量</th>
+            <th>含义</th>
+            <th>示例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>{{bpHunter}}</code></td>
+            <td>当前监管者</td>
+            <td><code>监管者：{{bpHunter}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpLatestSurvivor}}</code></td>
+            <td>最近触发对应求生者</td>
+            <td><code>已选：{{bpLatestSurvivor}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpSurvivorSelectedCount}}</code></td>
+            <td>已选求生者数量</td>
+            <td><code>进度 {{bpSurvivorSelectedCount}}/4</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpRound}}</code></td>
+            <td>BP 回合</td>
+            <td><code>第 {{bpRound}} 回合</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpSurvivors}}</code></td>
+            <td>求生者数组（用于脚本/调试）</td>
+            <td><code>{{bpSurvivors}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpSurvivors.0}}</code> ~ <code>{{bpSurvivors.3}}</code></td>
+            <td>四个求生者槽位</td>
+            <td><code>D:/sur/{{bpSurvivors.0}}.png</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpSurvivorsText}}</code></td>
+            <td>求生者拼接文本</td>
+            <td><code>{{bpSurvivorsText}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpBannedSurvivors}}</code> / <code>{{bpBannedHunters}}</code></td>
+            <td>禁用数组（用于脚本/调试）</td>
+            <td><code>{{bpBannedHunters}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpBannedSurvivorsText}}</code> / <code>{{bpBannedHuntersText}}</code></td>
+            <td>禁用角色拼接文本</td>
+            <td><code>禁用：{{bpBannedHuntersText}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{bpTeamA}}</code> / <code>{{bpTeamB}}</code></td>
+            <td>BP 事件中的队伍名</td>
+            <td><code>{{bpTeamA}} VS {{bpTeamB}}</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>4.2 本地状态变量</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>变量</th>
+            <th>含义</th>
+            <th>示例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>{{mapName}}</code> / <code>{{matchMap}}</code></td>
+            <td>当前地图</td>
+            <td><code>地图：{{mapName}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{localTeamA}}</code> / <code>{{localTeamB}}</code></td>
+            <td>本地队伍名称</td>
+            <td><code>{{localTeamA}} VS {{localTeamB}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{roomId}}</code> <code>{{roomName}}</code> <code>{{roomStatus}}</code></td>
+            <td>房间信息（若事件提供）</td>
+            <td><code>{{roomId}} / {{roomStatus}}</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>4.3 比分变量（新增完整）</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>变量</th>
+            <th>含义</th>
+            <th>示例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>{{matchTeamA}}</code> / <code>{{matchTeamB}}</code></td>
+            <td>比分系统队名</td>
+            <td><code>{{matchTeamA}} vs {{matchTeamB}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{matchScoreA}}</code> / <code>{{matchScoreB}}</code></td>
+            <td>大比分（胜场）</td>
+            <td><code>{{matchScoreA}}:{{matchScoreB}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{matchDrawA}}</code> / <code>{{matchDrawB}}</code></td>
+            <td>平局场数</td>
+            <td><code>平 {{matchDrawA}} / {{matchDrawB}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{matchSmallScoreA}}</code> / <code>{{matchSmallScoreB}}</code></td>
+            <td>当前展示 BO 半局小比分</td>
+            <td><code>{{matchSmallScoreA}}:{{matchSmallScoreB}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{matchRound}}</code> <code>{{matchHalf}}</code> <code>{{matchHalfText}}</code> <code>{{matchBoCount}}</code></td>
+            <td>比分展示目标（第几 BO / 上下半 / BO 数）</td>
+            <td><code>BO{{matchRound}} {{matchHalfText}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{matchScore}}</code> <code>{{matchSmallScore}}</code></td>
+            <td>格式化比分字符串</td>
+            <td><code>大比分 {{matchScore}}，小比分 {{matchSmallScore}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{matchTitle}}</code> <code>{{matchScoreText}}</code></td>
+            <td>标题与完整比分文本</td>
+            <td><code>{{matchScoreText}}</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>4.4 通用模板语法</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>语法</th>
+            <th>含义</th>
+            <th>示例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>{{eventData.xxx}}</code></td>
+            <td>直接读取当前触发事件字段</td>
+            <td><code>{{eventData.survivorSlot}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{lastEvent}}</code> / <code>{{lastEventData.xxx}}</code></td>
+            <td>上一次触发事件类型与原始数据</td>
+            <td><code>{{lastEvent}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{timestamp}}</code></td>
+            <td>触发时刻时间戳（毫秒）</td>
+            <td><code>{{timestamp}}</code></td>
+          </tr>
+          <tr>
+            <td><code>{{timerRuleId}}</code> <code>{{timerRuleName}}</code> <code>{{intervalMs}}</code></td>
+            <td>仅 <code>timer:interval</code> 时有值</td>
+            <td><code>{{timerRuleName}} @ {{intervalMs}}ms</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="tip">模板只替换字符串字段；JSON 字段（如 <code>settings</code>）不会自动递归替换。</div>
+      <div class="tip warn">旧插件文档里的 <code>match:*</code> / <code>room:*</code> 触发器在内置版不可用，但对应常用变量已在本地事件中兼容。</div>
+    </section>
+
+    <section class="card section">
+      <h2>5. 条件写法（建议先简单后复杂）</h2>
+      <h3>5.1 图形条件（基础）</h3>
+      <p>在规则条件里可按字段判断：<code>==</code> <code>!=</code> <code>&gt;</code> <code>contains</code> <code>regex</code>。</p>
+      <h3>5.2 高级条件 JS（输入框）</h3>
+      <p>可写表达式，变量名是 <code>vars</code>，事件数据是 <code>data/eventData</code>。</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>用途</th>
+            <th>表达式示例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>只在选到第2人后触发</td>
+            <td><code>vars.bpSurvivorSelectedCount &gt;= 2</code></td>
+          </tr>
+          <tr>
+            <td>仅地图是军工厂时触发</td>
+            <td><code>data.mapName === '军工厂'</code></td>
+          </tr>
+          <tr>
+            <td>只处理全局禁用</td>
+            <td><code>data.scope === 'global'</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="tip warn">高级条件写错会导致规则不触发。先用“测试触发”确认。</div>
+    </section>
+
+    <section class="card section">
+      <h2>6. 动作参数怎么填（最常用）</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>动作</th>
+            <th>核心参数</th>
+            <th>示例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>切换场景 <code>SWITCH_SCENE</code></td>
+            <td><code>sceneName</code></td>
+            <td><code>BP_展示</code></td>
+          </tr>
+          <tr>
+            <td>设置文本 <code>SET_TEXT</code></td>
+            <td><code>sourceName</code> <code>text</code></td>
+            <td><code>text=监管者：{{bpHunter}}</code></td>
+          </tr>
+          <tr>
+            <td>设置图片 <code>SET_IMAGE</code></td>
+            <td><code>sourceName</code> <code>file</code></td>
+            <td><code>D:/sur/{{bpSurvivors.0}}.png</code></td>
+          </tr>
+          <tr>
+            <td>设置浏览器 URL <code>SET_BROWSER_URL</code></td>
+            <td><code>sourceName</code> <code>url</code></td>
+            <td><code>http://127.0.0.1:9528/scoreboard?team=teamA</code></td>
+          </tr>
+          <tr>
+            <td>刷新浏览器源 <code>REFRESH_BROWSER</code></td>
+            <td><code>sourceName</code></td>
+            <td><code>Score_A</code></td>
+          </tr>
+          <tr>
+            <td>等待 <code>DELAY</code></td>
+            <td><code>duration</code></td>
+            <td><code>800ms</code> / <code>1.5s</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card section">
+      <h2>7. 时间格式（规则延迟/冷却/定时/动作延迟通用）</h2>
+      <p>支持：<code>500ms</code> <code>1.5s</code> <code>2m</code> <code>1h</code> <code>1d</code> <code>01:30</code> <code>01:02:03</code></p>
+      <p class="muted">纯数字按毫秒处理，例如 <code>1000</code> = 1 秒。</p>
+    </section>
+
+    <section class="card section">
+      <h2>8. 三个可直接照抄的规则模板</h2>
+      <h3>模板 A：选求生者1就切到展示场景</h3>
+      <ul>
+        <li>触发：<code>bp:survivor-1-selected</code></li>
+        <li>动作：<code>SWITCH_SCENE(sceneName=BP_展示)</code></li>
+      </ul>
+
+      <h3>模板 B：监管者确定后更新文本并刷新浏览器源</h3>
+      <ul>
+        <li>触发：<code>bp:hunter-selected</code></li>
+        <li>动作1：<code>SET_TEXT(sourceName=HunterText, text=监管者：{{bpHunter}})</code></li>
+        <li>动作2：<code>REFRESH_BROWSER(sourceName=BPBrowser)</code></li>
+      </ul>
+
+      <h3>模板 C：每 30 秒刷新一次页面</h3>
+      <ul>
+        <li>触发：<code>timer:interval</code>，间隔填 <code>30s</code></li>
+        <li>动作：<code>REFRESH_BROWSER(sourceName=Score_A)</code></li>
+      </ul>
+
+      <h3>模板 D：比分变化时更新标题与小比分</h3>
+      <ul>
+        <li>触发：<code>localbp:score-updated</code></li>
+        <li>动作1：<code>SET_TEXT(sourceName=MatchTitle, text={{matchTitle}})</code></li>
+        <li>动作2：<code>SET_TEXT(sourceName=ScoreText, text=大分 {{matchScore}} | 小分 {{matchSmallScore}})</code></li>
+      </ul>
+    </section>
+
+    <section class="card section">
+      <h2>9. 排错清单（按顺序）</h2>
+      <ol>
+        <li>OBS 是否已连接（编辑器顶部状态）。</li>
+        <li>规则是否启用、动作是否启用、是否点击过“保存全部规则”。</li>
+        <li>场景名/源名是否与 OBS 完全一致（含空格和大小写）。</li>
+        <li>高级条件是否写错（先清空条件测试）。</li>
+        <li>图片路径是否真实存在、JSON 参数是否为合法 JSON。</li>
+      </ol>
+      <div class="tip">建议调试顺序：先只放一个“切换场景”动作，能触发后再加文本/图片/滤镜动作。</div>
+    </section>
+  </div>
+</body>
+
+</html>

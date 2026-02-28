@@ -1,0 +1,196 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  position: relative;
+  color: #fff;
+  font-family: "Microsoft YaHei", sans-serif;
+  -webkit-app-region: drag;
+}
+
+#customFrontendRoot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+#windowEdgeFrame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 2px solid rgba(120, 220, 255, 0.45);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 18px rgba(40, 190, 255, 0.28);
+  opacity: 0.45;
+  z-index: 999;
+}
+
+.custom-component {
+  position: absolute;
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+}
+
+.custom-component * {
+  -webkit-app-region: no-drag;
+}
+
+.custom-component-content {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.custom-component .control-label {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  display: none;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(0, 180, 255, 0.95);
+  display: none;
+  z-index: 6;
+}
+
+.resize-handle.nw {
+  left: -5px;
+  top: -5px;
+  cursor: nwse-resize;
+}
+
+.resize-handle.ne {
+  right: -5px;
+  top: -5px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.sw {
+  left: -5px;
+  bottom: -5px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+body.editing .custom-component {
+  outline: 1px dashed rgba(0, 190, 255, 0.95);
+  cursor: move;
+}
+
+body.editing .custom-component .control-label {
+  display: block;
+}
+
+body.editing .custom-component .resize-handle {
+  display: block;
+}
+
+#customEditHint {
+  position: fixed;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  display: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  z-index: 1000;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+#customWindowDragHandle {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(8, 12, 20, 0.42);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  line-height: 1;
+  user-select: none;
+  pointer-events: auto;
+  cursor: move;
+  -webkit-app-region: drag;
+  opacity: 0.56;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+#customWindowDragHandle:hover {
+  opacity: 0.9;
+  background: rgba(12, 18, 30, 0.75);
+}
+
+body.editing #customEditHint {
+  display: block;
+}
+
+body.editing #customWindowDragHandle {
+  opacity: 0.95;
+}
+
+body.opening #windowEdgeFrame {
+  animation: custom-window-edge-open 1.7s ease-out 1 both;
+}
+
+body.editing #windowEdgeFrame {
+  opacity: 1;
+  border-color: rgba(120, 220, 255, 0.95);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 24px rgba(40, 190, 255, 0.6);
+}
+
+@keyframes custom-window-edge-open {
+  0% {
+    opacity: 0.98;
+    border-color: rgba(120, 220, 255, 1);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+      0 0 28px rgba(40, 190, 255, 0.9);
+  }
+  60% {
+    opacity: 0.62;
+  }
+  100% {
+    opacity: 0.45;
+    border-color: rgba(120, 220, 255, 0.45);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+      0 0 18px rgba(40, 190, 255, 0.28);
+  }
+}

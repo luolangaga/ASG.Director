@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS 自动化侧边栏</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: radial-gradient(circle at top right, #1f2a44, #0b111a 45%, #090d14);
+      color: #e5e7eb;
+      min-height: 100vh;
+    }
+    .app {
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+    .status {
+      font-size: 12px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      background: rgba(15, 23, 42, 0.7);
+    }
+    .status.ok {
+      border-color: #14532d;
+      color: #86efac;
+      background: rgba(20, 83, 45, 0.3);
+    }
+    .status.warn {
+      border-color: #7c2d12;
+      color: #fdba74;
+      background: rgba(124, 45, 18, 0.25);
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button, select {
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 12px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    button {
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    }
+    button:active { transform: translateY(1px); }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-primary {
+      border: none;
+      background: #2563eb;
+      color: #fff;
+    }
+    .btn-tab {
+      background: rgba(30, 41, 59, 0.9);
+      color: #cbd5e1;
+      border: 1px solid #334155;
+    }
+    .btn-tab.active {
+      color: #93c5fd;
+      border-color: #3b82f6;
+      background: rgba(37, 99, 235, 0.2);
+    }
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .stat {
+      background: rgba(12, 18, 30, 0.88);
+      border: 1px solid #273449;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .stat .label {
+      color: #93a4bb;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .stat .value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .music-panel {
+      background: rgba(12, 18, 30, 0.9);
+      border: 1px solid #273449;
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .panel-tip {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .music-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .music-toolbar select {
+      min-width: 180px;
+      flex: 1;
+      max-width: 320px;
+    }
+    .music-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .playlist-block {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .playlist-block.active {
+      border-color: #2563eb;
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35);
+    }
+    .playlist-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .playlist-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .playlist-title {
+      font-size: 14px;
+      color: #f8fafc;
+      font-weight: 700;
+      word-break: break-all;
+    }
+    .playlist-meta {
+      font-size: 11px;
+      color: #94a3b8;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .playlist-tracks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .track-btn {
+      border: 1px solid #3b82f6;
+      background: rgba(37, 99, 235, 0.18);
+      color: #dbeafe;
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .track-btn.active {
+      border-color: #60a5fa;
+      background: #2563eb;
+      color: #fff;
+    }
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card {
+      background: rgba(12, 18, 30, 0.9);
+      border: 1px solid #243244;
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f1f5f9;
+      word-break: break-all;
+    }
+    .meta {
+      font-size: 11px;
+      color: #8fa2bb;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .desc {
+      font-size: 12px;
+      color: #b8c7da;
+      word-break: break-word;
+    }
+    .right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .badge {
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+    .badge.manual {
+      border-color: #155e75;
+      color: #67e8f9;
+      background: rgba(8, 145, 178, 0.15);
+    }
+    .badge.music {
+      border-color: #6d28d9;
+      color: #c4b5fd;
+      background: rgba(109, 40, 217, 0.18);
+    }
+    .badge.disabled {
+      border-color: #7f1d1d;
+      color: #fca5a5;
+      background: rgba(127, 29, 29, 0.18);
+    }
+    .hint {
+      text-align: center;
+      border: 1px dashed #334155;
+      border-radius: 10px;
+      padding: 20px 12px;
+      color: #94a3b8;
+      font-size: 13px;
+      background: rgba(12, 18, 30, 0.7);
+    }
+    .toast-wrap {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 99;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      min-width: 180px;
+      max-width: 360px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      border: 1px solid #334155;
+      background: rgba(15, 23, 42, 0.96);
+      color: #e2e8f0;
+      opacity: 0;
+      transform: translateY(8px);
+      animation: toast-in 0.2s ease forwards;
+    }
+    .toast.success { border-color: #14532d; color: #86efac; }
+    .toast.error { border-color: #7f1d1d; color: #fca5a5; }
+    @keyframes toast-in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 680px) {
+      .card {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .right {
+        justify-content: flex-end;
+      }
+      .music-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .music-toolbar select {
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="title-wrap">
+        <div class="title">OBS 自动化侧边栏</div>
+        <div id="status" class="status">加载中...</div>
+      </div>
+      <div class="toolbar">
+        <button id="tabSidebar" class="btn-tab active">可触发事件</button>
+        <button id="tabAll" class="btn-tab">全部规则</button>
+        <button id="refreshBtn" class="btn-primary">刷新</button>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="label">全部自动化规则</div><div id="allCount" class="value">0</div></div>
+      <div class="stat"><div class="label">侧边栏手动规则</div><div id="manualCount" class="value">0</div></div>
+      <div class="stat"><div class="label">音乐控制规则</div><div id="musicCount" class="value">0</div></div>
+    </div>
+
+    <section class="music-panel">
+      <div class="panel-title">切歌控制台（自动解析规则）</div>
+      <div class="panel-tip">请在 OBS 自动化里把触发事件设为“OBS音乐控制事件”，并配置“音乐歌单”积木（一个块里可放多首歌）。</div>
+      <div class="music-toolbar">
+        <button id="musicPrevBtn" class="btn-tab">上一首</button>
+        <button id="musicRandomBtn" class="btn-tab">随机</button>
+        <button id="musicNextBtn" class="btn-tab">下一首</button>
+      </div>
+      <div id="musicList" class="music-list"></div>
+    </section>
+
+    <div id="list" class="list"></div>
+  </div>
+
+  <div id="toastWrap" class="toast-wrap"></div>
+
+  <script>
+    const MANUAL_TRIGGER_TYPE = 'obs:sidebar-manual-trigger';
+    const MUSIC_TRIGGER_TYPE = 'obs:music-control';
+
+    const state = {
+      view: 'manual',
+      rules: [],
+      sidebarEvents: [],
+      musicEvents: [],
+      loading: false,
+      lastPlayedMusicButtonId: '',
+      activeMusicSourceKey: ''
+    };
+
+    const statusEl = document.getElementById('status');
+    const allCountEl = document.getElementById('allCount');
+    const manualCountEl = document.getElementById('manualCount');
+    const musicCountEl = document.getElementById('musicCount');
+    const listEl = document.getElementById('list');
+    const toastWrapEl = document.getElementById('toastWrap');
+    const tabSidebarEl = document.getElementById('tabSidebar');
+    const tabAllEl = document.getElementById('tabAll');
+    const refreshBtnEl = document.getElementById('refreshBtn');
+    const musicPrevBtnEl = document.getElementById('musicPrevBtn');
+    const musicRandomBtnEl = document.getElementById('musicRandomBtn');
+    const musicNextBtnEl = document.getElementById('musicNextBtn');
+    const musicListEl = document.getElementById('musicList');
+
+    function setStatus(text, level) {
+      statusEl.textContent = text;
+      statusEl.classList.remove('ok', 'warn');
+      if (level === 'ok') statusEl.classList.add('ok');
+      if (level === 'warn') statusEl.classList.add('warn');
+    }
+
+    function showToast(message, level) {
+      const toast = document.createElement('div');
+      toast.className = `toast ${level || ''}`.trim();
+      toast.textContent = message;
+      toastWrapEl.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+      }, 1600);
+      setTimeout(() => toast.remove(), 1900);
+    }
+
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      return response.json();
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeHtmlAttr(value) {
+      return escapeHtml(value).replace(/`/g, '&#96;');
+    }
+
+    function renderRulesPanel() {
+      allCountEl.textContent = String(state.rules.length);
+      manualCountEl.textContent = String(state.sidebarEvents.length);
+      musicCountEl.textContent = String(state.musicEvents.length);
+
+      const list = state.view === 'manual' ? state.sidebarEvents : state.rules;
+      if (!Array.isArray(list) || list.length === 0) {
+        const text = state.view === 'manual'
+          ? '暂无可触发事件。请在规则中使用“OBS侧边栏手动触发”或“OBS音乐控制事件”。'
+          : '暂无已配置自动化规则。';
+        listEl.innerHTML = `<div class="hint">${text}</div>`;
+        return;
+      }
+
+      listEl.innerHTML = '';
+      list.forEach((rule) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const triggerType = rule.triggerType || '';
+        const isManual = triggerType === MANUAL_TRIGGER_TYPE;
+        const isMusic = triggerType === MUSIC_TRIGGER_TYPE;
+        const isEnabled = rule.enabled !== false;
+        const triggerable = isEnabled && (isManual || isMusic);
+
+        let badgeClass = '';
+        let badgeText = '其他触发';
+        if (isManual) {
+          badgeClass = 'manual';
+          badgeText = '侧边栏触发';
+        } else if (isMusic) {
+          badgeClass = 'music';
+          badgeText = '音乐控制';
+        }
+
+        card.innerHTML = `
+          <div class="info">
+            <div class="name">${escapeHtml(rule.name || '未命名规则')}</div>
+            <div class="meta">
+              <span>动作数 ${Number.isFinite(rule.actionsCount) ? rule.actionsCount : 0}</span>
+              <span>触发类型 ${escapeHtml(triggerType || '-')}</span>
+              <span>ID ${escapeHtml(rule.id || '-')}</span>
+            </div>
+            <div class="desc">${escapeHtml((rule.description || '').trim() || '无备注')}</div>
+          </div>
+          <div class="right">
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            ${!isEnabled ? '<span class="badge disabled">已禁用</span>' : ''}
+            <button class="btn-primary" data-role="trigger" data-id="${escapeHtmlAttr(rule.id || '')}" ${triggerable ? '' : 'disabled'}>${triggerable ? '立即触发' : '不可触发'}</button>
+          </div>
+        `;
+
+        listEl.appendChild(card);
+      });
+    }
+
+    function normalizeSourceKey(sourceName) {
+      const text = typeof sourceName === 'string' ? sourceName.trim().toLowerCase() : '';
+      return text || '__unnamed__';
+    }
+
+    function buildMusicSourceBlocks() {
+      const grouped = new Map();
+      const items = Array.isArray(state.musicEvents) ? state.musicEvents : [];
+      items.forEach((item) => {
+        if (!item || !item.id) return;
+        const sourceNameRaw = String(item.sourceName || '').trim();
+        const sourceName = sourceNameRaw || '未命名源';
+        const sourceKey = normalizeSourceKey(sourceNameRaw);
+        if (!grouped.has(sourceKey)) {
+          grouped.set(sourceKey, { sourceName, sourceKey, tracks: [] });
+        }
+        grouped.get(sourceKey).tracks.push(item);
+      });
+
+      const blocks = Array.from(grouped.values());
+      blocks.forEach((block) => {
+        block.tracks = block.tracks
+          .filter((track) => track && track.id)
+          .sort((a, b) => {
+            const ai = Number.isFinite(Number(a.trackIndex)) ? Number(a.trackIndex) : 999999;
+            const bi = Number.isFinite(Number(b.trackIndex)) ? Number(b.trackIndex) : 999999;
+            if (ai !== bi) return ai - bi;
+            return String(a.trackName || a.name || '').localeCompare(String(b.trackName || b.name || ''), 'zh-CN');
+          });
+      });
+      blocks.sort((a, b) => String(a.sourceName).localeCompare(String(b.sourceName), 'zh-CN'));
+      return blocks;
+    }
+
+    function getActiveMusicBlock(blocks) {
+      if (!Array.isArray(blocks) || !blocks.length) return null;
+      const found = blocks.find((block) => block.sourceKey === state.activeMusicSourceKey);
+      if (found) return found;
+      state.activeMusicSourceKey = blocks[0].sourceKey;
+      return blocks[0];
+    }
+
+    function renderMusicPanel() {
+      const blocks = buildMusicSourceBlocks();
+      const activeBlock = getActiveMusicBlock(blocks);
+      const hasMusic = !!(activeBlock && Array.isArray(activeBlock.tracks) && activeBlock.tracks.length);
+      musicPrevBtnEl.disabled = !hasMusic;
+      musicRandomBtnEl.disabled = !hasMusic;
+      musicNextBtnEl.disabled = !hasMusic;
+
+      if (!blocks.length) {
+        musicListEl.innerHTML = '<div class="hint">暂无音乐控制规则。请在自动化规则中选择触发事件“OBS音乐控制事件”，并配置“音乐歌单”动作。</div>';
+        return;
+      }
+
+      musicListEl.innerHTML = '';
+      blocks.forEach((block) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = `playlist-block ${block.sourceKey === state.activeMusicSourceKey ? 'active' : ''}`;
+        wrapper.dataset.role = 'music-source';
+        wrapper.dataset.sourceKey = block.sourceKey;
+        const tracks = Array.isArray(block.tracks) ? block.tracks : [];
+        const buttonsHtml = tracks.map((track, index) => {
+          const text = track.trackName || track.name || `歌曲 ${index + 1}`;
+          const activeCls = state.lastPlayedMusicButtonId === track.id ? 'active' : '';
+          return `<button class="track-btn ${activeCls}" data-role="music-play" data-id="${escapeHtmlAttr(track.id || '')}" title="${escapeHtmlAttr(text)}">${escapeHtml(text)}</button>`;
+        }).join('');
+
+        wrapper.innerHTML = `
+          <div class="playlist-head">
+            <div class="playlist-info">
+              <div class="playlist-title">${escapeHtml(block.sourceName)}</div>
+            </div>
+          </div>
+          <div class="playlist-tracks">
+            ${buttonsHtml || '<div class="hint">该源暂无歌曲</div>'}
+          </div>
+        `;
+        musicListEl.appendChild(wrapper);
+      });
+    }
+
+    async function triggerRule(ruleId, buttonEl, extraData = {}) {
+      if (!ruleId) return { success: false, error: 'ruleId empty' };
+      if (buttonEl) buttonEl.disabled = true;
+      try {
+        const result = await fetchJson('/api/obs-automation/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ruleId,
+            data: {
+              sourcePage: 'obs-automation-sidebar',
+              clickedAt: Date.now(),
+              ...extraData
+            }
+          })
+        });
+        if (!result || result.success !== true) {
+          throw new Error(result && result.error ? result.error : '触发失败');
+        }
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message || String(error) };
+      } finally {
+        if (buttonEl) buttonEl.disabled = false;
+      }
+    }
+
+    async function playMusicRule(item, buttonEl, silent) {
+      if (!item || !item.ruleId) return false;
+      const result = await triggerRule(item.ruleId, buttonEl, {
+        sourceControl: 'music-play',
+        trackId: item.trackId || '',
+        trackName: item.trackName || '',
+        trackIndex: Number.isFinite(Number(item.trackIndex)) ? Number(item.trackIndex) : undefined,
+        trackUrl: item.mediaUrl || '',
+        sourceName: item.sourceName || '',
+        isLocalFile: item.isLocalFile === true
+      });
+      if (!result.success) {
+        if (!silent) showToast(`切歌失败：${result.error}`, 'error');
+        return false;
+      }
+      state.activeMusicSourceKey = normalizeSourceKey(String(item.sourceName || '').trim());
+      state.lastPlayedMusicButtonId = item.id || '';
+      renderMusicPanel();
+      if (!silent) showToast('切歌成功', 'success');
+      return true;
+    }
+
+    async function playByOffset(offset) {
+      const blocks = buildMusicSourceBlocks();
+      const activeBlock = getActiveMusicBlock(blocks);
+      const tracks = activeBlock && Array.isArray(activeBlock.tracks) ? activeBlock.tracks : [];
+      if (!tracks.length) return;
+      let currentIdx = tracks.findIndex(item => item.id === state.lastPlayedMusicButtonId);
+      if (currentIdx < 0) currentIdx = offset > 0 ? -1 : 0;
+      const nextIdx = (currentIdx + offset + tracks.length) % tracks.length;
+      const target = tracks[nextIdx];
+      if (!target) return;
+      await playMusicRule(target, null, false);
+    }
+
+    async function playRandom() {
+      const blocks = buildMusicSourceBlocks();
+      const activeBlock = getActiveMusicBlock(blocks);
+      const tracks = activeBlock && Array.isArray(activeBlock.tracks) ? activeBlock.tracks : [];
+      if (!tracks.length) return;
+      const idx = Math.floor(Math.random() * tracks.length);
+      const target = tracks[idx];
+      if (!target) return;
+      await playMusicRule(target, null, false);
+    }
+
+    async function loadEvents(silent) {
+      if (state.loading) return;
+      state.loading = true;
+      if (!silent) setStatus('正在刷新...', 'warn');
+      refreshBtnEl.disabled = true;
+
+      try {
+        const result = await fetchJson('/api/obs-automation/events');
+        if (!result || result.success !== true || !result.data) {
+          throw new Error(result && result.error ? result.error : '返回数据无效');
+        }
+
+        state.rules = Array.isArray(result.data.rules) ? result.data.rules : [];
+        state.sidebarEvents = Array.isArray(result.data.sidebarEvents) ? result.data.sidebarEvents : [];
+        state.musicEvents = Array.isArray(result.data.musicControlEvents)
+          ? result.data.musicControlEvents.filter(item => item && item.id)
+          : [];
+
+        renderRulesPanel();
+        renderMusicPanel();
+        setStatus(`手动${state.sidebarEvents.length} / 音乐${state.musicEvents.length} 已就绪`, 'ok');
+      } catch (error) {
+        setStatus('加载失败', 'warn');
+        showToast(`加载失败：${error.message || error}`, 'error');
+      } finally {
+        state.loading = false;
+        refreshBtnEl.disabled = false;
+      }
+    }
+
+    tabSidebarEl.addEventListener('click', () => {
+      state.view = 'manual';
+      tabSidebarEl.classList.add('active');
+      tabAllEl.classList.remove('active');
+      renderRulesPanel();
+    });
+
+    tabAllEl.addEventListener('click', () => {
+      state.view = 'all';
+      tabAllEl.classList.add('active');
+      tabSidebarEl.classList.remove('active');
+      renderRulesPanel();
+    });
+
+    refreshBtnEl.addEventListener('click', () => loadEvents(false));
+    musicPrevBtnEl.addEventListener('click', () => playByOffset(-1));
+    musicNextBtnEl.addEventListener('click', () => playByOffset(1));
+    musicRandomBtnEl.addEventListener('click', playRandom);
+
+    listEl.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-role="trigger"]');
+      if (!button) return;
+      const ruleId = button.dataset.id || '';
+      const result = await triggerRule(ruleId, button, { sourceControl: 'rule-list' });
+      if (!result.success) {
+        showToast(`触发失败：${result.error}`, 'error');
+        return;
+      }
+      showToast('触发成功', 'success');
+    });
+
+    musicListEl.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-role="music-play"]');
+      if (button) {
+        const buttonId = button.dataset.id || '';
+        const item = (state.musicEvents || []).find((track) => track.id === buttonId);
+        if (!item) {
+          showToast('歌曲项不存在，可能已更新，请刷新', 'error');
+          return;
+        }
+        await playMusicRule(item, button, false);
+        return;
+      }
+
+      const sourceEl = event.target.closest('[data-role="music-source"]');
+      if (!sourceEl) return;
+      state.activeMusicSourceKey = sourceEl.dataset.sourceKey || '';
+      renderMusicPanel();
+    });
+
+    renderRulesPanel();
+    renderMusicPanel();
+    loadEvents(false);
+    setInterval(() => loadEvents(true), 8000);
+  </script>
+</body>
+</html>

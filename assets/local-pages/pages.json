@@ -1,7 +1,7 @@
 {
   "port": 9528,
   "pages": [
-      {
+    {
       "fileName": "timer.html",
       "title": "局内正计时",
       "enabled": true,
@@ -30,6 +30,42 @@
       "title": "OBS BP控制",
       "enabled": true,
       "order": 3
+    },
+    {
+      "fileName": "lower-third.html",
+      "title": "姓名条",
+      "enabled": true,
+      "order": 4
+    },
+    {
+      "fileName": "countdown.html",
+      "title": "倒计时卡片",
+      "enabled": true,
+      "order": 5
+    },
+    {
+      "fileName": "ticker.html",
+      "title": "滚动信息条",
+      "enabled": true,
+      "order": 6
+    },
+    {
+      "fileName": "match-card.html",
+      "title": "对阵信息卡",
+      "enabled": true,
+      "order": 7
+    },
+    {
+      "fileName": "obs-automation-sidebar.html",
+      "title": "OBS自动化侧边栏",
+      "enabled": true,
+      "order": 8
+    },
+    {
+      "fileName": "AI-生成页面.html",
+      "title": "AI 生成页面",
+      "enabled": true,
+      "order": 9
     }
   ]
 }

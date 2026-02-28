@@ -1,5 +1,5 @@
 /**
- * ASG 自定义动画系统
+ * Idvevent 自定义动画系统
  * 用于在前端页面应用自定义CSS动画效果
  * 
  * 支持的动画类型:
@@ -216,7 +216,7 @@
      * 注入CSS样式
      */
     function injectStyles() {
-        let css = '/* ASG Custom Animations */\n\n'
+        let css = '/* Idvevent Custom Animations */\n\n'
 
         // 添加默认动画
         Object.values(DEFAULT_ANIMATIONS).forEach(anim => {

@@ -40,6 +40,68 @@
       display: flex;
     }
 
+    body.app-booting .app-sidebar,
+    body.app-booting .app-main {
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .startup-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, rgba(52, 52, 52, 0.98) 0%, rgba(20, 20, 20, 0.98) 65%);
+      transition: opacity 0.22s ease;
+    }
+
+    .startup-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .startup-overlay-card {
+      width: min(320px, 86vw);
+      border: 1px solid #404040;
+      border-radius: 12px;
+      background: rgba(29, 29, 29, 0.94);
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .startup-overlay-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255, 255, 255, 0.24);
+      border-top-color: #f1f1f1;
+      border-radius: 50%;
+      animation: startupSpin 0.78s linear infinite;
+    }
+
+    .startup-overlay-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f2f2f2;
+    }
+
+    .startup-overlay-hint {
+      font-size: 12px;
+      color: #c4c4c4;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    @keyframes startupSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     /* Light Theme Overrides */
     body.light-theme {
       background: #e0e0e0;
@@ -65,6 +127,23 @@
     body.light-theme .feature-card:hover,
     body.light-theme .plugin-card:hover {
       background: #ededed;
+    }
+
+    body.light-theme .startup-overlay {
+      background: radial-gradient(circle at top, rgba(251, 251, 251, 0.98) 0%, rgba(232, 232, 232, 0.98) 65%);
+    }
+
+    body.light-theme .startup-overlay-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: #d5d5d5;
+    }
+
+    body.light-theme .startup-overlay-title {
+      color: #222;
+    }
+
+    body.light-theme .startup-overlay-hint {
+      color: #666;
     }
 
     body.light-theme .section-title {
@@ -444,6 +523,55 @@
       max-width: 90%;
     }
 
+    .editor-modal {
+      width: min(1100px, 92vw);
+      height: min(80vh, 760px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .editor-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .editor-modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .editor-modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .editor-textarea {
+      flex: 1;
+      width: 100%;
+      resize: none;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #1e1e1e;
+      color: var(--text-main);
+      padding: 12px;
+      font-family: "Consolas", "Fira Code", "Microsoft YaHei", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    body.light-theme .editor-textarea {
+      background: #ffffff;
+      color: #222;
+    }
+
     .switch {
       position: relative;
       display: inline-block;
@@ -626,4 +754,196 @@
 
     .settings-section {
       margin-top: 24px;
+    }
+
+    .partners-contact-tip {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 10px 12px;
+    }
+
+    .partners-contact-tip a {
+      color: #a9c9ff;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(169, 201, 255, 0.45);
+    }
+
+    .partners-contact-tip a:hover {
+      color: #c5dcff;
+    }
+
+    .partner-hub-card {
+      min-height: 220px;
+    }
+
+    .partner-hub-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .partners-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .partners-search-input {
+      max-width: 420px;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .partners-count-badge {
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .partners-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .partner-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background: #262626;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 104px;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .partner-item:hover {
+      background: #2f2f2f;
+      border-color: #4a4a4a;
+      transform: translateY(-1px);
+    }
+
+    .partner-logo-wrap {
+      width: 64px;
+      height: 64px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #3a3a3a;
+      background: #1f1f1f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .partner-logo-wrap.fallback .partner-logo-fallback {
+      display: inline-flex;
+    }
+
+    .partner-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .partner-logo-fallback {
+      display: none;
+      font-size: 20px;
+      opacity: 0.85;
+    }
+
+    .partner-content {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .partner-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .partner-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      max-height: 52px;
+      overflow: hidden;
+    }
+
+    .partner-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: auto;
+      flex-wrap: wrap;
+    }
+
+    .partner-tag {
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 2px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .partner-link {
+      font-size: 11px;
+      color: #a9c9ff;
+      text-decoration: none;
+      border: 1px solid rgba(169, 201, 255, 0.35);
+      border-radius: 999px;
+      padding: 2px 8px;
+      transition: background 0.2s ease;
+    }
+
+    .partner-link:hover {
+      background: rgba(169, 201, 255, 0.12);
+    }
+
+    body.light-theme .partner-item {
+      background: #ffffff;
+      border-color: var(--border-color);
+    }
+
+    body.light-theme .partners-contact-tip {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    body.light-theme .partner-item:hover {
+      background: #f7f7f7;
+      border-color: #cfcfcf;
+    }
+
+    body.light-theme .partner-logo-wrap {
+      background: #f8f8f8;
+      border-color: #dddddd;
+    }
+
+    @media (max-width: 900px) {
+      .partners-search-input {
+        max-width: none;
+        width: 100%;
+      }
+
+      .partners-grid {
+        grid-template-columns: 1fr;
+      }
     }

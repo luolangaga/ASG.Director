@@ -15,7 +15,9 @@ const { app } = require('electron')
 // 项目级硬禁用插件（与用户功能需求保持一致）
 // 说明：即使用户目录中存在同名插件，也不会被加载/激活。
 const BLOCKED_PLUGIN_IDS = new Set([
-  'blender-bridge'
+  'blender-bridge',
+  // 已内置到主程序，防止旧版扩展重复加载导致规则重复触发
+  'obs-automation'
 ])
 
 /**

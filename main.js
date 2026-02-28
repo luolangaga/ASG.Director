@@ -1,12 +1,19 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, screen } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { spawn } = require('child_process')
+const { pathToFileURL } = require('url')
+const { spawn, spawnSync } = require('child_process')
 const os = require('os')
 const https = require('https')
 const http = require('http')
 const archiver = require('archiver')
 const { pinyin } = require('pinyin-pro')
+let sharp = null
+try {
+  sharp = require('sharp')
+} catch (e) {
+  console.warn('[Main] sharp 模块不可用，本地BP背景将跳过自动压缩:', e.message)
+}
 
 // 兜底：某些环境下（例如把 stdout/stderr 通过管道截断）console.log 会触发 EPIPE，
 // 进而导致主进程 Uncaught Exception 弹窗。这里仅忽略 EPIPE，不吞掉其他异常。
@@ -39,11 +46,40 @@ process.on('unhandledRejection', (reason) => {
   }
 })
 
+function extractMarkedJsonOutput(stdoutText) {
+  if (!stdoutText) return null
+  const text = String(stdoutText)
+  const marker = '__ASG_JSON__:'
+  const idx = text.lastIndexOf(marker)
+  if (idx < 0) return null
+  const payload = text.slice(idx + marker.length).trim()
+  if (!payload) return null
+  return JSON.parse(payload)
+}
+
+function runPowerShellJson(script, timeoutMs = 8000) {
+  const bin = process.env.ComSpec ? 'powershell.exe' : 'powershell'
+  const result = spawnSync(bin, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: timeoutMs
+  })
+  if (result.error) throw result.error
+  if (result.status !== 0) {
+    const stderr = String(result.stderr || '').trim()
+    throw new Error(stderr || `PowerShell failed with code ${result.status}`)
+  }
+  return extractMarkedJsonOutput(result.stdout || '')
+}
+
 // 引入重构的模块
 const { zipDirectory, unzipFile, validateZip } = require('./utils/archive')
 const { httpGet, httpPost, downloadFile, formatSize } = require('./utils/downloader')
 const packManager = require('./utils/packManager')
 const pluginPackManager = require('./utils/pluginPackManager')
+const { LocalBpOcrService } = require('./utils/localBpOcrService')
+const { ObsAutomationService } = require('./internal/obs-automation/Service')
+const { createDirectorSyncService, normalizeDirectorSyncSettings } = require('./internal/director-sync-service')
 
 // 插件系统
 const { bootstrapPluginSystem, waitPluginSystemReady, setPluginWindow, setPluginRoomData, shutdownPlugins, pluginManager } = require('./plugins/bootstrap')
@@ -394,10 +430,104 @@ let localBpWindow = null
 let localBpGuideWindow = null
 let characterDisplayWindow = null
 let welcomeWindow = null
+let startupLoadingWindow = null
+let startupBootstrapFallbackTimer = null
+let mainBootstrapReady = false
+let secondInstanceNoticeCooldownUntil = 0
+let obsAutomationService = null
+const SUPPORTS_NATIVE_RESIZE_WITH_TRANSPARENT = process.platform !== 'win32'
+const FRONTEND_MAIN_WINDOW_ID = 'frontend-main'
+const customFrontendWindows = new Map()
+
+function getCustomFrontendWindowList() {
+  return Array.from(customFrontendWindows.values()).filter(w => w && !w.isDestroyed())
+}
+
+function isCustomFrontendWindow(win) {
+  if (!win || win.isDestroyed()) return false
+  for (const item of customFrontendWindows.values()) {
+    if (item === win) return true
+  }
+  return false
+}
+
+function getAllFrontendWindows() {
+  const windows = []
+  if (frontendWindow && !frontendWindow.isDestroyed()) windows.push(frontendWindow)
+  windows.push(...getCustomFrontendWindowList())
+  return windows
+}
+
+function broadcastToFrontendWindows(channel, ...args) {
+  const windows = getAllFrontendWindows()
+  for (const win of windows) {
+    try {
+      win.webContents.send(channel, ...args)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function focusPrimaryWindow() {
+  const primaryCandidates = [
+    welcomeWindow,
+    mainWindow,
+    frontendWindow,
+    backendWindow
+  ]
+  const win = primaryCandidates.find(w => w && !w.isDestroyed()) || BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  try {
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  } catch (e) {
+    console.warn('[Main] focusPrimaryWindow failed:', e?.message || e)
+  }
+}
+
+function notifySecondInstanceBlocked() {
+  const now = Date.now()
+  if (now < secondInstanceNoticeCooldownUntil) return
+  secondInstanceNoticeCooldownUntil = now + 3000
+
+  const owner = [mainWindow, welcomeWindow, frontendWindow, ...getCustomFrontendWindowList(), backendWindow].find(w => w && !w.isDestroyed())
+  const messageBoxOptions = {
+    type: 'info',
+    title: 'ASG Director',
+    message: '程序已在运行',
+    detail: '已阻止打开第二个实例，并切换到已打开窗口。',
+    buttons: ['确定'],
+    defaultId: 0
+  }
+
+  if (owner) {
+    dialog.showMessageBox(owner, messageBoxOptions).catch(() => {})
+    return
+  }
+  dialog.showMessageBox(messageBoxOptions).catch(() => {})
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (BrowserWindow.getAllWindows().length === 0 && app.isReady()) {
+      createMainWindow()
+      notifySecondInstanceBlocked()
+      return
+    }
+    focusPrimaryWindow()
+    notifySecondInstanceBlocked()
+  })
+}
 
 function broadcastToAllWindows(channel, ...args) {
   const targets = [
     frontendWindow,
+    ...getCustomFrontendWindowList(),
     backendWindow,
     scoreboardWindowA,
     scoreboardWindowB,
@@ -483,6 +613,261 @@ function normalizeFrontendResizeLockSetting(input) {
   return !!input
 }
 
+function normalizeBpStartupWindowAnimationSetting(input) {
+  return input === true
+}
+
+function isWindowAnimatable(win) {
+  if (!win || win.isDestroyed()) return false
+  try {
+    return win.isVisible()
+  } catch {
+    return false
+  }
+}
+
+function getDirectorSyncSettingsFromConfig() {
+  const config = readJsonFileSafe(configPath, {})
+  return normalizeDirectorSyncSettings(config.directorSync)
+}
+
+function saveDirectorSyncSettingsToConfig(settings) {
+  const config = readJsonFileSafe(configPath, {})
+  const next = normalizeDirectorSyncSettings(settings)
+  config.directorSync = next
+  writeJsonFileSafe(configPath, config)
+  return next
+}
+
+const directorSyncService = createDirectorSyncService({
+  onIncomingUpdate: (payload, meta) => {
+    if (!payload || typeof payload !== 'object') return
+    const marked = {
+      ...payload,
+      __asgDirectorSyncRemote: true,
+      __asgDirectorSyncSource: meta && meta.origin ? meta.origin : null
+    }
+    broadcastUpdateData(marked)
+  },
+  onStatusChange: (status) => {
+    try {
+      broadcastToAllWindows('director-sync-status', status)
+    } catch {
+      // ignore
+    }
+  },
+  logger: console
+})
+
+function forwardUpdateToDirectorSync(data) {
+  if (!data || typeof data !== 'object') return
+  if (data.__asgDirectorSyncRemote) return
+  try {
+    directorSyncService.broadcastUpdate(data)
+  } catch (e) {
+    console.warn('[DirectorSync] 转发更新失败:', e && e.message ? e.message : e)
+  }
+}
+
+function resolvePathWithin(baseDir, relativePath) {
+  if (!baseDir || typeof baseDir !== 'string') return null
+  if (typeof relativePath !== 'string' || !relativePath) return null
+  const base = path.resolve(baseDir)
+  const target = path.resolve(base, relativePath)
+  if (target !== base && !target.startsWith(base + path.sep)) return null
+  return target
+}
+
+function collectBpWindowsForStartupAnimation() {
+  return [
+    frontendWindow,
+    ...getCustomFrontendWindowList(),
+    localBpWindow,
+    characterDisplayWindow,
+    scoreboardWindowA,
+    scoreboardWindowB,
+    scoreboardOverviewWindow,
+    postMatchWindow
+  ].filter(isWindowAnimatable)
+}
+
+function resolveAnimationDisplay(windows) {
+  try {
+    if (windows.length > 0) {
+      const bounds = windows[0].getBounds()
+      const center = {
+        x: Math.round(bounds.x + bounds.width / 2),
+        y: Math.round(bounds.y + bounds.height / 2)
+      }
+      return screen.getDisplayNearestPoint(center)
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    return screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  } catch {
+    return screen.getPrimaryDisplay()
+  }
+}
+
+function computeTiledBounds(count, workArea) {
+  const margin = 24
+  const gap = 14
+  const safeCount = Math.max(1, Number(count) || 1)
+  const cols = Math.max(1, Math.ceil(Math.sqrt(safeCount)))
+  const rows = Math.max(1, Math.ceil(safeCount / cols))
+  const availableW = Math.max(360, workArea.width - margin * 2 - gap * (cols - 1))
+  const availableH = Math.max(240, workArea.height - margin * 2 - gap * (rows - 1))
+  const cellW = Math.max(240, Math.floor(availableW / cols))
+  const cellH = Math.max(160, Math.floor(availableH / rows))
+  const bounds = []
+
+  for (let i = 0; i < safeCount; i++) {
+    const row = Math.floor(i / cols)
+    const col = i % cols
+    bounds.push({
+      x: Math.round(workArea.x + margin + col * (cellW + gap)),
+      y: Math.round(workArea.y + margin + row * (cellH + gap)),
+      width: cellW,
+      height: cellH
+    })
+  }
+  return bounds
+}
+
+function buildAnimationPlans(windows, tiledBounds, targetBounds) {
+  return windows.map((win, idx) => {
+    const from = tiledBounds[idx]
+    const to = targetBounds[idx]
+    if (!from || !to) return null
+
+    // 前台窗口在动画中只移动不缩放，避免出现“尺寸被改”的观感问题
+    const keepSize = win === frontendWindow || isCustomFrontendWindow(win)
+    const start = keepSize
+      ? { ...from, width: to.width, height: to.height }
+      : { ...from }
+
+    return {
+      win,
+      from: start,
+      to: { ...to },
+      keepSize
+    }
+  }).filter(Boolean)
+}
+
+function lerp(from, to, t) {
+  return from + (to - from) * t
+}
+
+function easeInOutCubic(t) {
+  if (t < 0.5) return 4 * t * t * t
+  return 1 - Math.pow(-2 * t + 2, 3) / 2
+}
+
+function animateWindowPlans(plans, durationMs = 1200) {
+  return new Promise((resolve) => {
+    const startAt = Date.now()
+    const lastApplied = new WeakMap()
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startAt
+      const t = Math.min(1, elapsed / durationMs)
+      const eased = easeInOutCubic(t)
+
+      plans.forEach((plan) => {
+        const win = plan.win
+        if (!win || win.isDestroyed()) return
+        const from = plan.from
+        const to = plan.to
+        const next = {
+          x: Math.round(lerp(from.x, to.x, eased)),
+          y: Math.round(lerp(from.y, to.y, eased)),
+          width: plan.keepSize
+            ? to.width
+            : Math.max(120, Math.round(lerp(from.width, to.width, eased))),
+          height: plan.keepSize
+            ? to.height
+            : Math.max(80, Math.round(lerp(from.height, to.height, eased)))
+        }
+        const prev = lastApplied.get(win)
+        if (prev &&
+          prev.x === next.x &&
+          prev.y === next.y &&
+          prev.width === next.width &&
+          prev.height === next.height) return
+        try {
+          win.setBounds(next, false)
+          lastApplied.set(win, next)
+        } catch {
+          // ignore
+        }
+      })
+
+      if (t >= 1) {
+        clearInterval(timer)
+        resolve()
+      }
+    }, 33) // 30fps，降低窗口重绘压力，减少卡顿
+  })
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function runBpStartupWindowsAnimationIfEnabled() {
+  const config = readJsonFileSafe(configPath, {})
+  const enabled = normalizeBpStartupWindowAnimationSetting(config.bpStartupWindowAnimation)
+  if (!enabled) return
+
+  const windows = collectBpWindowsForStartupAnimation()
+  if (!windows.length) return
+
+  const targets = windows.map(win => {
+    try {
+      return win.getBounds()
+    } catch {
+      return null
+    }
+  }).filter(Boolean)
+
+  if (targets.length !== windows.length) return
+
+  const display = resolveAnimationDisplay(windows)
+  const workArea = display && display.workArea
+    ? display.workArea
+    : { x: 0, y: 0, width: 1600, height: 900 }
+  const tiled = computeTiledBounds(windows.length, workArea)
+  const plans = buildAnimationPlans(windows, tiled, targets)
+
+  plans.forEach((plan, idx) => {
+    const win = plan.win
+    try {
+      win.show()
+      win.setOpacity(0.95)
+      win.setBounds(plan.from, false)
+    } catch {
+      // ignore
+    }
+  })
+
+  // 按需求：平铺展示阶段停留 2 秒，给用户足够观察时间
+  await sleep(2000)
+  await animateWindowPlans(plans, 1650)
+
+  plans.forEach((plan) => {
+    const win = plan.win
+    if (!win || win.isDestroyed()) return
+    try {
+      win.setOpacity(1)
+      win.setBounds(plan.to, false)
+    } catch {
+      // ignore
+    }
+  })
+}
+
 function ensureLocalPagesStorage() {
   const config = normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
   if (!fs.existsSync(localPagesBaseDir)) {
@@ -526,8 +911,242 @@ function listLocalPages() {
   return { config, pages, dir: baseDir }
 }
 
+function resolveLocalPagesHtmlPath(fileName) {
+  if (!fileName || typeof fileName !== 'string') return null
+  const baseName = path.basename(fileName)
+  if (baseName !== fileName) return null
+  if (path.extname(baseName).toLowerCase() !== '.html') return null
+  const { dir } = ensureLocalPagesStorage()
+  const filePath = path.join(dir, baseName)
+  if (!fs.existsSync(filePath)) return null
+  return filePath
+}
+
+function sanitizeLocalPagesHtmlFileName(fileName) {
+  const raw = typeof fileName === 'string' ? fileName.trim() : ''
+  const fallback = `ai-page-${Date.now()}`
+  const base = (raw || fallback)
+    .replace(/\.html?$/i, '')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const finalBase = (base || fallback).slice(0, 64)
+  return `${finalBase}.html`
+}
+
+function ensureUniqueLocalPagesHtmlFileName(fileName, dir) {
+  const safeDir = (typeof dir === 'string' && dir) ? dir : ensureLocalPagesStorage().dir
+  const parsed = path.parse(fileName)
+  const ext = parsed.ext || '.html'
+  const base = parsed.name || `ai-page-${Date.now()}`
+  let candidate = `${base}${ext}`
+  let index = 2
+  while (fs.existsSync(path.join(safeDir, candidate))) {
+    candidate = `${base}-${index}${ext}`
+    index++
+    if (index > 2000) break
+  }
+  return candidate
+}
+
+function upsertLocalPagesConfigEntry(fileName, title) {
+  const config = readLocalPagesConfig()
+  if (!Array.isArray(config.pages)) config.pages = []
+  const normalizedTitle = (typeof title === 'string' ? title.trim() : '') || path.parse(fileName).name
+  const idx = config.pages.findIndex(p => p && String(p.fileName || '').toLowerCase() === String(fileName).toLowerCase())
+  if (idx >= 0) {
+    const prev = config.pages[idx] || {}
+    config.pages[idx] = {
+      ...prev,
+      fileName,
+      title: normalizedTitle,
+      enabled: prev.enabled !== false,
+      order: Number.isFinite(Number(prev.order)) ? Number(prev.order) : 9999
+    }
+  } else {
+    const maxOrder = config.pages.reduce((max, p) => {
+      const order = Number.isFinite(Number(p && p.order)) ? Number(p.order) : 0
+      return Math.max(max, order)
+    }, 0)
+    config.pages.push({
+      fileName,
+      title: normalizedTitle,
+      enabled: true,
+      order: maxOrder + 1
+    })
+  }
+  writeJsonFileSafe(localPagesConfigPath, config)
+  return config
+}
+
+function extractProviderErrorMessage(payload) {
+  if (!payload) return ''
+  if (typeof payload === 'string') return payload
+  if (payload.error && typeof payload.error === 'object') {
+    if (typeof payload.error.message === 'string') return payload.error.message
+  }
+  if (typeof payload.message === 'string') return payload.message
+  return ''
+}
+
+function extractHtmlTitle(text) {
+  if (typeof text !== 'string' || !text) return ''
+  const match = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+  if (!match || !match[1]) return ''
+  return String(match[1])
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractAiResponseText(payload) {
+  if (!payload || typeof payload !== 'object') return ''
+  const firstChoice = Array.isArray(payload.choices) ? payload.choices[0] : null
+  const content = firstChoice && firstChoice.message ? firstChoice.message.content : null
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    const text = content
+      .map(item => {
+        if (typeof item === 'string') return item
+        if (item && typeof item.text === 'string') return item.text
+        if (item && typeof item.content === 'string') return item.content
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+    if (text) return text
+  }
+  if (typeof payload.output_text === 'string') return payload.output_text
+  if (Array.isArray(payload.output_text)) return payload.output_text.join('\n')
+  if (typeof payload.text === 'string') return payload.text
+  return ''
+}
+
+function extractHtmlDocumentFromAiText(text, fallbackTitle = 'AI 生成页面') {
+  const raw = typeof text === 'string' ? text.trim() : ''
+  if (!raw) return ''
+  let candidate = raw
+  const fencedMatch = raw.match(/```(?:html)?\s*([\s\S]*?)```/i)
+  if (fencedMatch && fencedMatch[1]) {
+    candidate = fencedMatch[1].trim()
+  }
+  const docMatch = candidate.match(/<!doctype html[\s\S]*<\/html>/i) || candidate.match(/<html[\s\S]*<\/html>/i)
+  if (docMatch && docMatch[0]) {
+    candidate = docMatch[0].trim()
+  }
+  if (/<html[\s>]/i.test(candidate)) {
+    if (!/<!doctype html/i.test(candidate)) {
+      candidate = `<!DOCTYPE html>\n${candidate}`
+    }
+    return candidate
+  }
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${fallbackTitle}</title>
+  </head>
+  <body>
+${candidate}
+  </body>
+</html>`
+}
+
+async function generateLocalPageWithAi(payload) {
+  const apiBaseUrl = typeof payload?.apiBaseUrl === 'string' ? payload.apiBaseUrl.trim() : ''
+  const apiKey = typeof payload?.apiKey === 'string' ? payload.apiKey.trim() : ''
+  const model = typeof payload?.model === 'string' ? payload.model.trim() : ''
+  const prompt = typeof payload?.prompt === 'string' ? payload.prompt.trim() : ''
+  const fileNameInput = typeof payload?.fileName === 'string' ? payload.fileName : ''
+  const titleInput = typeof payload?.title === 'string' ? payload.title.trim() : ''
+
+  if (!apiBaseUrl) throw new Error('API 地址不能为空')
+  if (!/^https?:\/\//i.test(apiBaseUrl)) throw new Error('API 地址需以 http:// 或 https:// 开头')
+  if (!apiKey) throw new Error('API Key 不能为空')
+  if (!prompt) throw new Error('提示词不能为空')
+
+  const endpoint = /\/chat\/completions$/i.test(apiBaseUrl)
+    ? apiBaseUrl
+    : `${apiBaseUrl.replace(/\/+$/, '')}/chat/completions`
+
+  const systemPrompt = [
+    '你是一个直播导播前端工程师。请严格输出一个可直接运行的单文件 HTML。',
+    '硬性要求：',
+    '1. 必须是完整 HTML 文档（含 doctype、html、head、body）。',
+    '2. 所有 CSS 和 JS 必须内联，禁止依赖外部文件。',
+    '3. 默认背景透明（body 背景 transparent），用于 OBS 浏览器源叠加。',
+    '4. 页面应可读可维护，变量命名清晰，注释简洁。',
+    '5. 如果业务允许，优先支持 URL 参数控制关键文案与配色。',
+    '6. 只返回 HTML，不要 Markdown，不要解释。'
+  ].join('\n')
+
+  const enforcedPrompt = [
+    '【固定提示词（必须满足）】',
+    '- 用途：OBS 浏览器源覆盖层；默认透明背景。',
+    '- 兼容：1920x1080 画布，超出时保持布局稳定。',
+    '- 交互：禁止依赖后端接口，单页可独立运行。',
+    '- 输出：仅返回单文件 HTML。',
+    '',
+    '【用户需求】',
+    prompt
+  ].join('\n')
+
+  const body = {
+    model: model || 'gpt-4o-mini',
+    temperature: 0.4,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: enforcedPrompt }
+    ]
+  }
+
+  const response = await httpPost(endpoint, body, {
+    timeout: 180000,
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    }
+  })
+
+  if (!response || !Number.isFinite(Number(response.status))) {
+    throw new Error('AI 服务返回无效响应')
+  }
+  const statusCode = Number(response.status)
+  if (statusCode < 200 || statusCode >= 300) {
+    const detail = extractProviderErrorMessage(response.data)
+    throw new Error(`AI 请求失败（${statusCode}）${detail ? `: ${detail}` : ''}`)
+  }
+
+  const text = extractAiResponseText(response.data)
+  if (!text) throw new Error('AI 未返回可用文本内容')
+  const html = extractHtmlDocumentFromAiText(text, titleInput || 'AI 生成页面')
+  if (!html || !/<html[\s>]/i.test(html)) throw new Error('AI 返回内容不是有效 HTML')
+
+  const storage = ensureLocalPagesStorage()
+  const aiTitle = extractHtmlTitle(html)
+  const finalTitle = titleInput || aiTitle || `AI 页面 ${new Date().toLocaleString('zh-CN')}`
+  const requestedFileName = sanitizeLocalPagesHtmlFileName(fileNameInput || finalTitle)
+  const fileName = fileNameInput
+    ? requestedFileName
+    : ensureUniqueLocalPagesHtmlFileName(requestedFileName, storage.dir)
+  const filePath = path.join(storage.dir, fileName)
+  fs.writeFileSync(filePath, html, 'utf8')
+  upsertLocalPagesConfigEntry(fileName, finalTitle)
+
+  const baseUrl = getLocalPagesBaseUrl(readLocalPagesConfig().port)
+  return {
+    success: true,
+    fileName,
+    title: finalTitle,
+    filePath,
+    url: `${baseUrl}/pages/${encodeURIComponent(fileName)}`,
+    message: `AI 已生成页面：${finalTitle}`
+  }
+}
+
 function getLocalPagesBaseUrl(port) {
-  return `http://localhost:${port}`
+  return `http://127.0.0.1:${port}`
 }
 
 function getLocalPagesMimeType(filePath) {
@@ -561,11 +1180,22 @@ function getLocalPagesMimeType(filePath) {
 }
 
 function buildLocalPagesIndexHtml(pages, baseUrl, baseDir) {
+  const routeAliasMap = {
+    'frontend.html': '/frontend',
+    'scoreboard.html': '/scoreboard',
+    'character-display.html': '/character-display',
+    'lower-third.html': '/lower-third',
+    'ticker.html': '/ticker',
+    'match-card.html': '/match-card'
+  }
   const items = pages
     .filter(p => p.enabled)
     .map(p => {
       const fileName = String(p.fileName)
-      const url = `${baseUrl}/pages/${encodeURIComponent(fileName)}`
+      const routeAlias = routeAliasMap[fileName.toLowerCase()]
+      const url = routeAlias
+        ? `${baseUrl}${routeAlias}`
+        : `${baseUrl}/pages/${encodeURIComponent(fileName)}`
       const title = p.title || fileName
       if (fileName.toLowerCase() === 'scoreboard.html') {
         const urlA = `${url}?team=teamA`
@@ -632,6 +1262,14 @@ function localPagesBroadcastSseMessage(data) {
   }
 }
 
+function localPagesNotifyPageUpdated(fileName) {
+  if (!fileName) return
+  localPagesBroadcastSse('local-page-updated', {
+    fileName: String(fileName),
+    ts: Date.now()
+  })
+}
+
 function localPagesReadJsonBody(req, maxSize = 1024 * 1024) {
   return new Promise(resolve => {
     let body = ''
@@ -690,6 +1328,18 @@ function localPagesGenerateInjectedScript(pageType) {
         const data = JSON.parse(e.data);
         if (typeof handleLocalBpBlink === 'function') {
           handleLocalBpBlink(data.index);
+        }
+      } catch (err) {}
+    });
+    eventSource.addEventListener('local-page-updated', function(e) {
+      try {
+        const data = JSON.parse(e.data || '{}');
+        const fileName = String(data.fileName || '').trim();
+        if (!fileName) return;
+        var pathname = decodeURIComponent(window.location.pathname || '');
+        var current = pathname.split('/').pop() || '';
+        if (current && current.toLowerCase() === fileName.toLowerCase()) {
+          window.location.reload();
         }
       } catch (err) {}
     });
@@ -815,6 +1465,112 @@ function localPagesHandleApi(req, res, pathname) {
     return
   }
 
+  if (pathname === '/api/obs-automation/events' && req.method === 'GET') {
+    const allRules = (obsAutomationService && typeof obsAutomationService.getRules === 'function')
+      ? obsAutomationService.getRules()
+      : []
+    const sidebarEvents = (obsAutomationService && typeof obsAutomationService.getSidebarManualRules === 'function')
+      ? obsAutomationService.getSidebarManualRules({ includeDisabled: false })
+      : []
+    const musicControlEvents = (obsAutomationService && typeof obsAutomationService.getMusicControlRules === 'function')
+      ? obsAutomationService.getMusicControlRules({ includeDisabled: false })
+      : []
+
+    const mappedRules = Array.isArray(allRules)
+      ? allRules.map(rule => ({
+        id: rule?.id || '',
+        name: rule?.name || '未命名规则',
+        description: rule?.description || '',
+        enabled: rule?.enabled !== false,
+        triggerType: rule?.triggerType || '',
+        actionsCount: Array.isArray(rule?.actions) ? rule.actions.length : 0
+      }))
+      : []
+
+    res.writeHead(200)
+    res.end(JSON.stringify({
+      success: true,
+      data: {
+        rules: mappedRules,
+        sidebarEvents: Array.isArray(sidebarEvents) ? sidebarEvents : [],
+        musicControlEvents: Array.isArray(musicControlEvents) ? musicControlEvents : []
+      }
+    }))
+    return
+  }
+
+  if (pathname === '/api/obs-automation/trigger' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then(async payload => {
+      try {
+        if (!obsAutomationService || typeof obsAutomationService.triggerSidebarRule !== 'function') {
+          res.writeHead(200)
+          res.end(JSON.stringify({ success: false, error: 'OBS 自动化服务未就绪' }))
+          return
+        }
+
+        const ruleId = typeof payload?.ruleId === 'string' ? payload.ruleId : ''
+        const eventData = (payload?.data && typeof payload.data === 'object') ? payload.data : {}
+        const result = await obsAutomationService.triggerSidebarRule(ruleId, eventData)
+        res.writeHead(200)
+        res.end(JSON.stringify(result))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/obs-automation/music-config' && req.method === 'GET') {
+    if (!obsAutomationService || typeof obsAutomationService.getMusicControlConfig !== 'function') {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: 'OBS 自动化服务未就绪' }))
+      return
+    }
+    const data = obsAutomationService.getMusicControlConfig()
+    res.writeHead(200)
+    res.end(JSON.stringify({ success: true, data }))
+    return
+  }
+
+  if (pathname === '/api/obs-automation/music-config' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then((payload) => {
+      try {
+        if (!obsAutomationService || typeof obsAutomationService.saveMusicControlConfig !== 'function') {
+          res.writeHead(200)
+          res.end(JSON.stringify({ success: false, error: 'OBS 自动化服务未就绪' }))
+          return
+        }
+        const data = obsAutomationService.saveMusicControlConfig(payload || {})
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true, data }))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/obs-automation/switch-song' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then(async (payload) => {
+      try {
+        if (!obsAutomationService || typeof obsAutomationService.switchSong !== 'function') {
+          res.writeHead(200)
+          res.end(JSON.stringify({ success: false, error: 'OBS 自动化服务未就绪' }))
+          return
+        }
+        const result = await obsAutomationService.switchSong(payload || {})
+        res.writeHead(200)
+        res.end(JSON.stringify(result))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      }
+    })
+    return
+  }
+
   if (pathname === '/api/frontend-layout') {
     try {
       const root = __readLayoutJsonSafe__()
@@ -886,7 +1642,15 @@ function localPagesHandleApi(req, res, pathname) {
         : []
       const pinyinMap = buildPinyinMap([...survivors, ...hunters])
       res.writeHead(200)
-      res.end(JSON.stringify({ success: true, data: { survivors, hunters, pinyinMap } }))
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          survivors,
+          hunters,
+          pinyinMap,
+          assetOverrides: idx.assetOverrides || {}
+        }
+      }))
       return
     } catch (e) {
       res.writeHead(200)
@@ -1202,6 +1966,21 @@ function handleLocalPagesRequest(req, res) {
     localPagesHandleHtmlPage(req, res, filePath, 'character-display')
     return
   }
+  if (pathname === '/lower-third' || pathname === '/lower-third.html') {
+    const filePath = path.join(dir, 'lower-third.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'lower-third')
+    return
+  }
+  if (pathname === '/ticker' || pathname === '/ticker.html') {
+    const filePath = path.join(dir, 'ticker.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'ticker')
+    return
+  }
+  if (pathname === '/match-card' || pathname === '/match-card.html') {
+    const filePath = path.join(dir, 'match-card.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'match-card')
+    return
+  }
   if (urlObj.pathname === '/api/pages') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
     res.end(JSON.stringify({ success: true, pages, baseUrl }))
@@ -1258,10 +2037,23 @@ function handleLocalPagesRequest(req, res) {
     }
   }
   if (pathname.startsWith('/assets/')) {
-    const assetPath = pathname.replace('/assets/', '')
-    const filePath = path.join(app.getAppPath(), 'assets', assetPath)
-    if (fs.existsSync(filePath)) {
-      localPagesHandleStaticFile(res, filePath)
+    const assetPathRaw = pathname.replace('/assets/', '')
+    let assetPath = assetPathRaw
+    try {
+      assetPath = decodeURIComponent(assetPathRaw)
+    } catch {
+      assetPath = assetPathRaw
+    }
+
+    const customPath = resolvePathWithin(customCharacterAssetsPath, assetPath)
+    if (customPath && fs.existsSync(customPath)) {
+      localPagesHandleStaticFile(res, customPath)
+      return
+    }
+
+    const bundledAssetsPath = resolvePathWithin(path.join(app.getAppPath(), 'assets'), assetPath)
+    if (bundledAssetsPath && fs.existsSync(bundledAssetsPath)) {
+      localPagesHandleStaticFile(res, bundledAssetsPath)
       return
     }
   }
@@ -1433,6 +2225,7 @@ function ensureDirectories() {
   if (!fs.existsSync(bgImagePath)) {
     fs.mkdirSync(bgImagePath, { recursive: true })
   }
+  ensureCharacterDirectories()
   ensureLocalPagesStorage()
 }
 
@@ -1444,6 +2237,43 @@ ipcMain.handle('local-pages:get-pages', () => {
 
 ipcMain.handle('local-pages:get-status', () => {
   return { success: true, status: getLocalPagesStatus() }
+})
+
+ipcMain.handle('local-pages:read-file', (event, fileName) => {
+  const filePath = resolveLocalPagesHtmlPath(fileName)
+  if (!filePath) return { success: false, message: '文件不存在' }
+  try {
+    const content = fs.readFileSync(filePath, 'utf8')
+    return { success: true, content }
+  } catch (e) {
+    return { success: false, message: '读取失败' }
+  }
+})
+
+ipcMain.handle('local-pages:write-file', (event, fileName, content) => {
+  const filePath = resolveLocalPagesHtmlPath(fileName)
+  if (!filePath) return { success: false, message: '文件不存在' }
+  if (typeof content !== 'string') return { success: false, message: '内容无效' }
+  try {
+    fs.writeFileSync(filePath, content, 'utf8')
+    localPagesNotifyPageUpdated(path.basename(fileName))
+    return { success: true }
+  } catch (e) {
+    return { success: false, message: '写入失败' }
+  }
+})
+
+ipcMain.handle('local-pages:generate-with-ai', async (event, payload) => {
+  try {
+    const result = await generateLocalPageWithAi(payload || {})
+    localPagesNotifyPageUpdated(result.fileName)
+    return result
+  } catch (e) {
+    return {
+      success: false,
+      message: e && e.message ? e.message : 'AI 生成失败'
+    }
+  }
 })
 
 ipcMain.handle('local-bp:auto-open:get', () => {
@@ -1481,6 +2311,47 @@ ipcMain.handle('frontend-resize-lock:set', (event, locked) => {
   return { success: true, locked: next }
 })
 
+ipcMain.handle('bp-startup-window-animation:get', () => {
+  const config = readJsonFileSafe(configPath, {})
+  const enabled = normalizeBpStartupWindowAnimationSetting(config.bpStartupWindowAnimation)
+  return { success: true, enabled }
+})
+
+ipcMain.handle('bp-startup-window-animation:set', (event, enabled) => {
+  const config = readJsonFileSafe(configPath, {})
+  const next = normalizeBpStartupWindowAnimationSetting(enabled)
+  config.bpStartupWindowAnimation = next
+  writeJsonFileSafe(configPath, config)
+  return { success: true, enabled: next }
+})
+
+ipcMain.handle('director-sync:get-settings', () => {
+  const settings = getDirectorSyncSettingsFromConfig()
+  return { success: true, settings, status: directorSyncService.getStatus() }
+})
+
+ipcMain.handle('director-sync:set-settings', (event, patch) => {
+  const current = getDirectorSyncSettingsFromConfig()
+  const next = normalizeDirectorSyncSettings({ ...(current || {}), ...(patch || {}) })
+  saveDirectorSyncSettingsToConfig(next)
+  directorSyncService.setSettings(next)
+  return { success: true, settings: next, status: directorSyncService.getStatus() }
+})
+
+ipcMain.handle('director-sync:get-status', () => {
+  return { success: true, status: directorSyncService.getStatus() }
+})
+
+ipcMain.handle('director-sync:reconnect', () => {
+  const status = directorSyncService.reconnectOutbound()
+  return { success: true, status }
+})
+
+ipcMain.handle('director-sync:disconnect', () => {
+  const status = directorSyncService.disconnectOutbound()
+  return { success: true, status }
+})
+
 // 获取当前环境信息
 ipcMain.handle('get-environment', () => {
   return {
@@ -1500,8 +2371,84 @@ ipcMain.handle('switch-environment', (event, env) => {
   }
 })
 
+function createStartupLoadingWindow() {
+  if (startupLoadingWindow && !startupLoadingWindow.isDestroyed()) return startupLoadingWindow
+
+  startupLoadingWindow = new BrowserWindow({
+    width: 420,
+    height: 280,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    center: true,
+    show: false,
+    backgroundColor: '#141414',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  startupLoadingWindow.loadFile('pages/loading.html')
+  startupLoadingWindow.once('ready-to-show', () => {
+    try {
+      startupLoadingWindow.show()
+    } catch {
+      // ignore
+    }
+  })
+  startupLoadingWindow.on('closed', () => {
+    startupLoadingWindow = null
+  })
+  return startupLoadingWindow
+}
+
+function closeStartupLoadingWindow() {
+  if (!startupLoadingWindow || startupLoadingWindow.isDestroyed()) return
+  try {
+    startupLoadingWindow.close()
+  } catch {
+    // ignore
+  }
+  startupLoadingWindow = null
+}
+
+function finalizeMainBootstrap(reason = 'renderer-ready') {
+  if (mainBootstrapReady) return
+  mainBootstrapReady = true
+
+  if (startupBootstrapFallbackTimer) {
+    clearTimeout(startupBootstrapFallbackTimer)
+    startupBootstrapFallbackTimer = null
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      if (!mainWindow.isVisible()) mainWindow.show()
+      mainWindow.focus()
+    } catch (e) {
+      console.warn('[Main] Failed to show main window:', e?.message || e)
+    }
+  }
+  closeStartupLoadingWindow()
+  console.log(`[Main] Main bootstrap finalized: ${reason}`)
+}
+
+ipcMain.handle('main-ui-bootstrap-ready', async () => {
+  finalizeMainBootstrap('renderer-signal')
+  return { success: true }
+})
+
 // 创建主窗口（链接展示）
 function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    focusPrimaryWindow()
+    return mainWindow
+  }
+
   // 确保首次运行标志被设置，防止欢迎页面重复弹出
   try {
     const config = readJsonFileSafe(configPath, {})
@@ -1513,11 +2460,20 @@ function createMainWindow() {
     console.error('[Main] Failed to ensure hasRunBefore flag:', e)
   }
 
+  mainBootstrapReady = false
+  if (startupBootstrapFallbackTimer) {
+    clearTimeout(startupBootstrapFallbackTimer)
+    startupBootstrapFallbackTimer = null
+  }
+  createStartupLoadingWindow()
+
   mainWindow = new BrowserWindow({
     width: 800,
     height: 700,
     title: '导播端',
     resizable: true,
+    show: false,
+    backgroundColor: '#1e1e1e',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -1528,6 +2484,18 @@ function createMainWindow() {
   mainWindow.loadFile('pages/main.html')
   mainWindow.setMenu(null)
 
+  mainWindow.webContents.once('did-finish-load', () => {
+    if (mainBootstrapReady) return
+    startupBootstrapFallbackTimer = setTimeout(() => {
+      console.warn('[Main] Bootstrap ready signal timeout, force showing main window.')
+      finalizeMainBootstrap('timeout')
+    }, 15000)
+  })
+
+  mainWindow.webContents.once('did-fail-load', () => {
+    finalizeMainBootstrap('did-fail-load')
+  })
+
   try {
     setPluginWindow('main', mainWindow)
   } catch (e) {
@@ -1535,12 +2503,20 @@ function createMainWindow() {
   }
 
   mainWindow.on('closed', () => {
+    if (startupBootstrapFallbackTimer) {
+      clearTimeout(startupBootstrapFallbackTimer)
+      startupBootstrapFallbackTimer = null
+    }
+    closeStartupLoadingWindow()
+    mainBootstrapReady = false
     mainWindow = null
     // 关闭主窗口时关闭所有窗口
     if (frontendWindow) frontendWindow.close()
+    closeAllCustomFrontendWindows()
     if (backendWindow) backendWindow.close()
     app.quit()
   })
+  return mainWindow
 }
 
 // 创建插件管理窗口
@@ -1618,48 +2594,147 @@ ipcMain.handle('open-plugin-store', async () => {
 })
 
 // 创建前台窗口（可自定义布局的观战页面）
-function createFrontendWindow(roomData) {
-  // 读取保存的窗口大小配置
-  let windowBounds = { width: 1280, height: 720 }
-  let contentSize = null
+function normalizeFrontendWindowProfile(raw, index = 0) {
+  const item = (raw && typeof raw === 'object') ? raw : {}
+  const idRaw = typeof item.id === 'string' ? item.id.trim() : ''
+  const id = (idRaw || `frontend-window-${index + 1}`)
+    .replace(/[^\w-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+  if (!id || id === FRONTEND_MAIN_WINDOW_ID) return null
+
+  const name = (typeof item.name === 'string' && item.name.trim()) ? item.name.trim() : `前台窗口 ${index + 1}`
+  const width = Number.isFinite(Number(item.width)) ? Math.max(320, Math.round(Number(item.width))) : 1280
+  const height = Number.isFinite(Number(item.height)) ? Math.max(180, Math.round(Number(item.height))) : 720
+  const x = Number.isFinite(Number(item.x)) ? Math.round(Number(item.x)) : undefined
+  const y = Number.isFinite(Number(item.y)) ? Math.round(Number(item.y)) : undefined
+  return {
+    id,
+    name,
+    width,
+    height,
+    x,
+    y,
+    autoOpen: item.autoOpen !== false,
+    enabled: item.enabled !== false,
+    alwaysOnTop: item.alwaysOnTop === true,
+    resizable: item.resizable !== false
+  }
+}
+
+function readFrontendWindowProfilesFromLayout() {
+  const layout = readJsonFileSafe(layoutPath, {})
+  const source = Array.isArray(layout.frontendWindows) ? layout.frontendWindows : []
+  const profiles = []
+  const used = new Set()
+  source.forEach((item, idx) => {
+    const normalized = normalizeFrontendWindowProfile(item, idx)
+    if (!normalized) return
+    if (used.has(normalized.id)) return
+    used.add(normalized.id)
+    profiles.push(normalized)
+  })
+  return profiles
+}
+
+function persistFrontendWindowBounds(windowId, win) {
+  if (!win || win.isDestroyed()) return
   try {
-    if (fs.existsSync(layoutPath)) {
-      const layout = JSON.parse(fs.readFileSync(layoutPath, 'utf8'))
-      if (layout.windowBounds && layout.windowBounds.frontendBounds) {
-        windowBounds = layout.windowBounds.frontendBounds
+    const bounds = win.getBounds()
+    const [cw, ch] = win.getContentSize()
+    const layout = readJsonFileSafe(layoutPath, {})
+    if (!layout.windowBounds || typeof layout.windowBounds !== 'object') layout.windowBounds = {}
+
+    if (windowId === FRONTEND_MAIN_WINDOW_ID) {
+      layout.windowBounds.frontendBounds = bounds
+      layout.windowBounds.frontendContentSize = { width: cw, height: ch }
+    } else {
+      if (!layout.windowBounds.frontendCustomBounds || typeof layout.windowBounds.frontendCustomBounds !== 'object') {
+        layout.windowBounds.frontendCustomBounds = {}
       }
-      if (layout.windowBounds && layout.windowBounds.frontendContentSize) {
-        contentSize = normalizeResolution(layout.windowBounds.frontendContentSize)
+      if (!layout.windowBounds.frontendCustomContentSize || typeof layout.windowBounds.frontendCustomContentSize !== 'object') {
+        layout.windowBounds.frontendCustomContentSize = {}
+      }
+      layout.windowBounds.frontendCustomBounds[windowId] = bounds
+      layout.windowBounds.frontendCustomContentSize[windowId] = { width: cw, height: ch }
+
+      if (Array.isArray(layout.frontendWindows)) {
+        const idx = layout.frontendWindows.findIndex(item => item && item.id === windowId)
+        if (idx >= 0) {
+          layout.frontendWindows[idx] = {
+            ...(layout.frontendWindows[idx] || {}),
+            width: cw,
+            height: ch,
+            x: bounds.x,
+            y: bounds.y
+          }
+        }
       }
     }
+
+    writeJsonFileSafe(layoutPath, layout)
   } catch (e) {
-    console.error('[Frontend] Failed to load window bounds:', e)
+    console.error('[Frontend] 自动保存窗口尺寸失败:', e)
+  }
+}
+
+function createManagedFrontendWindow(roomData, options = {}) {
+  const windowId = (typeof options.windowId === 'string' && options.windowId.trim())
+    ? options.windowId.trim()
+    : FRONTEND_MAIN_WINDOW_ID
+  const isPrimary = windowId === FRONTEND_MAIN_WINDOW_ID
+  const existing = isPrimary ? frontendWindow : customFrontendWindows.get(windowId)
+  if (existing && !existing.isDestroyed()) {
+    try {
+      existing.show()
+      existing.focus()
+      if (roomData) existing.webContents.send('room-data', roomData)
+    } catch {
+      // ignore
+    }
+    return existing
   }
 
-  // 🔧 Windows 不可见边框修复方案：
-  // 问题：Windows 在无边框窗口周围添加不可见调整边框，导致 getBounds() 比实际可见区域大
-  // 解决：使用 ContentSize（可见内容区域）而不是 Bounds（包含边框）
-
-  const savedContentSize = contentSize || { width: 1280, height: 720 }
-  const finalWidth = Number(savedContentSize.width) || 1280
-  const finalHeight = Number(savedContentSize.height) || 720
-  const finalX = windowBounds.x
-  const finalY = windowBounds.y
+  const profile = normalizeFrontendWindowProfile(options.profile || {}, 0) || options.profile || {}
+  const layout = readJsonFileSafe(layoutPath, {})
+  const windowBounds = (layout.windowBounds && typeof layout.windowBounds === 'object') ? layout.windowBounds : {}
   const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
 
-  console.log('[Frontend] 恢复内容尺寸:', { width: finalWidth, height: finalHeight }, '位置:', { x: finalX, y: finalY })
+  const savedBounds = isPrimary
+    ? (windowBounds.frontendBounds || null)
+    : (windowBounds.frontendCustomBounds && windowBounds.frontendCustomBounds[windowId] ? windowBounds.frontendCustomBounds[windowId] : null)
+  const savedContentSize = isPrimary
+    ? normalizeResolution(windowBounds.frontendContentSize)
+    : normalizeResolution(windowBounds.frontendCustomContentSize && windowBounds.frontendCustomContentSize[windowId])
 
-  frontendWindow = new BrowserWindow({
+  const defaultWidth = Number.isFinite(Number(profile.width)) ? Math.max(320, Math.round(Number(profile.width))) : 1280
+  const defaultHeight = Number.isFinite(Number(profile.height)) ? Math.max(180, Math.round(Number(profile.height))) : 720
+  const content = savedContentSize || { width: defaultWidth, height: defaultHeight }
+  const finalWidth = Number(content.width) || defaultWidth
+  const finalHeight = Number(content.height) || defaultHeight
+  const finalX = (savedBounds && Number.isFinite(savedBounds.x))
+    ? savedBounds.x
+    : (Number.isFinite(Number(profile.x)) ? Math.round(Number(profile.x)) : undefined)
+  const finalY = (savedBounds && Number.isFinite(savedBounds.y))
+    ? savedBounds.y
+    : (Number.isFinite(Number(profile.y)) ? Math.round(Number(profile.y)) : undefined)
+
+  const title = isPrimary
+    ? '导播 - 前台'
+    : `导播 - 前台（${profile.name || windowId}）`
+
+  const win = new BrowserWindow({
     ...(typeof finalX === 'number' ? { x: finalX } : {}),
     ...(typeof finalY === 'number' ? { y: finalY } : {}),
     width: finalWidth,
     height: finalHeight,
-    useContentSize: true, // ✅ 使用内容尺寸（不含边框）
-    title: '导播 - 前台',
+    useContentSize: true,
+    title,
     frame: false,
     transparent: true,
     titleBarStyle: 'hidden',
-    resizable: !resizeLocked,
+    resizable: isPrimary ? !resizeLocked : profile.resizable !== false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -1670,64 +2745,102 @@ function createFrontendWindow(roomData) {
     }
   })
 
-  // 双保险：创建后再次精确设置内容尺寸
-  frontendWindow.setContentSize(finalWidth, finalHeight)
+  win.setContentSize(finalWidth, finalHeight)
+  if (!isPrimary && profile.alwaysOnTop) {
+    try { win.setAlwaysOnTop(true) } catch {}
+  }
 
-  // 开发环境下或调试需要时自动打开开发者工具
-  // frontendWindow.webContents.openDevTools({ mode: 'detach' })
+  const params = new URLSearchParams({
+    windowId,
+    windowName: (profile.name || '').toString()
+  })
+  const frontendPagePath = isPrimary ? 'pages/frontend.html' : 'pages/custom-frontend.html'
+  win.loadFile(frontendPagePath, { search: params.toString() })
+  try {
+    win.webContents.session.clearCache()
+  } catch {
+    // ignore
+  }
 
-  frontendWindow.loadFile('pages/frontend.html')
-
-  // 禁用缓存，确保每次都加载最新内容
-  frontendWindow.webContents.session.clearCache()
-
-  // 窗口加载完成后发送房间数据
-  frontendWindow.webContents.on('did-finish-load', () => {
-    frontendWindow.webContents.send('room-data', roomData)
+  win.webContents.on('did-finish-load', () => {
+    try {
+      win.webContents.send('room-data', roomData || {
+        localMode: true,
+        roomId: 'local-bp',
+        teamAName: 'A队',
+        teamBName: 'B队'
+      })
+    } catch {
+      // ignore
+    }
   })
 
-  // 🔧 监听窗口大小变化，自动保存（防抖 500ms）
   let resizeTimer = null
-  frontendWindow.on('resize', () => {
+  const schedulePersist = () => {
     if (resizeTimer) clearTimeout(resizeTimer)
     resizeTimer = setTimeout(() => {
-      if (!frontendWindow || frontendWindow.isDestroyed()) return
-      const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
-      if (resizeLocked) return
-
-      try {
-        const bounds = frontendWindow.getBounds()
-        const [cw, ch] = frontendWindow.getContentSize()
-
-        // 读取现有布局
-        let layout = {}
-        try {
-          if (fs.existsSync(layoutPath)) {
-            const content = fs.readFileSync(layoutPath, 'utf8')
-            layout = content ? JSON.parse(content) : {}
-          }
-        } catch (e) {
-          console.warn('[Frontend] 读取布局失败:', e.message)
-        }
-
-        // 更新窗口尺寸
-        if (!layout.windowBounds) layout.windowBounds = {}
-        layout.windowBounds.frontendBounds = bounds
-        layout.windowBounds.frontendContentSize = { width: cw, height: ch }
-
-        // 保存
-        fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
-        console.log('[Frontend] 窗口尺寸已自动保存:', { bounds, contentSize: { width: cw, height: ch } })
-      } catch (e) {
-        console.error('[Frontend] 自动保存窗口尺寸失败:', e)
+      if (!win || win.isDestroyed()) return
+      if (isPrimary) {
+        const resizeLockedNow = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
+        if (resizeLockedNow) return
       }
-    }, 500) // 防抖 500ms
+      persistFrontendWindowBounds(windowId, win)
+    }, 500)
+  }
+  win.on('resize', schedulePersist)
+  win.on('move', schedulePersist)
+
+  win.on('closed', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    if (isPrimary) {
+      frontendWindow = null
+    } else {
+      customFrontendWindows.delete(windowId)
+    }
   })
 
-  frontendWindow.on('closed', () => {
-    if (resizeTimer) clearTimeout(resizeTimer)
-    frontendWindow = null
+  if (isPrimary) frontendWindow = win
+  else customFrontendWindows.set(windowId, win)
+  return win
+}
+
+function createFrontendWindow(roomData) {
+  const win = createManagedFrontendWindow(roomData, { windowId: FRONTEND_MAIN_WINDOW_ID, profile: { id: FRONTEND_MAIN_WINDOW_ID, name: '主前台' } })
+  ensureCustomFrontendWindows(roomData, { onlyAutoOpen: true })
+  return win
+}
+
+function ensureCustomFrontendWindows(roomData, options = {}) {
+  const onlyAutoOpen = options && options.onlyAutoOpen !== false
+  const profiles = readFrontendWindowProfilesFromLayout().filter(item => item.enabled !== false)
+  const toOpen = onlyAutoOpen ? profiles.filter(item => item.autoOpen !== false) : profiles
+  const keepIds = new Set(toOpen.map(item => item.id))
+
+  for (const [id, win] of customFrontendWindows.entries()) {
+    if (win && !win.isDestroyed() && !keepIds.has(id)) {
+      try { win.close() } catch {}
+      customFrontendWindows.delete(id)
+    }
+  }
+
+  toOpen.forEach(profile => {
+    createManagedFrontendWindow(roomData, { windowId: profile.id, profile })
   })
+}
+
+function closeAllCustomFrontendWindows() {
+  for (const [id, win] of customFrontendWindows.entries()) {
+    if (!win || win.isDestroyed()) {
+      customFrontendWindows.delete(id)
+      continue
+    }
+    try {
+      win.close()
+    } catch {
+      // ignore
+    }
+    customFrontendWindows.delete(id)
+  }
 }
 
 // 创建后台窗口（管理页面）
@@ -1797,6 +2910,7 @@ function createMapDisplayWindow(action, mapName, team) {
 // 创建比分展示窗口
 function createScoreboardWindow(roomId, team) {
   const targetWindow = team === 'teamA' ? 'scoreboardWindowA' : 'scoreboardWindowB'
+  const boundsKey = team === 'teamA' ? 'scoreboardABounds' : 'scoreboardBBounds'
 
   // 如果已有窗口，聚焦
   if ((team === 'teamA' && scoreboardWindowA && !scoreboardWindowA.isDestroyed()) ||
@@ -1811,7 +2925,6 @@ function createScoreboardWindow(roomId, team) {
   try {
     if (fs.existsSync(layoutPath)) {
       const layout = JSON.parse(fs.readFileSync(layoutPath, 'utf8'))
-      const boundsKey = team === 'teamA' ? 'scoreboardABounds' : 'scoreboardBBounds'
       if (layout.windowBounds && layout.windowBounds[boundsKey]) {
         windowBounds = layout.windowBounds[boundsKey]
       }
@@ -1821,13 +2934,18 @@ function createScoreboardWindow(roomId, team) {
   }
 
   const windowTitle = `导播 - ${team === 'teamA' ? 'A队' : 'B队'}比分板`
+  const useTransparentWindow = SUPPORTS_NATIVE_RESIZE_WITH_TRANSPARENT
   const newWindow = new BrowserWindow({
     ...windowBounds,
     title: windowTitle,
     frame: true,
-    transparent: true,
-    backgroundColor: '#00000000',
+    thickFrame: true,
+    // Windows 透明窗口不支持原生拖边缩放，这里优先保证可调整窗口大小
+    transparent: useTransparentWindow,
+    backgroundColor: useTransparentWindow ? '#00000000' : '#000000',
     resizable: true,
+    minimizable: true,
+    maximizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -1837,19 +2955,9 @@ function createScoreboardWindow(roomId, team) {
   })
 
   newWindow.setTitle(windowTitle)
-  newWindow.on('page-title-updated', (event) => {
-    event.preventDefault()
-    newWindow.setTitle(windowTitle)
-  })
-
-  // 传递 roomId 和 team 参数
-  const params = new URLSearchParams({ roomId: roomId || '', team: team })
-  newWindow.loadFile('pages/scoreboard.html', { search: params.toString() })
-
-  let resizeTimer = null
-  newWindow.on('resize', () => {
-    if (resizeTimer) clearTimeout(resizeTimer)
-    resizeTimer = setTimeout(() => {
+  let boundsSaveTimer = null
+  const persistBounds = (immediate = false) => {
+    const writeNow = () => {
       if (!newWindow || newWindow.isDestroyed()) return
       try {
         const bounds = newWindow.getBounds()
@@ -1863,15 +2971,58 @@ function createScoreboardWindow(roomId, team) {
           layout = {}
         }
         if (!layout.windowBounds) layout.windowBounds = {}
-        const boundsKey = team === 'teamA' ? 'scoreboardABounds' : 'scoreboardBBounds'
         layout.windowBounds[boundsKey] = bounds
         fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
-      } catch {}
-    }, 500)
+      } catch (e) {
+        console.warn('[Scoreboard] 保存窗口大小失败:', e?.message || e)
+      }
+    }
+
+    if (immediate) {
+      if (boundsSaveTimer) {
+        clearTimeout(boundsSaveTimer)
+        boundsSaveTimer = null
+      }
+      writeNow()
+      return
+    }
+
+    if (boundsSaveTimer) clearTimeout(boundsSaveTimer)
+    boundsSaveTimer = setTimeout(() => {
+      boundsSaveTimer = null
+      writeNow()
+    }, 350)
+  }
+
+  newWindow.once('ready-to-show', () => {
+    try {
+      newWindow.setResizable(true)
+      newWindow.setMinimizable(true)
+      newWindow.setMaximizable(true)
+    } catch (e) {
+      console.warn('[Scoreboard] 强制启用窗口缩放失败:', e?.message || e)
+    }
+    // 确保窗口首次打开时也有一份可导出的窗口尺寸记录
+    persistBounds(false)
+  })
+  newWindow.on('page-title-updated', (event) => {
+    event.preventDefault()
+    newWindow.setTitle(windowTitle)
+  })
+
+  // 传递 roomId 和 team 参数
+  const params = new URLSearchParams({ roomId: roomId || '', team: team })
+  newWindow.loadFile('pages/scoreboard.html', { search: params.toString() })
+
+  newWindow.on('resize', () => persistBounds(false))
+  newWindow.on('move', () => persistBounds(false))
+  newWindow.on('close', () => {
+    // 关闭前立即落盘，避免 debounce 未触发导致尺寸丢失
+    persistBounds(true)
   })
 
   newWindow.on('closed', () => {
-    if (resizeTimer) clearTimeout(resizeTimer)
+    if (boundsSaveTimer) clearTimeout(boundsSaveTimer)
     if (team === 'teamA') scoreboardWindowA = null
     else scoreboardWindowB = null
   })
@@ -1901,13 +3052,19 @@ function createScoreboardOverviewWindow(roomId, boCount) {
     console.error('[ScoreboardOverview] Failed to load window bounds:', e)
   }
 
+  const useTransparentWindow = SUPPORTS_NATIVE_RESIZE_WITH_TRANSPARENT
   scoreboardOverviewWindow = new BrowserWindow({
     ...windowBounds,
     title: '导播 - 总览比分板',
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    thickFrame: true,
+    // Windows 透明窗口不支持原生拖边缩放，这里优先保证可调整窗口大小
+    transparent: useTransparentWindow,
+    backgroundColor: useTransparentWindow ? '#00000000' : '#000000',
     titleBarStyle: 'hidden',
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -1921,8 +3078,41 @@ function createScoreboardOverviewWindow(roomId, boCount) {
     bo: boCount || 5
   })
   scoreboardOverviewWindow.loadFile('pages/scoreboard-overview.html', { search: params.toString() })
+  scoreboardOverviewWindow.once('ready-to-show', () => {
+    try {
+      scoreboardOverviewWindow.setResizable(true)
+      scoreboardOverviewWindow.setMinimizable(true)
+      scoreboardOverviewWindow.setMaximizable(true)
+    } catch (e) {
+      console.warn('[ScoreboardOverview] 强制启用窗口缩放失败:', e?.message || e)
+    }
+  })
+
+  let resizeTimer = null
+  scoreboardOverviewWindow.on('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      if (!scoreboardOverviewWindow || scoreboardOverviewWindow.isDestroyed()) return
+      try {
+        const bounds = scoreboardOverviewWindow.getBounds()
+        let layout = {}
+        try {
+          if (fs.existsSync(layoutPath)) {
+            const content = fs.readFileSync(layoutPath, 'utf8')
+            layout = content ? JSON.parse(content) : {}
+          }
+        } catch {
+          layout = {}
+        }
+        if (!layout.windowBounds) layout.windowBounds = {}
+        layout.windowBounds.scoreboardOverviewBounds = bounds
+        fs.writeFileSync(layoutPath, JSON.stringify(layout, null, 2))
+      } catch {}
+    }, 500)
+  })
 
   scoreboardOverviewWindow.on('closed', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
     scoreboardOverviewWindow = null
   })
 
@@ -2010,6 +3200,7 @@ ipcMain.handle('close-bp-windows', async (event) => {
       frontendWindow.close()
       frontendWindow = null
     }
+    closeAllCustomFrontendWindows()
     if (backendWindow && !backendWindow.isDestroyed()) {
       backendWindow.close()
       backendWindow = null
@@ -2075,6 +3266,21 @@ ipcMain.handle('save-layout', async (event, layout) => {
     if (postMatchWindow && !postMatchWindow.isDestroyed()) {
       windowBounds.postMatchBounds = postMatchWindow.getBounds()
       console.log('[Main] 保存赛后数据窗口大小:', windowBounds.postMatchBounds)
+    }
+    const customWindows = getCustomFrontendWindowList()
+    if (customWindows.length > 0) {
+      if (!windowBounds.frontendCustomBounds || typeof windowBounds.frontendCustomBounds !== 'object') {
+        windowBounds.frontendCustomBounds = {}
+      }
+      if (!windowBounds.frontendCustomContentSize || typeof windowBounds.frontendCustomContentSize !== 'object') {
+        windowBounds.frontendCustomContentSize = {}
+      }
+      for (const [windowId, win] of customFrontendWindows.entries()) {
+        if (!win || win.isDestroyed()) continue
+        windowBounds.frontendCustomBounds[windowId] = win.getBounds()
+        const [cw, ch] = win.getContentSize()
+        windowBounds.frontendCustomContentSize[windowId] = { width: cw, height: ch }
+      }
     }
 
     // 合并布局和窗口大小配置（保留旧字段）
@@ -2253,6 +3459,203 @@ ipcMain.handle('load-layout', async () => {
   }
 })
 
+const LOCAL_BP_CONSOLE_BG_SUPPORTED_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'])
+const LOCAL_BP_CONSOLE_BG_COMPRESSIBLE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp'])
+const LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_SIZE_THRESHOLD = 6 * 1024 * 1024
+const LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_MAX_DIMENSION = 3840
+const LOCAL_BP_CONSOLE_BG_DEFAULT_CARD_OPACITY = 1
+
+function cleanupLocalBpConsoleBackgroundFiles(keepPath) {
+  try {
+    if (!fs.existsSync(bgImagePath)) return
+    const keepResolved = keepPath ? path.resolve(keepPath).toLowerCase() : ''
+    const files = fs.readdirSync(bgImagePath)
+    for (const file of files) {
+      if (!/^local-bp-console-background\./i.test(file)) continue
+      const fullPath = path.join(bgImagePath, file)
+      if (keepResolved && path.resolve(fullPath).toLowerCase() === keepResolved) continue
+      try {
+        fs.unlinkSync(fullPath)
+      } catch (e) {
+        console.warn('[Main] 清理旧本地BP背景图片失败:', fullPath, e.message)
+      }
+    }
+  } catch (e) {
+    console.warn('[Main] 扫描本地BP背景目录失败:', e.message)
+  }
+}
+
+async function saveLocalBpConsoleBackgroundImage(srcPath, options = {}) {
+  const ext = path.extname(srcPath).toLowerCase()
+  if (!LOCAL_BP_CONSOLE_BG_SUPPORTED_EXTS.has(ext)) {
+    throw new Error('仅支持 PNG/JPG/JPEG/GIF/WEBP/BMP')
+  }
+
+  ensureDirectories()
+
+  const autoCompressLargeImage = options.autoCompressLargeImage !== false
+  const originalSize = fs.statSync(srcPath).size
+  const canCompress = autoCompressLargeImage
+    && typeof sharp === 'function'
+    && LOCAL_BP_CONSOLE_BG_COMPRESSIBLE_EXTS.has(ext)
+
+  if (canCompress) {
+    try {
+      const metadata = await sharp(srcPath, { failOn: 'none' }).metadata()
+      const width = Number(metadata?.width) || 0
+      const height = Number(metadata?.height) || 0
+      const needsCompress = originalSize > LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_SIZE_THRESHOLD
+        || width > LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_MAX_DIMENSION
+        || height > LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_MAX_DIMENSION
+
+      if (needsCompress) {
+        const destExt = ext === '.bmp' ? '.jpg' : ext
+        const destPath = path.join(bgImagePath, `local-bp-console-background${destExt}`)
+
+        let pipeline = sharp(srcPath, { failOn: 'none' })
+          .rotate()
+          .resize({
+            width: LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_MAX_DIMENSION,
+            height: LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_MAX_DIMENSION,
+            fit: 'inside',
+            withoutEnlargement: true,
+            fastShrinkOnLoad: true
+          })
+
+        if (destExt === '.png') {
+          pipeline = pipeline.png({ compressionLevel: 9, palette: true, quality: 80 })
+        } else if (destExt === '.webp') {
+          pipeline = pipeline.webp({ quality: 82, effort: 4 })
+        } else {
+          pipeline = pipeline.jpeg({ quality: 82, mozjpeg: true })
+        }
+
+        await pipeline.toFile(destPath)
+        cleanupLocalBpConsoleBackgroundFiles(destPath)
+        const finalSize = fs.statSync(destPath).size
+        return { path: destPath, compressed: true, originalSize, finalSize }
+      }
+    } catch (e) {
+      console.warn('[Main] 自动压缩本地BP背景失败，改为复制原图:', e.message)
+    }
+  }
+
+  const destPath = path.join(bgImagePath, `local-bp-console-background${ext}`)
+  const samePath = path.resolve(srcPath).toLowerCase() === path.resolve(destPath).toLowerCase()
+  if (!samePath) {
+    fs.copyFileSync(srcPath, destPath)
+  }
+  cleanupLocalBpConsoleBackgroundFiles(destPath)
+  const finalSize = fs.statSync(destPath).size
+  return { path: destPath, compressed: false, originalSize, finalSize }
+}
+
+function normalizeLocalBpConsoleBackgroundSettings(input) {
+  const base = input && typeof input === 'object' ? input : {}
+  const imagePath = (typeof base.imagePath === 'string' && base.imagePath.trim())
+    ? base.imagePath.trim()
+    : null
+
+  const maskOpacityRaw = Number(base.maskOpacity)
+  const maskOpacity = Number.isFinite(maskOpacityRaw)
+    ? Math.min(1, Math.max(0, maskOpacityRaw))
+    : 0.25
+
+  const blurRaw = Number(base.blur)
+  const blur = Number.isFinite(blurRaw)
+    ? Math.min(40, Math.max(0, blurRaw))
+    : 0
+
+  const autoCompressLargeImage = base.autoCompressLargeImage !== false
+  const cardOpacityRaw = Number(base.cardOpacity)
+  const cardOpacity = Number.isFinite(cardOpacityRaw)
+    ? Math.min(1, Math.max(0, cardOpacityRaw))
+    : LOCAL_BP_CONSOLE_BG_DEFAULT_CARD_OPACITY
+
+  return { imagePath, maskOpacity, blur, autoCompressLargeImage, cardOpacity }
+}
+
+function readLocalBpConsoleBackgroundSettings() {
+  const root = readJsonFileSafe(layoutPath, {})
+  const settings = normalizeLocalBpConsoleBackgroundSettings(root.localBpConsoleBackground)
+  if (settings.imagePath && !fs.existsSync(settings.imagePath)) {
+    settings.imagePath = null
+  }
+  return settings
+}
+
+function broadcastLocalBpConsoleBackground(settings) {
+  const payload = normalizeLocalBpConsoleBackgroundSettings(settings)
+  if (localBpWindow && !localBpWindow.isDestroyed()) {
+    localBpWindow.webContents.send('local-bp-console-bg-updated', payload)
+  }
+  if (localBpGuideWindow && !localBpGuideWindow.isDestroyed()) {
+    localBpGuideWindow.webContents.send('local-bp-console-bg-updated', payload)
+  }
+}
+
+ipcMain.handle('local-bp-console-bg:get', async () => {
+  try {
+    return { success: true, settings: readLocalBpConsoleBackgroundSettings() }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('local-bp-console-bg:set', async (event, input) => {
+  try {
+    const patch = input && typeof input === 'object' ? input : {}
+    const root = readJsonFileSafe(layoutPath, {})
+    const current = normalizeLocalBpConsoleBackgroundSettings(root.localBpConsoleBackground)
+    const merged = { ...current, ...patch }
+
+    if (Object.prototype.hasOwnProperty.call(patch, 'imagePath')) {
+      const val = patch.imagePath
+      merged.imagePath = (typeof val === 'string' && val.trim()) ? val.trim() : null
+    }
+
+    const next = normalizeLocalBpConsoleBackgroundSettings(merged)
+    root.localBpConsoleBackground = next
+    root.updatedAt = new Date().toISOString()
+
+    const ok = writeJsonFileSafe(layoutPath, root)
+    if (!ok) return { success: false, error: '保存背景设置失败' }
+
+    broadcastLocalBpConsoleBackground(next)
+    return { success: true, settings: next }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('local-bp-console-bg:select-image', async (event, options) => {
+  try {
+    const opt = options && typeof options === 'object' ? options : {}
+    const result = await dialog.showOpenDialog({
+      title: '选择本地BP控制台背景图片',
+      filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+      properties: ['openFile']
+    })
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      const srcPath = result.filePaths[0]
+      const saved = await saveLocalBpConsoleBackgroundImage(srcPath, {
+        autoCompressLargeImage: opt.autoCompressLargeImage !== false
+      })
+      return {
+        success: true,
+        path: saved.path,
+        compressed: saved.compressed === true,
+        originalSize: Number(saved.originalSize) || 0,
+        finalSize: Number(saved.finalSize) || 0
+      }
+    }
+    return { success: false, canceled: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
 // 获取透明背景设置
 ipcMain.handle('get-transparent-background', async () => {
   try {
@@ -2289,9 +3692,7 @@ ipcMain.handle('set-transparent-background', async (event, enabled) => {
     console.log('[Main] 透明背景设置已保存:', enabled)
 
     // 通知所有前台窗口刷新
-    if (frontendWindow && !frontendWindow.isDestroyed()) {
-      frontendWindow.webContents.send('update-data', { type: 'layout-updated' })
-    }
+    broadcastToFrontendWindows('update-data', { type: 'layout-updated' })
     if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
       scoreboardWindowA.webContents.reload()
     }
@@ -2585,9 +3986,7 @@ ipcMain.handle('save-font-config', async (event, config) => {
     console.log('[Main] 保存字体配置成功')
 
     // 通知前台窗口更新字体
-    if (frontendWindow && !frontendWindow.isDestroyed()) {
-      frontendWindow.webContents.send('font-config-updated', config)
-    }
+    broadcastToFrontendWindows('font-config-updated', config)
     if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
       scoreboardWindowA.webContents.send('font-config-updated', config)
     }
@@ -2627,8 +4026,12 @@ ipcMain.handle('get-font-url', async (event, fileName) => {
   try {
     const fontPath = path.join(fontsPath, fileName)
     if (fs.existsSync(fontPath)) {
-      // 返回 file:// URL
-      return { success: true, url: `file://${fontPath.replace(/\\/g, '/')}` }
+      // 返回可被渲染进程安全加载的 file URL（兼容中文/空格路径）
+      let normalized = fontPath.replace(/\\/g, '/')
+      if (/^[a-zA-Z]:\//.test(normalized)) {
+        normalized = '/' + normalized
+      }
+      return { success: true, url: `file://${encodeURI(normalized)}` }
     }
     return { success: false, error: '字体文件不存在' }
   } catch (error) {
@@ -2720,6 +4123,7 @@ ipcMain.handle('export-bp-pack', async () => {
       frontendWindow,
       scoreboardWindowA,
       scoreboardWindowB,
+      scoreboardOverviewWindow,
       postMatchWindow
     }
 
@@ -2744,6 +4148,7 @@ ipcMain.handle('import-bp-pack', async () => {
       frontendWindow,
       scoreboardWindowA,
       scoreboardWindowB,
+      scoreboardOverviewWindow,
       postMatchWindow
     }
 
@@ -2776,6 +4181,7 @@ ipcMain.handle('reset-layout', async () => {
       frontendWindow,
       scoreboardWindowA,
       scoreboardWindowB,
+      scoreboardOverviewWindow,
       postMatchWindow
     }
     return await packManager.resetLayout(windowRefs)
@@ -2810,6 +4216,7 @@ ipcMain.handle('get-background-path', async () => {
 ipcMain.handle('send-to-frontend', async (event, data) => {
   const targets = [
     frontendWindow,
+    ...getCustomFrontendWindowList(),
     backendWindow,
     scoreboardWindowA,
     scoreboardWindowB,
@@ -2870,6 +4277,8 @@ ipcMain.handle('send-to-frontend', async (event, data) => {
       console.warn('[Main] setPluginRoomData failed:', e.message)
     }
   }
+
+  forwardUpdateToDirectorSync(data)
 
   return true
 })
@@ -3040,11 +4449,12 @@ ipcMain.handle('ai-parse-game-record-image', async (event, imageBase64) => {
 
 // 切换前台编辑模式
 ipcMain.handle('toggle-frontend-edit-mode', async () => {
-  if (frontendWindow) {
-    frontendWindow.webContents.send('toggle-edit-mode')
-    return true
-  }
-  return false
+  const windows = getAllFrontendWindows()
+  if (!windows.length) return false
+  windows.forEach((win) => {
+    try { win.webContents.send('toggle-edit-mode') } catch {}
+  })
+  return true
 })
 
 // 显示地图展示窗口
@@ -3276,7 +4686,9 @@ ipcMain.handle('store-download-pack', async (event, id) => {
     const windowRefs = {
       frontendWindow,
       scoreboardWindowA,
-      scoreboardWindowB
+      scoreboardWindowB,
+      scoreboardOverviewWindow,
+      postMatchWindow
     }
 
     const installResult = await packManager.installFromStore(tempFile, { id, name, version }, { windowRefs })
@@ -3287,8 +4699,11 @@ ipcMain.handle('store-download-pack', async (event, id) => {
 
     // 检查是否有窗口打开
     const hasWindows = (frontendWindow && !frontendWindow.isDestroyed()) ||
+      getCustomFrontendWindowList().length > 0 ||
       (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) ||
-      (scoreboardWindowB && !scoreboardWindowB.isDestroyed())
+      (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) ||
+      (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) ||
+      (postMatchWindow && !postMatchWindow.isDestroyed())
 
     return {
       success: true,
@@ -3692,9 +5107,17 @@ ipcMain.handle('store-upload-pack', async (event, metadata) => {
     }
     if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
       packData.scoreboardABounds = scoreboardWindowA.getBounds()
+      packData.scoreboardLayoutA = packData.scoreboardABounds
     }
     if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
       packData.scoreboardBBounds = scoreboardWindowB.getBounds()
+      packData.scoreboardLayoutB = packData.scoreboardBBounds
+    }
+    if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+      packData.scoreboardOverviewBounds = scoreboardOverviewWindow.getBounds()
+    }
+    if (postMatchWindow && !postMatchWindow.isDestroyed()) {
+      packData.postMatchBounds = postMatchWindow.getBounds()
     }
 
     if (Object.keys(packData).length > 0) {
@@ -3997,6 +5420,53 @@ ipcMain.handle('asg-get-my-events', async () => {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
     if (response.status >= 200 && response.status < 300) return { success: true, data: response.data }
+    return { success: false, error: response.data?.message || '获取失败' }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('select-component-image', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: '选择组件图片',
+      filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+      properties: ['openFile']
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    const filePath = result.filePaths[0]
+    const fileBuffer = fs.readFileSync(filePath)
+    const ext = path.extname(filePath).toLowerCase()
+    const mime = ext === '.png'
+      ? 'image/png'
+      : ext === '.gif'
+        ? 'image/gif'
+        : ext === '.webp'
+          ? 'image/webp'
+          : ext === '.bmp'
+            ? 'image/bmp'
+            : 'image/jpeg'
+    const base64 = `data:${mime};base64,${fileBuffer.toString('base64')}`
+    return { success: true, data: base64 }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+// 获取公开合作伙伴（可选按类型过滤）
+ipcMain.handle('asg-get-public-partners', async (event, type) => {
+  try {
+    const apiBase = getEnvConfig().api
+    const normalizedType = typeof type === 'string' ? type.trim() : ''
+    const path = normalizedType
+      ? `/api/Partners/public/type/${encodeURIComponent(normalizedType)}`
+      : '/api/Partners/public'
+    const response = await httpRequest(`${apiBase}${path}`)
+    if (response.status >= 200 && response.status < 300) {
+      return { success: true, data: response.data }
+    }
     return { success: false, error: response.data?.message || '获取失败' }
   } catch (error) {
     return { success: false, error: error.message }
@@ -4452,44 +5922,225 @@ function __loadCharacterDisplayLayoutFromDiskIntoState__() {
 
 let characterIndexCache = null
 
-// 角色管理配置文件路径
-const characterConfigPath = path.join(__dirname, 'roles.json')
+// 角色管理配置文件路径（内置只读 + 用户自定义可写）
+const bundledCharacterConfigPath = path.join(__dirname, 'roles.json')
+const customCharacterConfigPath = path.join(userDataPath, 'roles.custom.json')
+const customCharacterAssetsPath = path.join(userDataPath, 'character-assets')
+
+const CHARACTER_ASSET_FOLDERS = Object.freeze({
+  survivor: { header: 'surHeader', half: 'surHalf', big: 'surBig' },
+  hunter: { header: 'hunHeader', half: 'hunHalf', big: 'hunBig' }
+})
+
+function ensureCharacterDirectories() {
+  if (!fs.existsSync(customCharacterAssetsPath)) {
+    fs.mkdirSync(customCharacterAssetsPath, { recursive: true })
+  }
+  for (const type of ['survivor', 'hunter']) {
+    for (const variant of ['header', 'half', 'big']) {
+      const folder = CHARACTER_ASSET_FOLDERS[type][variant]
+      const dir = path.join(customCharacterAssetsPath, folder)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    }
+  }
+}
+
+function normalizeCharacterType(type) {
+  if (type === 'survivor' || type === 'hunter') return type
+  return null
+}
+
+function normalizeCharacterName(name) {
+  if (typeof name !== 'string') return ''
+  return name.trim()
+}
+
+function isValidCharacterName(name) {
+  if (!name) return false
+  return !/[\\/:*?"<>|]/.test(name)
+}
+
+function getCharacterEntryName(entry) {
+  if (!entry) return ''
+  if (typeof entry === 'string') return normalizeCharacterName(entry)
+  if (typeof entry === 'object' && entry !== null) return normalizeCharacterName(entry.name)
+  return ''
+}
+
+function mergeCharacterEntries(baseList, customList) {
+  const merged = []
+  const seen = new Set()
+
+  const append = (list) => {
+    if (!Array.isArray(list)) return
+    for (const entry of list) {
+      const name = getCharacterEntryName(entry)
+      if (!name || seen.has(name)) continue
+      merged.push(entry)
+      seen.add(name)
+    }
+  }
+
+  append(baseList)
+  append(customList)
+  return merged
+}
+
+function getCharacterAssetFolder(type, variant) {
+  const normalizedType = normalizeCharacterType(type)
+  if (!normalizedType) return null
+  return CHARACTER_ASSET_FOLDERS[normalizedType][variant] || null
+}
+
+function getBundledCharacterAssetPath(type, variant, name) {
+  const folder = getCharacterAssetFolder(type, variant)
+  if (!folder || !name) return null
+  return path.join(app.getAppPath(), 'assets', folder, `${name}.png`)
+}
+
+function getCustomCharacterAssetPath(type, variant, name) {
+  const folder = getCharacterAssetFolder(type, variant)
+  if (!folder || !name) return null
+  return path.join(customCharacterAssetsPath, folder, `${name}.png`)
+}
+
+function resolveCharacterAssetPath(type, variant, name) {
+  if (!name) return null
+  const customPath = getCustomCharacterAssetPath(type, variant, name)
+  if (customPath && fs.existsSync(customPath)) return customPath
+  const bundledPath = getBundledCharacterAssetPath(type, variant, name)
+  if (bundledPath && fs.existsSync(bundledPath)) return bundledPath
+  return null
+}
+
+function createCharacterAssetOverrides() {
+  return {
+    surHeader: {},
+    surHalf: {},
+    surBig: {},
+    hunHeader: {},
+    hunHalf: {},
+    hunBig: {}
+  }
+}
+
+function toFileUrlSafe(filePath) {
+  try {
+    return pathToFileURL(filePath).href
+  } catch {
+    const normalized = String(filePath).replace(/\\/g, '/')
+    return normalized.startsWith('/') ? `file://${encodeURI(normalized)}` : `file:///${encodeURI(normalized)}`
+  }
+}
+
+function buildCharacterAssetOverrides(survivors, hunters) {
+  const map = createCharacterAssetOverrides()
+  const setFor = (type, variant, name, key) => {
+    const customPath = getCustomCharacterAssetPath(type, variant, name)
+    if (!customPath || !fs.existsSync(customPath)) return
+    map[key][name] = toFileUrlSafe(customPath)
+  }
+
+  for (const name of survivors || []) {
+    setFor('survivor', 'header', name, 'surHeader')
+    setFor('survivor', 'half', name, 'surHalf')
+    setFor('survivor', 'big', name, 'surBig')
+  }
+  for (const name of hunters || []) {
+    setFor('hunter', 'header', name, 'hunHeader')
+    setFor('hunter', 'half', name, 'hunHalf')
+    setFor('hunter', 'big', name, 'hunBig')
+  }
+  return map
+}
+
+function copyCharacterAssetFromSource(type, variant, name, srcPath) {
+  if (!srcPath) return
+  if (!fs.existsSync(srcPath)) {
+    throw new Error(`图片不存在: ${srcPath}`)
+  }
+  const destPath = getCustomCharacterAssetPath(type, variant, name)
+  if (!destPath) return
+  fs.mkdirSync(path.dirname(destPath), { recursive: true })
+  fs.copyFileSync(srcPath, destPath)
+}
+
+function renameCustomCharacterAssets(type, oldName, newName) {
+  if (!oldName || !newName || oldName === newName) return
+  for (const variant of ['header', 'half', 'big']) {
+    const oldPath = getCustomCharacterAssetPath(type, variant, oldName)
+    const newPath = getCustomCharacterAssetPath(type, variant, newName)
+    if (!oldPath || !newPath) continue
+    if (!fs.existsSync(oldPath)) continue
+    fs.mkdirSync(path.dirname(newPath), { recursive: true })
+    fs.renameSync(oldPath, newPath)
+  }
+}
+
+function deleteCustomCharacterAssets(type, name) {
+  if (!name) return
+  for (const variant of ['header', 'half', 'big']) {
+    const target = getCustomCharacterAssetPath(type, variant, name)
+    if (target && fs.existsSync(target)) fs.unlinkSync(target)
+  }
+}
+
+function isBuiltInCharacter(index, type, name) {
+  if (!index || !name) return false
+  return type === 'survivor'
+    ? index.builtInSurvivorSet.has(name)
+    : index.builtInHunterSet.has(name)
+}
 
 function loadCharacterIndex() {
   if (characterIndexCache) return characterIndexCache
+  ensureCharacterDirectories()
 
-  let rolesData = { survivors: [], hunters: [] }
-  try {
-    if (fs.existsSync(characterConfigPath)) {
-      const content = fs.readFileSync(characterConfigPath, 'utf-8')
-      rolesData = JSON.parse(content)
-    }
-  } catch (e) {
-    console.error('Error loading roles.json:', e)
+  const baseData = readJsonFileSafe(bundledCharacterConfigPath, { survivors: [], hunters: [] })
+  const customData = readJsonFileSafe(customCharacterConfigPath, { survivors: [], hunters: [] })
+
+  if (!Array.isArray(baseData.survivors)) baseData.survivors = []
+  if (!Array.isArray(baseData.hunters)) baseData.hunters = []
+  if (!Array.isArray(customData.survivors)) customData.survivors = []
+  if (!Array.isArray(customData.hunters)) customData.hunters = []
+
+  const mergedSurvivors = mergeCharacterEntries(baseData.survivors, customData.survivors)
+  const mergedHunters = mergeCharacterEntries(baseData.hunters, customData.hunters)
+
+  const survivors = mergedSurvivors.map(getCharacterEntryName).filter(Boolean)
+  const hunters = mergedHunters.map(getCharacterEntryName).filter(Boolean)
+
+  const builtInSurvivors = baseData.survivors.map(getCharacterEntryName).filter(Boolean)
+  const builtInHunters = baseData.hunters.map(getCharacterEntryName).filter(Boolean)
+  const customSurvivors = customData.survivors.map(getCharacterEntryName).filter(Boolean)
+  const customHunters = customData.hunters.map(getCharacterEntryName).filter(Boolean)
+
+  const survivorsBig = survivors.filter(name => !!resolveCharacterAssetPath('survivor', 'big', name))
+  const huntersBig = hunters.filter(name => !!resolveCharacterAssetPath('hunter', 'big', name))
+
+  const mergedData = {
+    ...baseData,
+    survivors: mergedSurvivors,
+    hunters: mergedHunters
   }
 
-  // 提取单纯的名称列表，用于保持与旧逻辑兼容
-  const survivors = Array.isArray(rolesData.survivors) ? rolesData.survivors.map(c => typeof c === 'string' ? c : c.name) : []
-  const hunters = Array.isArray(rolesData.hunters) ? rolesData.hunters.map(c => typeof c === 'string' ? c : c.name) : []
-
-  const assetsPath = path.join(app.getAppPath(), 'assets')
-  const surBigPath = path.join(assetsPath, 'surBig')
-  const hunBigPath = path.join(assetsPath, 'hunBig')
-
-  // 检查全身图是否存在
-  const survivorsBig = survivors.filter(name => fs.existsSync(path.join(surBigPath, `${name}.png`)))
-  const huntersBig = hunters.filter(name => fs.existsSync(path.join(hunBigPath, `${name}.png`)))
-
   characterIndexCache = {
-    fullData: rolesData,
+    fullData: mergedData,
+    baseData,
+    customData,
     survivors,
     hunters,
     survivorSet: new Set(survivors),
     hunterSet: new Set(hunters),
+    builtInSurvivorSet: new Set(builtInSurvivors),
+    builtInHunterSet: new Set(builtInHunters),
+    customSurvivorSet: new Set(customSurvivors),
+    customHunterSet: new Set(customHunters),
     survivorsBig,
     huntersBig,
     survivorBigSet: new Set(survivorsBig),
-    hunterBigSet: new Set(huntersBig)
+    hunterBigSet: new Set(huntersBig),
+    assetOverrides: buildCharacterAssetOverrides(survivors, hunters)
   }
 
   return characterIndexCache
@@ -4522,13 +6173,15 @@ function refreshCharacterIndex() {
 // 获取角色详细信息（包含半身图和全身图路径）
 function getCharacterDetails() {
   const index = loadCharacterIndex()
-  const assetsPath = path.join(app.getAppPath(), 'assets')
 
   const normalize = (c, type) => {
     const isObj = typeof c === 'object' && c !== null
     const name = isObj ? c.name : c
-    const folder = type === 'survivor' ? 'sur' : 'hun'
-    const hasBig = type === 'survivor' ? index.survivorBigSet.has(name) : index.hunterBigSet.has(name)
+    const normalizedType = normalizeCharacterType(type)
+    const headerImage = resolveCharacterAssetPath(normalizedType, 'header', name)
+    const halfImage = resolveCharacterAssetPath(normalizedType, 'half', name)
+    const bigImage = resolveCharacterAssetPath(normalizedType, 'big', name)
+    const builtIn = isBuiltInCharacter(index, normalizedType, name)
 
     return {
       name,
@@ -4536,15 +6189,18 @@ function getCharacterDetails() {
       id: isObj ? c.id : null,
       enName: isObj ? c.enName : null,
       abbr: isObj ? c.abbr : null,
-      halfImage: path.join(assetsPath, `${folder}Half`, `${name}.png`),
-      bigImage: hasBig ? path.join(assetsPath, `${folder}Big`, `${name}.png`) : null,
-      hasHalfImage: true,
-      hasBigImage: hasBig
+      headerImage,
+      halfImage,
+      bigImage,
+      hasHeaderImage: !!headerImage,
+      hasHalfImage: !!halfImage,
+      hasBigImage: !!bigImage,
+      builtIn
     }
   }
 
-  const survivorDetails = (index.fullData?.survivors || index.survivors).map(c => normalize(c, 'survivor'))
-  const hunterDetails = (index.fullData?.hunters || index.hunters).map(c => normalize(c, 'hunter'))
+  const survivorDetails = (index.fullData?.survivors || []).map(c => normalize(c, 'survivor'))
+  const hunterDetails = (index.fullData?.hunters || []).map(c => normalize(c, 'hunter'))
 
   return { survivors: survivorDetails, hunters: hunterDetails }
 }
@@ -4573,6 +6229,7 @@ ipcMain.handle('character:get-index', async () => {
         hunters: index.hunters,
         survivorsBig: index.survivorsBig,
         huntersBig: index.huntersBig,
+        assetOverrides: index.assetOverrides,
         // 返回完整配置中的其他数据
         survivorTalents: index.fullData?.survivorTalents || [],
         hunterTalents: index.fullData?.hunterTalents || [],
@@ -4586,55 +6243,43 @@ ipcMain.handle('character:get-index', async () => {
 })
 
 // 添加角色
-ipcMain.handle('character:add', async (event, { name, type, halfImagePath, bigImagePath, id, enName, abbr }) => {
+ipcMain.handle('character:add', async (event, { name, type, headerImagePath, halfImagePath, bigImagePath, id, enName, abbr }) => {
   try {
-    if (!name || !type) {
+    const normalizedType = normalizeCharacterType(type)
+    const roleName = normalizeCharacterName(name)
+    if (!roleName || !normalizedType) {
       return { success: false, error: '角色名称和类型不能为空' }
     }
+    if (!isValidCharacterName(roleName)) {
+      return { success: false, error: '角色名称包含非法文件名字符' }
+    }
 
-    // 更新 JSON 配置
     const index = loadCharacterIndex()
-    // 确保 fullData 结构完整
-    if (!index.fullData.survivors) index.fullData.survivors = []
-    if (!index.fullData.hunters) index.fullData.hunters = []
-
-    const list = type === 'survivor' ? index.fullData.survivors : index.fullData.hunters
-    // 检查重名
-    if (list.some(c => (typeof c === 'string' ? c : c.name) === name)) {
+    const exists = normalizedType === 'survivor'
+      ? index.survivorSet.has(roleName)
+      : index.hunterSet.has(roleName)
+    if (exists) {
       return { success: false, error: '角色已存在' }
     }
 
+    copyCharacterAssetFromSource(normalizedType, 'header', roleName, headerImagePath)
+    copyCharacterAssetFromSource(normalizedType, 'half', roleName, halfImagePath)
+    copyCharacterAssetFromSource(normalizedType, 'big', roleName, bigImagePath)
+
+    const list = normalizedType === 'survivor' ? index.customData.survivors : index.customData.hunters
     list.push({
       id: id || '',
-      name,
+      name: roleName,
       enName: enName || '',
       abbr: abbr || ''
     })
-    try {
-      fs.writeFileSync(characterConfigPath, JSON.stringify(index.fullData, null, 2))
-    } catch (e) {
-      console.error('Failed to write roles.json', e)
+    const saved = writeJsonFileSafe(customCharacterConfigPath, index.customData)
+    if (!saved) {
+      return { success: false, error: '写入自定义角色配置失败' }
     }
 
-    const assetsPath = path.join(app.getAppPath(), 'assets')
-    const halfFolder = type === 'survivor' ? 'surHalf' : 'hunHalf'
-    const bigFolder = type === 'survivor' ? 'surBig' : 'hunBig'
-
-    // 复制半身图
-    if (halfImagePath && fs.existsSync(halfImagePath)) {
-      const destHalf = path.join(assetsPath, halfFolder, `${name}.png`)
-      fs.copyFileSync(halfImagePath, destHalf)
-    }
-
-    // 复制全身图
-    if (bigImagePath && fs.existsSync(bigImagePath)) {
-      const destBig = path.join(assetsPath, bigFolder, `${name}.png`)
-      fs.copyFileSync(bigImagePath, destBig)
-    }
-
-    // 刷新缓存
     refreshCharacterIndex()
-
+    broadcastUpdateData({ type: 'character-assets-updated' })
     return { success: true }
   } catch (error) {
     console.error('[Character] 添加角色失败:', error)
@@ -4643,64 +6288,60 @@ ipcMain.handle('character:add', async (event, { name, type, halfImagePath, bigIm
 })
 
 // 更新角色
-ipcMain.handle('character:update', async (event, { oldName, newName, type, halfImagePath, bigImagePath, id, enName, abbr }) => {
+ipcMain.handle('character:update', async (event, { oldName, newName, type, headerImagePath, halfImagePath, bigImagePath, id, enName, abbr }) => {
   try {
-    if (!oldName || !type) {
+    const normalizedType = normalizeCharacterType(type)
+    const sourceName = normalizeCharacterName(oldName)
+    const targetName = normalizeCharacterName(newName) || sourceName
+    if (!sourceName || !normalizedType) {
       return { success: false, error: '角色名称和类型不能为空' }
     }
+    if (!isValidCharacterName(targetName)) {
+      return { success: false, error: '角色名称包含非法文件名字符' }
+    }
 
-    // 更新 JSON 配置
     const index = loadCharacterIndex()
-    const list = type === 'survivor' ? index.fullData.survivors : index.fullData.hunters
-    const entryIndex = list.findIndex(c => (typeof c === 'string' ? c : c.name) === oldName)
+    if (isBuiltInCharacter(index, normalizedType, sourceName)) {
+      return { success: false, error: '内置角色不可修改，请新增自定义角色' }
+    }
 
-    if (entryIndex !== -1) {
-      const title = newName || oldName
-      const oldEntry = list[entryIndex]
-      const updated = typeof oldEntry === 'string'
-        ? { id: id || '', name: title, enName: enName || '', abbr: abbr || '' }
-        : { ...oldEntry, name: title, id: id !== undefined ? id : oldEntry.id, enName: enName !== undefined ? enName : oldEntry.enName, abbr: abbr !== undefined ? abbr : oldEntry.abbr }
+    const list = normalizedType === 'survivor' ? index.customData.survivors : index.customData.hunters
+    const entryIndex = list.findIndex(c => getCharacterEntryName(c) === sourceName)
+    if (entryIndex === -1) {
+      return { success: false, error: '未找到可修改的自定义角色' }
+    }
 
-      list[entryIndex] = updated
-      try {
-        fs.writeFileSync(characterConfigPath, JSON.stringify(index.fullData, null, 2))
-      } catch (e) {
-        console.error('Failed to save roles.json', e)
+    const typeSet = normalizedType === 'survivor' ? index.survivorSet : index.hunterSet
+    if (targetName !== sourceName && typeSet.has(targetName)) {
+      return { success: false, error: '角色已存在' }
+    }
+
+    if (targetName !== sourceName) {
+      renameCustomCharacterAssets(normalizedType, sourceName, targetName)
+    }
+    copyCharacterAssetFromSource(normalizedType, 'header', targetName, headerImagePath)
+    copyCharacterAssetFromSource(normalizedType, 'half', targetName, halfImagePath)
+    copyCharacterAssetFromSource(normalizedType, 'big', targetName, bigImagePath)
+
+    const oldEntry = list[entryIndex]
+    const updated = typeof oldEntry === 'string'
+      ? { id: id || '', name: targetName, enName: enName || '', abbr: abbr || '' }
+      : {
+        ...oldEntry,
+        name: targetName,
+        id: id !== undefined ? id : oldEntry.id,
+        enName: enName !== undefined ? enName : oldEntry.enName,
+        abbr: abbr !== undefined ? abbr : oldEntry.abbr
       }
+    list[entryIndex] = updated
+
+    const saved = writeJsonFileSafe(customCharacterConfigPath, index.customData)
+    if (!saved) {
+      return { success: false, error: '写入自定义角色配置失败' }
     }
 
-    const assetsPath = path.join(app.getAppPath(), 'assets')
-    const halfFolder = type === 'survivor' ? 'surHalf' : 'hunHalf'
-    const bigFolder = type === 'survivor' ? 'surBig' : 'hunBig'
-
-    const oldHalfPath = path.join(assetsPath, halfFolder, `${oldName}.png`)
-    const oldBigPath = path.join(assetsPath, bigFolder, `${oldName}.png`)
-    const newHalfPath = path.join(assetsPath, halfFolder, `${newName || oldName}.png`)
-    const newBigPath = path.join(assetsPath, bigFolder, `${newName || oldName}.png`)
-
-    // 如果改名了，先重命名现有文件
-    if (newName && newName !== oldName) {
-      if (fs.existsSync(oldHalfPath)) {
-        fs.renameSync(oldHalfPath, newHalfPath)
-      }
-      if (fs.existsSync(oldBigPath)) {
-        fs.renameSync(oldBigPath, newBigPath)
-      }
-    }
-
-    // 如果提供了新的半身图
-    if (halfImagePath && fs.existsSync(halfImagePath)) {
-      fs.copyFileSync(halfImagePath, newHalfPath)
-    }
-
-    // 如果提供了新的全身图
-    if (bigImagePath && fs.existsSync(bigImagePath)) {
-      fs.copyFileSync(bigImagePath, newBigPath)
-    }
-
-    // 刷新缓存
     refreshCharacterIndex()
-
+    broadcastUpdateData({ type: 'character-assets-updated' })
     return { success: true }
   } catch (error) {
     console.error('[Character] 更新角色失败:', error)
@@ -4711,44 +6352,32 @@ ipcMain.handle('character:update', async (event, { oldName, newName, type, halfI
 // 删除角色
 ipcMain.handle('character:delete', async (event, { name, type }) => {
   try {
-    if (!name || !type) {
+    const normalizedType = normalizeCharacterType(type)
+    const roleName = normalizeCharacterName(name)
+    if (!roleName || !normalizedType) {
       return { success: false, error: '角色名称和类型不能为空' }
     }
 
-    // 更新 JSON 配置
     const index = loadCharacterIndex()
-    const list = type === 'survivor' ? index.fullData.survivors : index.fullData.hunters
-    const entryIndex = list.findIndex(c => (typeof c === 'string' ? c : c.name) === name)
-
-    if (entryIndex !== -1) {
-      list.splice(entryIndex, 1)
-      try {
-        fs.writeFileSync(characterConfigPath, JSON.stringify(index.fullData, null, 2))
-      } catch (e) {
-        console.error('Failed to save roles.json', e)
-      }
+    if (isBuiltInCharacter(index, normalizedType, roleName)) {
+      return { success: false, error: '内置角色不可删除' }
     }
 
-    const assetsPath = path.join(app.getAppPath(), 'assets')
-    const halfFolder = type === 'survivor' ? 'surHalf' : 'hunHalf'
-    const bigFolder = type === 'survivor' ? 'surBig' : 'hunBig'
-
-    const halfPath = path.join(assetsPath, halfFolder, `${name}.png`)
-    const bigPath = path.join(assetsPath, bigFolder, `${name}.png`)
-
-    // 删除半身图
-    if (fs.existsSync(halfPath)) {
-      fs.unlinkSync(halfPath)
+    const list = normalizedType === 'survivor' ? index.customData.survivors : index.customData.hunters
+    const entryIndex = list.findIndex(c => getCharacterEntryName(c) === roleName)
+    if (entryIndex === -1) {
+      return { success: false, error: '未找到可删除的自定义角色' }
     }
 
-    // 删除全身图
-    if (fs.existsSync(bigPath)) {
-      fs.unlinkSync(bigPath)
+    list.splice(entryIndex, 1)
+    const saved = writeJsonFileSafe(customCharacterConfigPath, index.customData)
+    if (!saved) {
+      return { success: false, error: '写入自定义角色配置失败' }
     }
 
-    // 刷新缓存
+    deleteCustomCharacterAssets(normalizedType, roleName)
     refreshCharacterIndex()
-
+    broadcastUpdateData({ type: 'character-assets-updated' })
     return { success: true }
   } catch (error) {
     console.error('[Character] 删除角色失败:', error)
@@ -4759,8 +6388,13 @@ ipcMain.handle('character:delete', async (event, { name, type }) => {
 // 选择角色图片
 ipcMain.handle('character:select-image', async (event, imageType) => {
   try {
+    const titleByType = {
+      header: '选择头像',
+      half: '选择半身图',
+      big: '选择全身图'
+    }
     const result = await dialog.showOpenDialog({
-      title: imageType === 'half' ? '选择半身图' : '选择全身图',
+      title: titleByType[imageType] || '选择图片',
       filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       properties: ['openFile']
     })
@@ -4839,6 +6473,7 @@ ipcMain.handle('character:refresh', async () => {
 function broadcastUpdateData(data) {
   const targets = [
     frontendWindow,
+    ...getCustomFrontendWindowList(),
     backendWindow,
     scoreboardWindowA,
     scoreboardWindowB,
@@ -4894,6 +6529,8 @@ function broadcastUpdateData(data) {
       console.warn('[LocalBP] setPluginRoomData failed:', e.message)
     }
   }
+
+  forwardUpdateToDirectorSync(data)
 }
 
 function buildLocalBpFrontendState() {
@@ -4926,17 +6563,128 @@ function buildLocalBpFrontendState() {
 }
 
 function broadcastLocalBpState() {
-  broadcastUpdateData({ type: 'state', state: buildLocalBpFrontendState() })
+  const state = buildLocalBpFrontendState()
+  broadcastUpdateData({ type: 'state', state })
+  try {
+    if (obsAutomationService && typeof obsAutomationService.onLocalBpState === 'function') {
+      obsAutomationService.onLocalBpState(localBpState, { reason: 'localbp:broadcast-state' })
+    }
+  } catch (e) {
+    console.warn('[OBS 内置] 同步本地 BP 状态失败:', e?.message || e)
+  }
 }
 
+function dedupeBpNameList(input, maxCount = 10) {
+  const list = Array.isArray(input) ? input : []
+  const seen = new Set()
+  const out = []
+  for (const item of list) {
+    if (typeof item !== 'string') continue
+    const name = item.trim()
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    out.push(name)
+    if (out.length >= maxCount) break
+  }
+  return out
+}
+
+function sameStringArray(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+function applyLocalBpOcrMatchedResult(matched) {
+  const data = matched && typeof matched === 'object' ? matched : {}
+  let changed = false
+
+  const pickedSurvivors = dedupeBpNameList(data.survivors, 4)
+  if (pickedSurvivors.length > 0) {
+    if (pickedSurvivors.length === 4) {
+      for (let i = 0; i < 4; i++) {
+        const next = pickedSurvivors[i] || null
+        if (localBpState.survivors[i] !== next) {
+          localBpState.survivors[i] = next
+          changed = true
+        }
+      }
+    } else {
+      for (let i = 0; i < pickedSurvivors.length; i++) {
+        const next = pickedSurvivors[i]
+        if (localBpState.survivors[i] !== next) {
+          localBpState.survivors[i] = next
+          changed = true
+        }
+      }
+    }
+  }
+
+  const pickedHunter = typeof data.hunter === 'string' ? data.hunter.trim() : ''
+  if (pickedHunter && localBpState.hunter !== pickedHunter) {
+    localBpState.hunter = pickedHunter
+    changed = true
+  }
+
+  const pickedSurvivorBans = dedupeBpNameList(data.survivorBans, 12)
+  if (pickedSurvivorBans.length > 0 && !sameStringArray(localBpState.hunterBannedSurvivors, pickedSurvivorBans)) {
+    localBpState.hunterBannedSurvivors = pickedSurvivorBans
+    changed = true
+  }
+
+  const pickedHunterBans = dedupeBpNameList(data.hunterBans, 12)
+  if (pickedHunterBans.length > 0 && !sameStringArray(localBpState.survivorBannedHunters, pickedHunterBans)) {
+    localBpState.survivorBannedHunters = pickedHunterBans
+    changed = true
+  }
+
+  if (changed) {
+    broadcastLocalBpState()
+  }
+
+  return {
+    applied: changed,
+    changed,
+    survivors: localBpState.survivors,
+    hunter: localBpState.hunter,
+    survivorBans: localBpState.hunterBannedSurvivors,
+    hunterBans: localBpState.survivorBannedHunters
+  }
+}
+
+const localBpOcrService = new LocalBpOcrService({
+  userDataPath,
+  getCharacterIndex: () => loadCharacterIndex(),
+  applyMatchedResult: (matched) => applyLocalBpOcrMatchedResult(matched),
+  log: (...args) => console.log('[LocalBpOCR]', ...args)
+})
+
 function ensureLocalFrontendWindow() {
-  if (frontendWindow && !frontendWindow.isDestroyed()) return
-  createFrontendWindow({
+  const roomData = {
     localMode: true,
     roomId: 'local-bp',
     teamAName: 'A队',
     teamBName: 'B队'
-  })
+  }
+  if (!frontendWindow || frontendWindow.isDestroyed()) {
+    createFrontendWindow(roomData)
+    return
+  }
+  ensureCustomFrontendWindows(roomData, { onlyAutoOpen: true })
+}
+
+function buildFrontendPreviewRoomData() {
+  return {
+    localMode: true,
+    roomId: 'local-bp',
+    teamAName: localBpState?.teamA?.name || 'A队',
+    teamBName: localBpState?.teamB?.name || 'B队',
+    teamALogo: localBpState?.teamA?.logo || '',
+    teamBLogo: localBpState?.teamB?.logo || ''
+  }
 }
 
 function ensureLocalBackendWindow() {
@@ -5057,14 +6805,18 @@ function createLocalBpGuideWindow() {
   return localBpGuideWindow
 }
 
-ipcMain.handle('open-local-bp', () => {
+ipcMain.handle('open-local-bp', async () => {
   try {
     localBpState.enabled = true
     __loadCharacterDisplayLayoutFromDiskIntoState__()
     __normalizeLocalBpStateInPlace__()
     const config = readJsonFileSafe(configPath, {})
     const autoOpen = normalizeLocalBpAutoOpenSettings(config.localBpAutoOpen)
-    if (autoOpen.frontend) ensureLocalFrontendWindow()
+    if (autoOpen.frontend) {
+      ensureLocalFrontendWindow()
+    } else {
+      ensureCustomFrontendWindows(buildFrontendPreviewRoomData(), { onlyAutoOpen: true })
+    }
     if (autoOpen.localBp) createLocalBpWindow()
     if (autoOpen.characterDisplay) openCharacterDisplayWindow()
     if (autoOpen.scoreboardA) createScoreboardWindow('local-bp', 'teamA')
@@ -5076,6 +6828,11 @@ ipcMain.handle('open-local-bp', () => {
       createScoreboardOverviewWindow('local-bp', boCount)
     }
     if (autoOpen.postMatch) createPostMatchWindow('local-bp')
+    try {
+      await runBpStartupWindowsAnimationIfEnabled()
+    } catch (e) {
+      console.warn('[Main] Local BP startup window animation failed:', e.message)
+    }
     broadcastLocalBpState()
     return { success: true }
   } catch (error) {
@@ -5100,6 +6857,7 @@ ipcMain.handle('open-local-bp-guide', () => {
 ipcMain.handle('open-local-frontend', () => {
   try {
     ensureLocalFrontendWindow()
+    ensureCustomFrontendWindows(buildFrontendPreviewRoomData(), { onlyAutoOpen: true })
     if (frontendWindow && !frontendWindow.isDestroyed()) {
       frontendWindow.show()
       frontendWindow.focus()
@@ -5152,6 +6910,112 @@ ipcMain.handle('localBp:getState', () => {
   __loadCharacterDisplayLayoutFromDiskIntoState__()
   __normalizeLocalBpStateInPlace__()
   return { success: true, data: localBpState }
+})
+
+ipcMain.handle('localBp:ocrGetConfig', () => {
+  try {
+    return {
+      success: true,
+      data: {
+        config: localBpOcrService.getConfig(),
+        runtime: localBpOcrService.getRuntimeState()
+      }
+    }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('open-custom-frontend-window', async (event, windowId) => {
+  try {
+    const id = typeof windowId === 'string' ? windowId.trim() : ''
+    if (!id || id === FRONTEND_MAIN_WINDOW_ID) {
+      return { success: false, error: 'windowId 无效' }
+    }
+
+    const profile = readFrontendWindowProfilesFromLayout().find(item => item.id === id)
+    if (!profile) {
+      return { success: false, error: '窗口不存在，请先在窗口设计器中创建' }
+    }
+
+    const roomData = buildFrontendPreviewRoomData()
+    createManagedFrontendWindow(roomData, { windowId: profile.id, profile })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('close-custom-frontend-window', async (event, windowId) => {
+  try {
+    const id = typeof windowId === 'string' ? windowId.trim() : ''
+    if (!id) return { success: false, error: 'windowId 无效' }
+    const win = customFrontendWindows.get(id)
+    if (!win || win.isDestroyed()) {
+      customFrontendWindows.delete(id)
+      return { success: true }
+    }
+    win.close()
+    customFrontendWindows.delete(id)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:ocrSetConfig', (event, patch) => {
+  try {
+    const config = localBpOcrService.updateConfig(patch)
+    return {
+      success: true,
+      data: {
+        config,
+        runtime: localBpOcrService.getRuntimeState()
+      }
+    }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:ocrListWindows', async () => {
+  try {
+    return await localBpOcrService.listWindowSources()
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:ocrCapturePreview', async (event, sourceId) => {
+  try {
+    return await localBpOcrService.capturePreview(sourceId)
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:ocrRecognizeOnce', async (event, options) => {
+  try {
+    return await localBpOcrService.recognizeOnce(options || {})
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:ocrInstallPaddle', async () => {
+  try {
+    return await localBpOcrService.installPaddleOcr()
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:ocrInstallStatus', () => {
+  try {
+    return { success: true, data: localBpOcrService.getInstallStatus() }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
 })
 
 ipcMain.handle('localBp:setSurvivor', (event, { index, character }) => {
@@ -5599,6 +7463,9 @@ ipcMain.handle('localBp:updateScoreData', (event, payload) => {
   try {
     localBpScoreData = payload
     broadcastUpdateData({ type: 'score', scoreData: payload })
+    if (obsAutomationService && typeof obsAutomationService.onLocalBpScoreData === 'function') {
+      obsAutomationService.onLocalBpScoreData(payload, { reason: 'localbp:update-score-data' })
+    }
     return { success: true }
   } catch (error) {
     return { success: false, error: error.message }
@@ -5770,7 +7637,21 @@ ipcMain.handle('localBp:getCharacters', () => {
 app.whenReady().then(async () => {
   ensureDirectories()
   packManager.ensureDirectories()
+
+  try {
+    const syncSettings = getDirectorSyncSettingsFromConfig()
+    directorSyncService.setSettings(syncSettings)
+  } catch (e) {
+    console.warn('[DirectorSync] 初始化失败:', e && e.message ? e.message : e)
+  }
+
   loadAuthState()
+  try {
+    obsAutomationService = new ObsAutomationService()
+    obsAutomationService.initialize({ app })
+  } catch (e) {
+    console.error('[App] 初始化 OBS 内置自动化失败:', e?.message || e)
+  }
   try {
     await startLocalPagesServer()
   } catch (e) {
@@ -5825,6 +7706,26 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', async () => {
   try {
+    directorSyncService.dispose()
+  } catch (e) {
+    console.error('[App] 关闭跨导播同步服务失败:', e?.message || e)
+  }
+  try {
+    if (obsAutomationService && typeof obsAutomationService.shutdown === 'function') {
+      obsAutomationService.shutdown()
+    }
+    obsAutomationService = null
+  } catch (e) {
+    console.error('[App] 关闭 OBS 内置自动化失败:', e?.message || e)
+  }
+  try {
+    if (localBpOcrService && typeof localBpOcrService.dispose === 'function') {
+      await localBpOcrService.dispose()
+    }
+  } catch (e) {
+    console.error('[App] 关闭本地BP OCR服务失败:', e?.message || e)
+  }
+  try {
     await shutdownPlugins()
   } catch (e) {
     console.error('[App] 关闭插件系统失败:', e?.message || e)
@@ -5852,6 +7753,7 @@ app.on('activate', () => {
 
 // 打开自定义组件设计器
 let componentEditorWindow = null
+let componentDesignerTutorialWindow = null
 ipcMain.handle('open-component-editor', async () => {
   try {
     if (componentEditorWindow && !componentEditorWindow.isDestroyed()) {
@@ -5881,6 +7783,37 @@ ipcMain.handle('open-component-editor', async () => {
     return { success: true }
   } catch (error) {
     console.error('[Main] 打开自定义组件设计器失败:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('open-component-designer-tutorial', async () => {
+  try {
+    if (componentDesignerTutorialWindow && !componentDesignerTutorialWindow.isDestroyed()) {
+      componentDesignerTutorialWindow.focus()
+      return { success: true }
+    }
+
+    componentDesignerTutorialWindow = new BrowserWindow({
+      width: 1120,
+      height: 860,
+      title: '组件积木 API 教程',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    })
+
+    componentDesignerTutorialWindow.loadFile('pages/component-designer-tutorial.html')
+    componentDesignerTutorialWindow.setMenu(null)
+    componentDesignerTutorialWindow.on('closed', () => {
+      componentDesignerTutorialWindow = null
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('[Main] 打开组件积木教程失败:', error)
     return { success: false, error: error.message }
   }
 })
@@ -5957,9 +7890,7 @@ ipcMain.handle('save-model-config', async (event, config) => {
   try {
     fs.writeFileSync(model3dConfigPath, JSON.stringify(config, null, 2))
     // 广播配置更新到前台窗口
-    if (frontendWindow && !frontendWindow.isDestroyed()) {
-      frontendWindow.webContents.send('model-config-updated', config)
-    }
+    broadcastToFrontendWindows('model-config-updated', config)
     return { success: true }
   } catch (error) {
     return { success: false, error: error.message }

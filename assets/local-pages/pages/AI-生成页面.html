@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>战队展示</title>
+<style>
+  /* 全局重置 */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* 背景层 */
+  .bg {
+    position: fixed;
+    inset: 0;
+    background: #0a0a0f;
+    z-index: 0;
+  }
+
+  /* 背景网格 */
+  .bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridMove 20s linear infinite;
+  }
+
+  /* 背景光晕 */
+  .bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 50%, rgba(0,100,255,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 80% 50%, rgba(180,0,255,0.10) 0%, transparent 70%);
+  }
+
+  @keyframes gridMove {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(60px); }
+  }
+
+  /* 主容器 */
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 30px;
+  }
+
+  /* 顶部标题区 */
+  .header {
+    text-align: center;
+    position: relative;
+  }
+
+  .header-label {
+    font-size: 11px;
+    letter-spacing: 8px;
+    color: rgba(0,200,255,0.7);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    animation: fadeInDown 0.8s ease both;
+  }
+
+  .header-title {
+    font-size: clamp(32px, 5vw, 64px);
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: #fff;
+    text-transform: uppercase;
+    line-height: 1;
+    animation: fadeInDown 0.8s 0.1s ease both;
+    position: relative;
+  }
+
+  .header-title span {
+    background: linear-gradient(90deg, #00c8ff, #a855f7, #ff3c6e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* 标题下划线 */
+  .header-line {
+    margin: 14px auto 0;
+    width: 120px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00c8ff, #a855f7, transparent);
+    animation: fadeInDown 0.8s 0.2s ease both;
+  }
+
+  /* 战队卡片区 */
+  .teams-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    width: 100%;
+    max-width: 1300px;
+    animation: fadeInUp 0.8s 0.3s ease both;
+  }
+
+  /* 单张战队卡片 */
+  .team-card {
+    position: relative;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 32px 20px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.35s cubic-bezier(0.23,1,0.32,1), box-shadow 0.35s ease;
+    animation: cardIn 0.6s ease both;
+  }
+
+  .team-card:nth-child(1) { animation-delay: 0.4s; --accent: #00c8ff; --accent2: #0066ff; }
+  .team-card:nth-child(2) { animation-delay: 0.55s; --accent: #ff3c6e; --accent2: #ff8c00; }
+  .team-card:nth-child(3) { animation-delay: 0.7s; --accent: #a855f7; --accent2: #ec4899; }
+  .team-card:nth-child(4) { animation-delay: 0.85s; --accent: #00e5a0; --accent2: #00c8ff; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(40px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* 卡片悬停 */
+  .team-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow:
+      0 30px 60px rgba(0,0,0,0.5),
+      0 0 0 1px var(--accent),
+      0 0 40px rgba(var(--accent-rgb, 0,200,255), 0.15);
+  }
+
+  /* 卡片顶部彩色条 */
+  .team-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 16px 16px 0 0;
+    transition: height 0.3s ease;
+  }
+
+  .team-card:hover::before { height: 4px; }
+
+  /* 卡片内部光晕 */
+  .team-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.04) 0%, transparent 70%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .team-card:hover::after { opacity: 1; }
+
+  /* 战队编号 */
+  .team-number {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    opacity: 0.6;
+  }
+
+  /* 战队徽标容器 */
+  .team-logo-wrap {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 旋转光圈 */
+  .team-logo-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    border-top-color: var(--accent);
+    border-right-color: var(--accent);
+    animation: spin 3s linear infinite;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+
+  .team-card:hover .team-logo-wrap::before { opacity: 1; }
+
+  /* 慢速反转圈 */
+  .team-logo-wrap::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    border: 1px dashed var(--accent2);
+    animation: spinReverse 8s linear infinite;
+    opacity: 0.2;
+    transition: opacity 0.3s;
+  }
+
+  .team-card:hover .team-logo-wrap::after { opacity: 0.5; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes spinReverse { to { transform: rotate(-360deg); } }
+
+  /* 战队图标背景圆 */
+  .team-logo-bg {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.4), 0 0 20px var(--accent);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  .team-card:hover .team-logo-bg {
+    box-shadow: 0 0 50px rgba(0,0,0,0.4), 0 0 35px var(--accent);
+    transform: scale(1.08);
+  }
+
+  /* 战队名称 */
+  .team-name {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #fff;
+    text-align: center;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+
+  .team-name-sub {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    opacity: 0.8;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* 分割线 */
+  .team-divider {
+    width: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transition: width 0.3s ease;
+  }
+
+  .team-card:hover .team-divider { width: 70px; }
+
+  /* 战队数据 */
+  .team-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 4px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .team-card:hover .stat-item {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.1);
+  }
+
+  .stat-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+  }
+
+  /* 战队标语 */
+  .team-slogan {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    text-align: center;
+    letter-spacing: 1px;
+    font-style: italic;
+    line-height: 1.5;
+    transition: color 0.3s;
+  }
+
+  .team-card:hover .team-slogan { color: rgba(255,255,255,0.6); }
+
+  /* 底部按钮 */
+  .team-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    border-radius: 20px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #fff;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.3s, transform 0.3s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  .team-card:hover .team-btn {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* 底部装饰 */
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    animation: fadeInUp 0.8s 1s ease both;
+  }
+
+  .footer-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c, #00c8ff);
+    animation: pulse 2s ease-in-out infinite;
+    animation-delay: var(--d, 0s);
+  }
+
+  .footer-text {
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.4); }
+  }
+
+  /* 浮动粒子 */
+  .particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .particle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--pc, #00c8ff);
+    animation: floatUp var(--dur, 8s) linear var(--delay, 0s) infinite;
+    opacity: 0;
+    left: var(--x, 50%);
+  }
+
+  @keyframes floatUp {
+    0%   { transform: translateY(110vh) scale(0); opacity: 0; }
+    10%  { opacity: 0.8; }
+    90%  { opacity: 0.4; }
+    100% { transform: translateY(-10vh) scale(1.5); opacity: 0; }
+  }
+
+  /* 扫光动画 */
+  .scan-line {
+    position: fixed;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent);
+    z-index: 0;
+    animation: scanDown 6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes scanDown {
+    0%   { top: -2px; opacity: 0; }
+    5%   { opacity: 1; }
+    95%  { opacity: 0.5; }
+    100% { top: 100vh; opacity: 0; }
+  }
+
+  /* 通用动画 */
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 响应式 */
+  @media (max-width: 900px) {
+    .teams-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 500px) {
+    .teams-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 背景 -->
+<div class="bg"></div>
+
+<!-- 扫光 -->
+<div class="scan-line"></div>
+
+<!-- 粒子 -->
+<div class="particles" id="particles"></div>
+
+<!-- 主容器 -->
+<div class="container">
+
+  <!-- 标题 -->
+  <div class="header">
+    <div class="header-label">⚡ Season Championship ⚡</div>
+    <div class="header-title">四大<span>战队</span>对决</div>
+    <div class="header-line"></div>
+  </div>
+
+  <!-- 战队卡片 -->
+  <div class="teams-grid">
+
+    <!-- 战队一：蓝色闪电 -->
+    <div class="team-card">
+      <div class="team-number">01</div>
+      <div class="team-logo-wrap">
+        <div class="team-logo-bg">⚡</div>
+      </div>
+      <div>
+        <div class="team-name">闪电战队</div>
+        <div class="team-name-sub">Thunder Strike</div>
+      </div>
+      <div class="team-divider"></div>
+      <div class="team-stats">
+        <div class="stat-item">
+          <div class="stat-value">32</div>
+          <div class="stat-label">胜场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">8</div>
+          <div class="stat-label">败场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">80%</div>
+          <div class="stat-label">胜率</div>
+        </div>
+      </div>
+      <div class="team-slogan">"速度即是力量，闪电永不停歇"</div>
+      <div class="team-btn">▶ 查看详情</div>
+    </div>
+
+    <!-- 战队二：红色烈焰 -->
+    <div class="team-card">
+      <div class="team-number">02</div>
+      <div class="team-logo-wrap">
+        <div class="team-logo-bg">🔥</div>
+      </div>
+      <div>
+        <div class="team-name">烈焰战队</div>
+        <div class="team-name-sub">Inferno Blaze</div>
+      </div>
+      <div class="team-divider"></div>
+      <div class="team-stats">
+        <div class="stat-item">
+          <div class="stat-value">28</div>
+          <div class="stat-label">胜场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">12</div>
+          <div class="stat-label">败场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">70%</div>
+          <div class="stat-label">胜率</div>
+        </div>
+      </div>
+      <div class="team-slogan">"烈火燃尽一切，灰烬中重生"</div>
+      <div class="team-btn">▶ 查看详情</div>
+    </div>
+
+    <!-- 战队三：紫色幽灵 -->
+    <div class="team-card">
+      <div class="team-number">03</div>
+      <div class="team-logo-wrap">
+        <div class="team-logo-bg">👁️</div>
+      </div>
+      <div>
+        <div class="team-name">幽灵战队</div>
+        <div class="team-name-sub">Phantom Eye</div>
+      </div>
+      <div class="team-divider"></div>
+      <div class="team-stats">
+        <div class="stat-item">
+          <div class="stat-value">35</div>
+          <div class="stat-label">胜场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">5</div>
+          <div class="stat-label">败场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">87%</div>
+          <div class="stat-label">胜率</div>
+        </div>
+      </div>
+      <div class="team-slogan">"无形无影，致命一击"</div>
+      <div class="team-btn">▶ 查看详情</div>
+    </div>
+
+    <!-- 战队四：绿色毒刺 -->
+    <div class="team-card">
+      <div class="team-number">04</div>
+      <div class="team-logo-wrap">
+        <div class="team-logo-bg">☠️</div>
+      </div>
+      <div>
+        <div class="team-name">毒刺战队</div>
+        <div class="team-name-sub">Venom Sting</div>
+      </div>
+      <div class="team-divider"></div>
+      <div class="team-stats">
+        <div class="stat-item">
+          <div class="stat-value">25</div>
+          <div class="stat-label">胜场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">15</div>
+          <div class="stat-label">败场</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">62%</div>
+          <div class="stat-label">胜率</div>
+        </div>
+      </div>
+      <div class="team-slogan">"毒液渗透每一道防线"</div>
+      <div class="team-btn">▶ 查看详情</div>
+    </div>
+
+  </div>
+
+  <!-- 底部装饰 -->
+  <div class="footer">
+    <div class="footer-dot" style="--c:#00c8ff; --d:0s;"></div>
+    <div class="footer-text">Season 2025 · Grand Finals</div>
+    <div class="footer-dot" style="--c:#a855f7; --d:0.5s;"></div>
+    <div class="footer-text">4 Teams · 1 Champion</div>
+    <div class="footer-dot" style="--c:#ff3c6e; --d:1s;"></div>
+  </div>
+
+</div>
+
+<script>
+  // 生成浮动粒子
+  const container = document.getElementById('particles');
+  const colors = ['#00c8ff', '#a855f7', '#ff3c6e', '#00e5a0', '#ffffff'];
+  const count = 60;
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const x = Math.random() * 100;
+    const dur = 6 + Math.random() * 10;
+    const delay = Math.random() * 10;
+    const size = 1 + Math.random() * 2;
+    p.style.cssText = `
+      --pc: ${color};
+      --dur: ${dur}s;
+      --delay: ${delay}s;
+      --x: ${x}%;
+      width: ${size}px;
+      height: ${size}px;
+    `;
+    container.appendChild(p);
+  }
+
+  // 卡片鼠标视差效果
+  document.querySelectorAll('.team-card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx) / (rect.width / 2);
+      const dy = (e.clientY - cy) / (rect.height / 2);
+      card.style.transform = `
+        translateY(-10px) scale(1.02)
+        rotateX(${-dy * 5}deg)
+        rotateY(${dx * 5}deg)
+      `;
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+    });
+  });
+</script>
+
+</body>
+</html>

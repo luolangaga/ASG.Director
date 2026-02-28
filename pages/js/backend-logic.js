@@ -3,6 +3,7 @@ let connection = null
 let currentState = null
 let timerInterval = null
 let timerRemaining = 0
+let lastRoundHalfSyncKey = ''
 
 // 比分数据（与当前房间对应）
 let scoreData = {
@@ -12,6 +13,7 @@ let scoreData = {
   teamADraws: 0,
   teamBDraws: 0
 }
+const DIRECTOR_SYNC_REMOTE_FLAG = '__asgDirectorSyncRemote'
 
 // BP阶段配置
 const phases = [
@@ -88,6 +90,24 @@ function init() {
           if (payload && payload.type === 'theme-changed') {
             if (payload.theme === 'dark' || payload.theme === 'light') document.documentElement.setAttribute('data-theme', payload.theme)
             else document.documentElement.removeAttribute('data-theme')
+          }
+
+          if (!payload || payload[DIRECTOR_SYNC_REMOTE_FLAG] !== true) return
+
+          if (payload.type === 'state' && payload.state && typeof payload.state === 'object') {
+            currentState = payload.state
+            updateStateDisplay({ broadcast: false, syncScoreBroadcast: false })
+            return
+          }
+
+          if (payload.type === 'score' && payload.scoreData && typeof payload.scoreData === 'object') {
+            applyRemoteSyncedScore(payload.scoreData)
+            return
+          }
+
+          if (payload.type === 'postmatch' && payload.postMatchData && roomData && roomData.roomId) {
+            localStorage.setItem(`postmatch_${roomData.roomId}`, JSON.stringify(payload.postMatchData))
+            loadPostMatch(false)
           }
         } catch (e) { console.warn('onUpdateData error', e) }
       })
@@ -287,11 +307,50 @@ function updateScoreDisplay() {
   document.getElementById('teamBRecord').textContent = `${scoreData.teamBWins}胜 ${scoreData.teamBDraws}平 ${teamBLosses}负`
 }
 
+function emitScoreUpdate() {
+  if (!window.electronAPI || !window.electronAPI.sendToFrontend) return
+  window.electronAPI.sendToFrontend({
+    type: 'score',
+    roomId: roomData?.roomId || null,
+    scoreData
+  })
+}
+
+function applyRemoteSyncedScore(nextScoreData) {
+  if (!nextScoreData || typeof nextScoreData !== 'object') return
+  scoreData = nextScoreData
+  if (!Array.isArray(scoreData.bos)) scoreData.bos = []
+  if (!scoreData.scoreboardDisplay || typeof scoreData.scoreboardDisplay !== 'object') {
+    scoreData.scoreboardDisplay = { teamA: 'auto', teamB: 'auto' }
+  }
+
+  calculateScore()
+  renderScoreBoard()
+  updateScoreDisplay()
+
+  const teamANameEl = document.getElementById('teamAName')
+  const teamBNameEl = document.getElementById('teamBName')
+  if (teamANameEl) teamANameEl.value = scoreData.teamAName || roomData?.teamAName || 'A队'
+  if (teamBNameEl) teamBNameEl.value = scoreData.teamBName || roomData?.teamBName || 'B队'
+
+  const selA = document.getElementById('scoreboardDisplayTeamA')
+  const selB = document.getElementById('scoreboardDisplayTeamB')
+  if (selA) selA.value = scoreData.scoreboardDisplay.teamA || 'auto'
+  if (selB) selB.value = scoreData.scoreboardDisplay.teamB || 'auto'
+
+  saveScore({ broadcast: false, silent: true })
+}
+
 // 保存比分到 localStorage
-function saveScore() {
+function saveScore(options = {}) {
+  const broadcast = options.broadcast !== false
+  const silent = options.silent === true
   if (roomData && roomData.roomId) {
     localStorage.setItem(`score_${roomData.roomId}`, JSON.stringify(scoreData))
-    addLog('比分已保存', 'success')
+    if (!silent) addLog('比分已保存', 'success')
+  }
+  if (broadcast) {
+    emitScoreUpdate()
   }
 }
 
@@ -680,14 +739,17 @@ async function connectToServer() {
 }
 
 // 更新状态显示
-function updateStateDisplay() {
+function updateStateDisplay(options = {}) {
   if (!currentState) return
 
   // 同步当前局数和半场到比分数据
   if (currentState.currentRound && currentState.currentHalf) {
     scoreData.currentRound = currentState.currentRound
     scoreData.currentHalf = currentState.currentHalf
-    saveScore() // 保存到 localStorage
+    const roundHalfKey = `${currentState.currentRound}-${currentState.currentHalf}`
+    const shouldBroadcast = options.syncScoreBroadcast !== false && roundHalfKey !== lastRoundHalfSyncKey
+    saveScore({ broadcast: shouldBroadcast, silent: true }) // 保存到 localStorage
+    lastRoundHalfSyncKey = roundHalfKey
   }
 
   // 侧边栏信息
@@ -794,7 +856,7 @@ function updateStateDisplay() {
   }
 
   // 同步状态到前台窗口
-  if (window.electronAPI && window.electronAPI.sendToFrontend) {
+  if (options.broadcast !== false && window.electronAPI && window.electronAPI.sendToFrontend) {
     window.electronAPI.sendToFrontend({
       type: 'state',
       state: currentState
@@ -1075,12 +1137,6 @@ function updateDisplayContent(type, value) {
 
   // 刷新显示
   updateStateDisplay()
-
-  // 同步到前台
-  window.electronAPI.sendToFrontend({
-    type: 'state',
-    state: currentState
-  })
 }
 
 // 打开比分展示窗口
@@ -1141,8 +1197,10 @@ async function importBpPack() {
     if (result.success) {
       const details = []
       if (result.packData?.frontendBounds) details.push('前台窗口大小')
-      if (result.packData?.scoreboardLayoutA) details.push('A队比分板布局')
-      if (result.packData?.scoreboardLayoutB) details.push('B队比分板布局')
+      if (result.packData?.scoreboardABounds || result.packData?.scoreboardLayoutA) details.push('A队比分板窗口大小')
+      if (result.packData?.scoreboardBBounds || result.packData?.scoreboardLayoutB) details.push('B队比分板窗口大小')
+      if (result.packData?.scoreboardOverviewBounds) details.push('总览比分板窗口大小')
+      if (result.packData?.postMatchBounds) details.push('赛后数据窗口大小')
       const detailStr = details.length > 0 ? `（已应用：${details.join('、')}）` : ''
       addLog(`BP布局包导入成功！前台页面已自动刷新。${detailStr}`, 'success')
       // 发送更新通知给前台

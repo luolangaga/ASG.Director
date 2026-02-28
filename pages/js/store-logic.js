@@ -35,7 +35,7 @@ function showToast(message, type = 'info') {
 async function ensureLoggedIn(actionName) {
   const auth = await window.electronAPI.getAuthStatus()
   if (!auth?.isLoggedIn) {
-    showToast(`请先登录 ASG 账号再${actionName || '进行此操作'}`, 'error')
+    showToast(`请先登录 Idvevent 账号再${actionName || '进行此操作'}`, 'error')
     return false
   }
   return true
