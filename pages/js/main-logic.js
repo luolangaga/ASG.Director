@@ -18,11 +18,144 @@ function switchView(viewId) {
   }
 }
 
+const SETTINGS_TAB_CONFIG = {
+  plugins: { title: '扩展与插件', keywords: ['插件', '插件商店', '插件管理', '布局商店', '布局包', 'obs', '自动化', '规则', '导入', '导出', '重置'], defaultAnchorId: 'settings-plugin-center-card' },
+  assets: { title: '资源与素材', keywords: ['资源', '角色图片', '字体', '组件', '动画'], defaultAnchorId: 'settings-assets-manage-card' },
+  render: { title: '输出与渲染', keywords: ['分辨率', '前台', '输出', '窗口', '锁定', '透明', '背景', '自动打开', '同步', '跨设备'], defaultAnchorId: 'settings-render-output-card' },
+  '3d': { title: '3D 模型', keywords: ['3d', '模型', 'mmd', '动作', 'toon', '描边', '抗锯齿', 'fps'], defaultAnchorId: 'model3dSettingsCard' }
+}
+
+const SETTINGS_SEARCH_INDEX = [
+  { label: '插件商店', keywords: ['插件', '商店', '下载'], tabId: 'plugins', anchorId: 'settings-plugin-center-card' },
+  { label: '管理已安装插件', keywords: ['插件', '管理', '安装'], tabId: 'plugins', anchorId: 'settings-plugin-center-card' },
+  { label: '布局商店', keywords: ['布局', '商店', '社区', '官方'], tabId: 'plugins', anchorId: 'storeCard' },
+  { label: 'OBS 自动化（内置）', keywords: ['obs', '自动化', '场景', '源', '规则'], tabId: 'plugins', anchorId: 'settings-obs-automation-card' },
+  { label: '布局管理（导入/导出/重置）', keywords: ['布局', '导入', '导出', '重置'], tabId: 'plugins', anchorId: 'settings-layout-manage-card' },
+  { label: '资源管理（角色图片/字体/组件/动画）', keywords: ['资源', '角色', '字体', '组件', '动画'], tabId: 'assets', anchorId: 'settings-assets-manage-card' },
+  { label: 'OBS 前台输出分辨率', keywords: ['obs', '前台', '输出', '分辨率', '1080p', '4k'], tabId: 'render', anchorId: 'settings-render-output-card' },
+  { label: '锁定前台窗口大小', keywords: ['窗口', '锁定', '防误触'], tabId: 'render', anchorId: 'settings-render-output-card' },
+  { label: '透明背景模式', keywords: ['透明', '背景', 'obs'], tabId: 'render', anchorId: 'settings-render-output-card' },
+  { label: '本地BP控制台背景', keywords: ['背景', '遮罩', '模糊', '透明度', 'bp'], tabId: 'render', anchorId: 'settings-render-output-card' },
+  { label: '本地BP自动打开', keywords: ['自动打开', 'bp', '窗口', '比分板'], tabId: 'render', anchorId: 'settings-auto-open-card' },
+  { label: '跨设备 ASG.Director 同步', keywords: ['同步', '跨设备', '主端', '副端', '连接'], tabId: 'render', anchorId: 'directorSyncCard' },
+  { label: '3D 模型设置', keywords: ['3d', '模型', 'mmd', '路径', 'toon', '描边'], tabId: '3d', anchorId: 'model3dSettingsCard' }
+]
+
 function switchSettingTab(tabId, e) {
   document.querySelectorAll('[id^="setting-tab-"]').forEach(el => el.style.display = 'none');
-  document.getElementById('setting-tab-' + tabId).style.display = 'block';
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  if (e && e.target) e.target.classList.add('active');
+  const target = document.getElementById('setting-tab-' + tabId)
+  if (target) target.style.display = 'block';
+
+  const navButtons = document.querySelectorAll('#settingsCategoryNav .tab-btn')
+  navButtons.forEach(b => b.classList.remove('active'));
+
+  let buttonToActive = null
+  if (e && e.target && e.target.matches && e.target.matches('.tab-btn')) {
+    buttonToActive = e.target
+  } else {
+    buttonToActive = document.querySelector(`#settingsCategoryNav .tab-btn[data-setting-tab="${tabId}"]`)
+  }
+  if (buttonToActive) buttonToActive.classList.add('active');
+}
+
+function normalizeSearchText(text) {
+  return String(text || '').trim().toLowerCase()
+}
+
+function scoreSettingSearchItem(item, query) {
+  const q = normalizeSearchText(query)
+  if (!q) return 0
+  const label = normalizeSearchText(item.label)
+  const joined = [item.label, ...(item.keywords || [])].join(' ').toLowerCase()
+
+  if (label === q) return 200
+  if (label.startsWith(q)) return 120
+  if (label.includes(q)) return 90
+  if (joined.includes(q)) return 60
+
+  const compactQuery = q.replace(/\s+/g, '')
+  if (compactQuery && joined.replace(/\s+/g, '').includes(compactQuery)) return 40
+  return 0
+}
+
+function renderSettingsSearchResults(query) {
+  const input = document.getElementById('settingsSearchInput')
+  const panel = document.getElementById('settingsSearchResults')
+  if (!input || !panel) return
+
+  const q = normalizeSearchText(query)
+  if (!q) {
+    panel.style.display = 'none'
+    panel.innerHTML = ''
+    return
+  }
+
+  const matches = SETTINGS_SEARCH_INDEX
+    .map(item => ({ item, score: scoreSettingSearchItem(item, q) }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+
+  if (!matches.length) {
+    panel.style.display = 'block'
+    panel.innerHTML = '<div class="settings-search-empty">未找到相关设置项</div>'
+    return
+  }
+
+  panel.style.display = 'block'
+  panel.innerHTML = matches.map(({ item }) => {
+    const tabTitle = SETTINGS_TAB_CONFIG[item.tabId]?.title || item.tabId
+    return `<button class="settings-search-item" type="button" data-setting-tab="${item.tabId}" data-setting-anchor="${item.anchorId}"><span>${item.label}</span><small>${tabTitle}</small></button>`
+  }).join('')
+}
+
+function jumpToSettingSearchItem(tabId, anchorId) {
+  switchSettingTab(tabId)
+  const anchor = document.getElementById(anchorId) || document.getElementById(SETTINGS_TAB_CONFIG[tabId]?.defaultAnchorId || '')
+  if (anchor && anchor.scrollIntoView) {
+    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    anchor.classList.add('settings-jump-flash')
+    window.setTimeout(() => anchor.classList.remove('settings-jump-flash'), 1200)
+  }
+}
+
+function bindSettingsNavigator() {
+  const nav = document.getElementById('settingsCategoryNav')
+  const input = document.getElementById('settingsSearchInput')
+  const panel = document.getElementById('settingsSearchResults')
+  if (!nav || !input || !panel) return
+
+  nav.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (evt) => {
+      const tabId = btn.dataset.settingTab
+      switchSettingTab(tabId, evt)
+    })
+  })
+
+  input.addEventListener('input', () => renderSettingsSearchResults(input.value))
+  input.addEventListener('focus', () => renderSettingsSearchResults(input.value))
+  input.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Escape') {
+      input.value = ''
+      renderSettingsSearchResults('')
+    }
+  })
+
+  panel.addEventListener('click', (evt) => {
+    const target = evt.target.closest('.settings-search-item')
+    if (!target) return
+    const tabId = target.dataset.settingTab
+    const anchorId = target.dataset.settingAnchor
+    jumpToSettingSearchItem(tabId, anchorId)
+    panel.style.display = 'none'
+  })
+
+  document.addEventListener('click', (evt) => {
+    const inside = evt.target.closest('.settings-nav-shell')
+    if (!inside) panel.style.display = 'none'
+  })
+
+  switchSettingTab('plugins')
 }
 
 // ============================================================
@@ -33,6 +166,7 @@ let currentLayout = null;
 
 // Initialize
 window.addEventListener('DOMContentLoaded', async () => {
+  bindSettingsNavigator()
   try {
     if (window.electronAPI && window.electronAPI.loadLayout) {
       const res = await window.electronAPI.loadLayout();

@@ -265,15 +265,38 @@
         </div>
 
         <!-- View: Settings -->
-        <div id="view-settings" class="view-section">
+        <div id="view-settings" class="view-section settings-center-page">
           <div class="section-header">
             <h1 class="section-title">设置中心</h1>
             <p class="section-desc">配置插件、布局、字体、动画、渲染分辨率与 MMD 模型。</p>
           </div>
 
+          <div class="settings-nav-shell">
+            <div class="settings-category-nav" id="settingsCategoryNav">
+              <button class="tab-btn" data-setting-tab="plugins" onclick="switchSettingTab('plugins')">扩展与插件</button>
+              <button class="tab-btn" data-setting-tab="assets" onclick="switchSettingTab('assets')">资源与素材</button>
+              <button class="tab-btn" data-setting-tab="render" onclick="switchSettingTab('render')">输出与渲染</button>
+              <button class="tab-btn" data-setting-tab="3d" onclick="switchSettingTab('3d')">3D 模型</button>
+            </div>
+            <div class="settings-search-wrap">
+              <input type="text" id="settingsSearchInput" class="form-input" placeholder="搜索设置项，例如：字体 / 分辨率 / OBS / 3D">
+              <div id="settingsSearchResults" class="settings-search-results" style="display:none;"></div>
+            </div>
+            <div class="settings-quick-links">
+              <button class="btn btn-ghost" type="button" onclick="jumpToSettingSearchItem('assets','settings-assets-manage-card')">常用：字体与素材</button>
+              <button class="btn btn-ghost" type="button" onclick="jumpToSettingSearchItem('render','settings-render-output-card')">常用：输出分辨率</button>
+              <button class="btn btn-ghost" type="button" onclick="jumpToSettingSearchItem('plugins','settings-obs-automation-card')">常用：OBS 自动化</button>
+              <button class="btn btn-ghost" type="button" onclick="jumpToSettingSearchItem('3d','model3dSettingsCard')">常用：3D 模型</button>
+            </div>
+          </div>
+
           <div id="setting-tab-plugins" class="settings-section">
+            <div class="settings-section-heading">
+              <h3>扩展与插件</h3>
+              <p>管理插件、布局商店与 OBS 自动化能力。</p>
+            </div>
             <div class="grid-2">
-              <div class="feature-card">
+              <div class="feature-card" id="settings-plugin-center-card">
                 <h3>插件中心</h3>
                 <p>扩展导播端功能。</p>
                 <button class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="openPluginStore()">插件商店</button>
@@ -288,7 +311,7 @@
               </div>
             </div>
 
-            <div class="feature-card" style="margin-top:20px;">
+            <div class="feature-card" id="settings-obs-automation-card" style="margin-top:20px;">
               <h3>OBS 自动化（内置）</h3>
               <p>无需下载插件，直接用本地 BP 事件触发 OBS 场景/源操作。</p>
               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
@@ -300,7 +323,7 @@
               </div>
             </div>
 
-            <div class="feature-card" style="margin-top:20px;">
+            <div class="feature-card" id="settings-layout-manage-card" style="margin-top:20px;">
               <h3>布局管理</h3>
               <p>导入或导出您的 BP 布局包，或重置为默认值。</p>
               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
@@ -328,7 +351,11 @@
           </div>
 
           <div id="setting-tab-assets" class="settings-section">
-            <div class="feature-card">
+            <div class="settings-section-heading">
+              <h3>资源与素材</h3>
+              <p>管理角色图片、字体、组件与动画。</p>
+            </div>
+            <div class="feature-card" id="settings-assets-manage-card">
               <h3>资源管理</h3>
               <div class="grid-2">
                 <button class="btn btn-secondary" onclick="openCharacterManager()">🎭 角色图片管理</button>
@@ -340,7 +367,11 @@
           </div>
 
           <div id="setting-tab-render" class="settings-section">
-            <div class="feature-card">
+            <div class="settings-section-heading">
+              <h3>输出与渲染</h3>
+              <p>前台输出参数、背景效果、自动开窗与跨设备同步。</p>
+            </div>
+            <div class="feature-card" id="settings-render-output-card">
               <h3>OBS 前台输出</h3>
               <div class="control-group">
                 <label class="control-label">输出分辨率</label>
@@ -441,7 +472,7 @@
               </div>
             </div>
 
-            <div class="feature-card" style="margin-top:20px;">
+            <div class="feature-card" id="settings-auto-open-card" style="margin-top:20px;">
               <h3>本地BP自动打开</h3>
               <p style="font-size:12px; color:var(--text-secondary);">进入本地BP时按需自动打开窗口</p>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
@@ -566,6 +597,10 @@
           </div>
 
           <div id="setting-tab-3d" class="settings-section">
+            <div class="settings-section-heading">
+              <h3>3D 模型</h3>
+              <p>配置 MMD 模型路径、渲染参数与性能选项。</p>
+            </div>
             <div class="feature-card" id="model3dSettingsCard">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <label
