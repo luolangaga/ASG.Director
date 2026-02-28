@@ -1,4 +1,4 @@
-name: Build Mac
+name: Build Desktop
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-mac:
     runs-on: macos-latest
 
     steps:
@@ -31,12 +31,6 @@ jobs:
           if [ ! -f assets/icon.icns ]; then
             echo "Warning: assets/icon.icns not found. Creating a temporary one from icon.png or empty."
             if [ -f assets/icon.png ]; then
-              # Try to convert png to icns if sips/iconutil is available, or just copy if testing
-              # Simple workaround: just ensure the file exists so electron-builder doesn't crash immediately
-              # But electron-builder really needs a valid icns.
-              # Let's try to install a tool or just skip if not critical, but it IS critical for mac build.
-              # For now, we will assume the user will fix it, but let's try to generate a dummy if possible.
-              # Actually, MacOS has 'sips' and 'iconutil'.
               mkdir -p assets/icon.iconset
               sips -z 16 16     assets/icon.png --out assets/icon.iconset/icon_16x16.png
               sips -z 32 32     assets/icon.png --out assets/icon.iconset/icon_16x16@2x.png
@@ -59,9 +53,40 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Artifacts
+      - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mac-build
           path: dist/*.dmg
+          retention-days: 5
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows App
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            dist/*.exe
+            dist/*.msi
+            dist/*.appx
           retention-days: 5
