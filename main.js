@@ -785,6 +785,19 @@ function getLocalPagesBaseUrl(port) {
   return `http://127.0.0.1:${port}`
 }
 
+function getLocalNetworkIps() {
+  const ifaces = os.networkInterfaces()
+  const ips = new Set()
+  Object.values(ifaces).forEach(list => {
+    if (!Array.isArray(list)) return
+    list.forEach(item => {
+      if (!item || item.family !== 'IPv4' || item.internal) return
+      ips.add(item.address)
+    })
+  })
+  return Array.from(ips)
+}
+
 function getLocalPagesMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase()
   if (ext === '.html') return 'text/html; charset=utf-8'
@@ -822,7 +835,8 @@ function buildLocalPagesIndexHtml(pages, baseUrl, baseDir) {
     'character-display.html': '/character-display',
     'lower-third.html': '/lower-third',
     'ticker.html': '/ticker',
-    'match-card.html': '/match-card'
+    'match-card.html': '/match-card',
+    'remote-control.html': '/remote-control'
   }
   const items = pages
     .filter(p => p.enabled)
@@ -1617,6 +1631,11 @@ function handleLocalPagesRequest(req, res) {
     localPagesHandleHtmlPage(req, res, filePath, 'match-card')
     return
   }
+  if (pathname === '/remote-control' || pathname === '/remote-control.html') {
+    const filePath = path.join(dir, 'remote-control.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'remote-control')
+    return
+  }
   if (urlObj.pathname === '/api/pages') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
     res.end(JSON.stringify({ success: true, pages, baseUrl }))
@@ -1737,7 +1756,7 @@ function startLocalPagesServer() {
     server.on('error', err => {
       resolve({ success: false, error: err.message })
     })
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, '0.0.0.0', () => {
       localPagesServer = server
       localPagesServerPort = port
       try {
@@ -1792,9 +1811,14 @@ function stopLocalPagesServer() {
 }
 
 function getLocalPagesStatus() {
+  const ips = getLocalNetworkIps()
+  const lanUrls = ips.map(ip => `http://${ip}:${localPagesServerPort || readLocalPagesConfig().port}`)
   return {
     running: !!localPagesServer,
-    port: localPagesServerPort
+    port: localPagesServerPort,
+    localhostUrl: localPagesServerPort ? getLocalPagesBaseUrl(localPagesServerPort) : null,
+    lanUrls,
+    cloudEntryBase: 'https://asg.director/remote-control.html'
   }
 }
 
@@ -1873,6 +1897,27 @@ ipcMain.handle('local-pages:get-pages', () => {
 
 ipcMain.handle('local-pages:get-status', () => {
   return { success: true, status: getLocalPagesStatus() }
+})
+
+ipcMain.handle('local-pages:get-connection-info', () => {
+  const status = getLocalPagesStatus()
+  const localTargets = Array.isArray(status.lanUrls)
+    ? status.lanUrls.map(base => ({
+      base,
+      frontend: `${base}/frontend`,
+      localBp: `${base}/local-bp.html`
+    }))
+    : []
+  const firstFrontend = localTargets[0]?.frontend || ''
+  const cloudRemoteControlUrl = firstFrontend
+    ? `https://asg.director/remote-control.html?target=${encodeURIComponent(firstFrontend)}`
+    : 'https://asg.director/remote-control.html'
+  return {
+    success: true,
+    status,
+    localTargets,
+    cloudRemoteControlUrl
+  }
 })
 
 ipcMain.handle('local-pages:read-file', (event, fileName) => {

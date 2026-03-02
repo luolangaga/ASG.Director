@@ -19,6 +19,91 @@ let characters = {
   hunters: []
 }
 let characterAssetOverrides = {}
+let remoteAccessCurrentPort = 9528
+
+function showRemoteAccessToast(message) {
+  console.log('[RemoteAccess]', message)
+}
+
+function buildCloudRelayUrl(targetUrl) {
+  const base = 'https://asg.director/remote-control.html'
+  if (!targetUrl) return base
+  return `${base}?target=${encodeURIComponent(targetUrl)}`
+}
+
+function setRemoteAccessQr(url) {
+  const img = document.getElementById('remoteAccessQrImage')
+  if (!img) return
+  if (!url) {
+    img.removeAttribute('src')
+    return
+  }
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`
+}
+
+function updateRemoteAccessUiFromStatus(status) {
+  const localInput = document.getElementById('remoteAccessLocalUrl')
+  const cloudInput = document.getElementById('remoteAccessCloudUrl')
+  const statusText = document.getElementById('remoteAccessStatusText')
+  const lanUrls = Array.isArray(status?.lanUrls) ? status.lanUrls : []
+  const localhostUrl = status?.localhostUrl || '-'
+  const primaryLan = lanUrls[0] || localhostUrl
+  remoteAccessCurrentPort = Number(status?.port) || remoteAccessCurrentPort
+
+  if (localInput) localInput.value = primaryLan
+  const cloudUrl = buildCloudRelayUrl(primaryLan && primaryLan !== '-' ? `${primaryLan}/local-bp.html` : '')
+  if (cloudInput) cloudInput.value = cloudUrl
+  setRemoteAccessQr(cloudUrl)
+
+  if (statusText) {
+    if (!status?.running) {
+      statusText.textContent = '未启动'
+    } else if (lanUrls.length > 0) {
+      statusText.textContent = `已就绪（${lanUrls.length} 个局域网地址）`
+    } else {
+      statusText.textContent = '已启动（仅本机）'
+    }
+  }
+}
+
+async function refreshRemoteAccessStatus() {
+  try {
+    const result = await window.electronAPI.localPagesGetStatus()
+    if (!result || !result.success) return
+    updateRemoteAccessUiFromStatus(result.status || {})
+  } catch (e) {
+    console.warn('[RemoteAccess] 获取状态失败:', e)
+  }
+}
+
+async function copyRemoteAccessUrl(inputId) {
+  const input = document.getElementById(inputId)
+  const text = input ? String(input.value || '').trim() : ''
+  if (!text || text === '-') return
+  try {
+    await navigator.clipboard.writeText(text)
+    showRemoteAccessToast('已复制链接')
+  } catch (e) {
+    showRemoteAccessToast('复制失败，请手动复制')
+  }
+}
+
+function buildManualRemoteAccessLink() {
+  const ipInput = document.getElementById('remoteAccessManualIp')
+  const portInput = document.getElementById('remoteAccessManualPort')
+  const targetInput = document.getElementById('remoteAccessManualUrl')
+  const ip = ipInput ? String(ipInput.value || '').trim() : ''
+  const port = Number(portInput ? portInput.value : remoteAccessCurrentPort) || remoteAccessCurrentPort
+  if (!targetInput) return
+  if (!ip) {
+    targetInput.value = '-'
+    return
+  }
+  const localUrl = `http://${ip}:${port}/local-bp.html`
+  const cloudUrl = buildCloudRelayUrl(localUrl)
+  targetInput.value = cloudUrl
+  setRemoteAccessQr(cloudUrl)
+}
 
 function getCharacterAssetSrc(type, variant, name) {
   const folderMap = type === 'survivor'
@@ -6079,6 +6164,7 @@ window.addEventListener('DOMContentLoaded', () => {
     resetInteractionOverlays()
     resetSearchInputs()
     unlockAllInputs()
+    refreshRemoteAccessStatus()
   }
 })
 

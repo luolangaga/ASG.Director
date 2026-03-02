@@ -532,6 +532,59 @@
               </div>
             </div>
 
+            <div class="feature-card" id="settings-remote-connect-card" style="margin-top:20px;">
+              <h3>远程连接入口（云端页面 + 局域网 ASG.Director）</h3>
+              <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+                把 <code>remote-control.html</code> 部署到云端后，其他用户可在浏览器访问该页面，通过扫码或手动输入 IP+端口连接你的局域网导播机。
+              </p>
+
+              <div class="control-group">
+                <label class="control-label">云端入口链接</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <input id="remoteConnectCloudUrl" class="form-input" readonly value="-">
+                  <button class="btn btn-secondary" onclick="copyRemoteConnectField('remoteConnectCloudUrl')">复制</button>
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top:10px;">
+                <label class="control-label">局域网前台链接（示例）</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <input id="remoteConnectLanFrontendUrl" class="form-input" readonly value="-">
+                  <button class="btn btn-secondary" onclick="copyRemoteConnectField('remoteConnectLanFrontendUrl')">复制</button>
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top:10px;">
+                <label class="control-label">二维码（给用户扫码直连）</label>
+                <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+                  <img id="remoteConnectQrImage" alt="远程连接二维码"
+                    style="width:130px; height:130px; border:1px solid var(--border-color); border-radius:8px; background:#fff; object-fit:contain;">
+                  <div style="font-size:12px; color:var(--text-secondary); line-height:1.6; max-width:540px;">
+                    <div>1) 该二维码默认指向云端入口链接。</div>
+                    <div>2) 云端页支持摄像头扫码，也支持手动输入 IP+端口。</div>
+                    <div>3) 若公网无法直连局域网，请通过内网穿透/端口映射保证可达。</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="control-group" style="margin-top:10px;">
+                <label class="control-label">手动连接生成（给用户输入）</label>
+                <div style="display:grid; grid-template-columns: 1.2fr 0.8fr auto; gap:8px;">
+                  <input id="remoteConnectManualIp" class="form-input" placeholder="局域网IP，例如 192.168.1.20">
+                  <input id="remoteConnectManualPort" class="form-input" type="number" min="1" max="65535" placeholder="端口，默认9528">
+                  <button class="btn btn-primary" onclick="buildRemoteConnectManualUrl()">生成</button>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+                  <input id="remoteConnectManualUrl" class="form-input" readonly value="-">
+                  <button class="btn btn-secondary" onclick="copyRemoteConnectField('remoteConnectManualUrl')">复制</button>
+                </div>
+              </div>
+
+              <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-secondary" onclick="refreshRemoteConnectInfo()">刷新连接信息</button>
+              </div>
+            </div>
+
             <div class="feature-card" id="directorSyncCard" style="margin-top:20px;">
               <h3>跨设备 ASG.Director 同步</h3>
               <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">

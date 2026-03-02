@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ASG Director 远程连接</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; margin:0; background:#111827; color:#e5e7eb; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 20px; }
+    .card { background:#1f2937; border:1px solid #374151; border-radius:14px; padding:16px; margin-bottom:14px; }
+    h1 { font-size:22px; margin:0 0 10px; }
+    p { margin:8px 0; color:#cbd5e1; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    input,select,button { border-radius:10px; border:1px solid #4b5563; padding:10px 12px; font-size:14px; }
+    input,select { background:#111827; color:#e5e7eb; flex:1; min-width:180px; }
+    button { background:#2563eb; color:#fff; cursor:pointer; }
+    button.secondary { background:#374151; }
+    #preview { font-size:13px; word-break: break-all; color:#93c5fd; }
+    video { width:100%; max-height:260px; border-radius:10px; background:#000; }
+    .hint { font-size:12px; color:#94a3b8; }
+    @media (max-width: 640px) { .wrap { padding: 12px; } h1{font-size:18px;} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>ASG.Director 远程连接页</h1>
+      <p>这个页面可以部署到云端，用户访问后可通过 <b>手动输入 IP+端口</b> 或 <b>摄像头扫码</b>，跳转连接局域网内 ASG.Director 本地页面。</p>
+      <p class="hint">建议二维码内容：<code>http://局域网IP:9528/frontend</code> 或 <code>http://局域网IP:9528/local-bp.html</code></p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="ipInput" placeholder="局域网IP，例如 192.168.1.20">
+        <input id="portInput" type="number" min="1" max="65535" value="9528" placeholder="端口">
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <select id="pathSelect">
+          <option value="/frontend">BP前台（frontend）</option>
+          <option value="/local-bp.html">本地BP控制（local-bp）</option>
+          <option value="/">服务首页（index）</option>
+        </select>
+        <button id="openBtn">连接</button>
+      </div>
+      <p id="preview">待生成链接...</p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px;">
+        <button id="startScanBtn" class="secondary">打开摄像头扫码</button>
+        <button id="stopScanBtn" class="secondary">停止扫码</button>
+      </div>
+      <video id="video" playsinline muted></video>
+      <p class="hint">扫码支持 URL 二维码；若扫码结果是云端中转链接（含 target 参数），会自动解析 target 并跳转。</p>
+      <p id="scanResult" class="hint"></p>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const ipInput = document.getElementById('ipInput');
+  const portInput = document.getElementById('portInput');
+  const pathSelect = document.getElementById('pathSelect');
+  const preview = document.getElementById('preview');
+  const video = document.getElementById('video');
+  const scanResult = document.getElementById('scanResult');
+  let mediaStream = null;
+  let detector = null;
+  let scanTimer = null;
+
+  function sanitizeIp(v){ return String(v || '').trim(); }
+  function sanitizePort(v){ const n = parseInt(v,10); return Number.isFinite(n) && n>0 && n<=65535 ? n : 9528; }
+
+  function buildUrl(ip, port, path) {
+    const cleanPath = String(path || '/').startsWith('/') ? path : '/' + path;
+    return `http://${ip}:${port}${cleanPath}`;
+  }
+
+  function parseTarget(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    try {
+      const u = new URL(text);
+      const t = u.searchParams.get('target');
+      if (t) return decodeURIComponent(t);
+      return u.href;
+    } catch {
+      if (/^\d+\.\d+\.\d+\.\d+:\d+/.test(text)) return `http://${text}`;
+      if (/^https?:\/\//i.test(text)) return text;
+      return '';
+    }
+  }
+
+  function updatePreview() {
+    const ip = sanitizeIp(ipInput.value);
+    const port = sanitizePort(portInput.value);
+    if (!ip) { preview.textContent = '待生成链接...'; return ''; }
+    const url = buildUrl(ip, port, pathSelect.value);
+    preview.textContent = url;
+    return url;
+  }
+
+  function connectNow() {
+    const url = updatePreview();
+    if (!url) return;
+    window.location.href = url;
+  }
+
+  async function startScan() {
+    scanResult.textContent = '';
+    if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
+      scanResult.textContent = '当前浏览器不支持摄像头。';
+      return;
+    }
+    if (!('BarcodeDetector' in window)) {
+      scanResult.textContent = '当前浏览器不支持 BarcodeDetector，请使用手动输入。';
+      return;
+    }
+    try {
+      detector = new BarcodeDetector({ formats: ['qr_code'] });
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = mediaStream;
+      await video.play();
+      scanTimer = setInterval(async () => {
+        if (!detector || video.readyState < 2) return;
+        const codes = await detector.detect(video);
+        if (!codes || !codes.length) return;
+        const value = codes[0].rawValue || '';
+        const target = parseTarget(value);
+        scanResult.textContent = `扫码内容: ${value}`;
+        if (target) {
+          stopScan();
+          window.location.href = target;
+        }
+      }, 500);
+    } catch (e) {
+      scanResult.textContent = `扫码启动失败: ${e.message || e}`;
+    }
+  }
+
+  function stopScan() {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+    video.srcObject = null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const target = parseTarget(params.get('target') || '');
+  if (target) {
+    try {
+      const u = new URL(target);
+      ipInput.value = u.hostname;
+      portInput.value = u.port || '9528';
+      pathSelect.value = u.pathname || '/frontend';
+    } catch {}
+  }
+
+  ipInput.addEventListener('input', updatePreview);
+  portInput.addEventListener('input', updatePreview);
+  pathSelect.addEventListener('change', updatePreview);
+  document.getElementById('openBtn').addEventListener('click', connectNow);
+  document.getElementById('startScanBtn').addEventListener('click', startScan);
+  document.getElementById('stopScanBtn').addEventListener('click', stopScan);
+  window.addEventListener('beforeunload', stopScan);
+  updatePreview();
+})();
+</script>
+</body>
+</html>

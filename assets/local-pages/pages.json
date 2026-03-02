@@ -66,6 +66,12 @@
       "title": "AI 生成页面",
       "enabled": true,
       "order": 9
+    },
+    {
+      "fileName": "remote-control.html",
+      "title": "远程连接入口",
+      "enabled": true,
+      "order": 10
     }
   ]
 }

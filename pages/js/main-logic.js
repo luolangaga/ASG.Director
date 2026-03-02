@@ -37,6 +37,7 @@ const SETTINGS_SEARCH_INDEX = [
   { label: '透明背景模式', keywords: ['透明', '背景', 'obs'], tabId: 'render', anchorId: 'settings-render-output-card' },
   { label: '本地BP控制台背景', keywords: ['背景', '遮罩', '模糊', '透明度', 'bp'], tabId: 'render', anchorId: 'settings-render-output-card' },
   { label: '本地BP自动打开', keywords: ['自动打开', 'bp', '窗口', '比分板'], tabId: 'render', anchorId: 'settings-auto-open-card' },
+  { label: '远程连接入口（云端+扫码）', keywords: ['远程', '扫码', '二维码', '云端', '局域网', 'ip', '端口'], tabId: 'render', anchorId: 'settings-remote-connect-card' },
   { label: '跨设备 ASG.Director 同步', keywords: ['同步', '跨设备', '主端', '副端', '连接'], tabId: 'render', anchorId: 'directorSyncCard' },
   { label: '3D 模型设置', keywords: ['3d', '模型', 'mmd', '路径', 'toon', '描边'], tabId: '3d', anchorId: 'model3dSettingsCard' }
 ]
@@ -179,6 +180,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (window.electronAPI && window.electronAPI.localPagesGetPages) {
       initLocalPagesWidget();
     }
+    if (window.electronAPI && window.electronAPI.localPagesGetConnectionInfo) {
+      refreshRemoteConnectInfo()
+    }
     if (window.electronAPI && window.electronAPI.localBpAutoOpenGet) {
       loadLocalBpAutoOpenSettings();
     }
@@ -194,6 +198,77 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.error('Failed to load layout:', e);
   }
 });
+
+function buildCloudQrUrl(text) {
+  const value = String(text || '').trim()
+  if (!value) return ''
+  return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(value)}`
+}
+
+function setRemoteConnectQr(text) {
+  const img = document.getElementById('remoteConnectQrImage')
+  if (!img) return
+  const url = buildCloudQrUrl(text)
+  if (!url) {
+    img.removeAttribute('src')
+    return
+  }
+  img.src = url
+}
+
+async function refreshRemoteConnectInfo() {
+  if (!window.electronAPI || !window.electronAPI.localPagesGetConnectionInfo) return
+  try {
+    const res = await window.electronAPI.localPagesGetConnectionInfo()
+    if (!res || !res.success) return
+    const cloudEl = document.getElementById('remoteConnectCloudUrl')
+    const lanEl = document.getElementById('remoteConnectLanFrontendUrl')
+    const cloudUrl = res.cloudRemoteControlUrl || 'https://asg.director/remote-control.html'
+    const lanFrontend = (Array.isArray(res.localTargets) && res.localTargets[0] && res.localTargets[0].frontend)
+      ? res.localTargets[0].frontend
+      : '-'
+    if (cloudEl) cloudEl.value = cloudUrl
+    if (lanEl) lanEl.value = lanFrontend
+    setRemoteConnectQr(cloudUrl)
+  } catch (e) {
+    console.error('Failed to refresh remote connect info', e)
+  }
+}
+
+function copyRemoteConnectField(inputId) {
+  const el = document.getElementById(inputId)
+  const text = el ? String(el.value || '').trim() : ''
+  if (!text || text === '-') return
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      if (typeof showStatus === 'function') showStatus('链接已复制', 'success')
+    })
+    .catch(() => {
+      if (typeof showStatus === 'function') showStatus('复制失败，请手动复制', 'warning')
+    })
+}
+
+function buildRemoteConnectManualUrl() {
+  const ipEl = document.getElementById('remoteConnectManualIp')
+  const portEl = document.getElementById('remoteConnectManualPort')
+  const outEl = document.getElementById('remoteConnectManualUrl')
+  if (!outEl) return
+  const ip = ipEl ? String(ipEl.value || '').trim() : ''
+  const portRaw = portEl ? parseInt(portEl.value, 10) : NaN
+  const port = Number.isFinite(portRaw) && portRaw > 0 && portRaw <= 65535 ? portRaw : 9528
+  if (!ip) {
+    outEl.value = '-'
+    return
+  }
+  const target = `http://${ip}:${port}/frontend`
+  const url = `https://asg.director/remote-control.html?target=${encodeURIComponent(target)}`
+  outEl.value = url
+  setRemoteConnectQr(url)
+}
+
+window.refreshRemoteConnectInfo = refreshRemoteConnectInfo
+window.copyRemoteConnectField = copyRemoteConnectField
+window.buildRemoteConnectManualUrl = buildRemoteConnectManualUrl
 
 function loadModel3dSettings() {
   if (!currentLayout || !currentLayout.model3d) return;
