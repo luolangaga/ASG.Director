@@ -1,5 +1,6 @@
 {
   "port": 9528,
+  "host": "10.182.37.215",
   "pages": [
     {
       "fileName": "timer.html",

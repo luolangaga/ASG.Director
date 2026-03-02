@@ -228,8 +228,30 @@ function normalizeLocalPagesConfig(input) {
   const base = input && typeof input === 'object' ? input : {}
   let port = parseInt(base.port, 10)
   if (!Number.isFinite(port) || port < 1024 || port > 65535) port = 9528
+  let host = typeof base.host === 'string' ? base.host : '127.0.0.1'
+  // 移除严格校验，允许绑定到任意IP
+  // if (host !== '127.0.0.1' && host !== '0.0.0.0') host = '127.0.0.1'
   const pages = Array.isArray(base.pages) ? base.pages.filter(p => p && typeof p === 'object') : []
-  return { port, pages }
+  return { port, host, pages }
+}
+
+function getNetworkInterfaces() {
+  const interfaces = os.networkInterfaces()
+  const results = []
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if ('IPv4' !== iface.family || iface.internal) {
+        continue
+      }
+      results.push({ name, address: iface.address })
+    }
+  }
+  return results
+}
+
+function getLanIp() {
+  const list = getNetworkInterfaces()
+  return list.length > 0 ? list[0].address : '127.0.0.1'
 }
 
 function normalizeLocalBpAutoOpenSettings(input) {
@@ -1721,12 +1743,14 @@ function handleLocalPagesRequest(req, res) {
 
 let localPagesServer = null
 let localPagesServerPort = null
+let localPagesServerHost = null
 
 function startLocalPagesServer() {
   ensureLocalPagesStorage()
   const config = readLocalPagesConfig()
   const port = config.port
-  if (localPagesServer && localPagesServerPort === port) {
+  const host = config.host || '127.0.0.1'
+  if (localPagesServer && localPagesServerPort === port && localPagesServerHost === host) {
     return Promise.resolve({ success: true, port, running: true })
   }
   if (localPagesServer) {
@@ -1737,9 +1761,10 @@ function startLocalPagesServer() {
     server.on('error', err => {
       resolve({ success: false, error: err.message })
     })
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, host, () => {
       localPagesServer = server
       localPagesServerPort = port
+      localPagesServerHost = host
       try {
         const baseState = (typeof buildLocalBpFrontendState === 'function') ? buildLocalBpFrontendState() : localBpState
         if (baseState) {
@@ -1783,6 +1808,7 @@ function stopLocalPagesServer() {
     localPagesServer.close(() => {
       localPagesServer = null
       localPagesServerPort = null
+      localPagesServerHost = null
       if (global.__localPageServerHooks) {
         delete global.__localPageServerHooks
       }
@@ -1867,8 +1893,18 @@ function ensureDirectories() {
 
 ipcMain.handle('local-pages:get-pages', () => {
   const { config, pages, dir } = listLocalPages()
+  const lanIp = getLanIp()
+  const interfaces = getNetworkInterfaces()
   const baseUrl = getLocalPagesBaseUrl(config.port)
-  return { success: true, config, pages, dir, baseUrl }
+  return { success: true, config, pages, dir, baseUrl, lanIp, interfaces, currentHost: config.host }
+})
+
+ipcMain.handle('local-pages:set-host', (event, host) => {
+  const config = readLocalPagesConfig()
+  config.host = host
+  writeJsonFileSafe(localPagesConfigPath, config)
+  startLocalPagesServer()
+  return { success: true, host: config.host }
 })
 
 ipcMain.handle('local-pages:get-status', () => {

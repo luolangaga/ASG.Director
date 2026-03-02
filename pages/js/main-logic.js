@@ -314,6 +314,13 @@ async function initLocalPagesWidget() {
       if (event.target === aiModal) closeLocalPageAiModal()
     })
   }
+  const qrModal = document.getElementById('qrModal')
+  if (qrModal && !qrModal.dataset.clickBound) {
+    qrModal.dataset.clickBound = 'true'
+    qrModal.addEventListener('click', (event) => {
+      if (event.target === qrModal) closeQrModal()
+    })
+  }
   const listEl = document.getElementById('localPagesList')
   if (listEl && !listEl.dataset.dblclickBound) {
     listEl.dataset.dblclickBound = 'true'
@@ -514,14 +521,83 @@ async function refreshLocalPagesStatus() {
   if (statusEl) statusEl.textContent = running ? '运行中' : '未启动'
 }
 
+async function onLocalPagesHostChange() {
+  const el = document.getElementById('localPagesHostSelect')
+  if (!el || !window.electronAPI || !window.electronAPI.localPagesSetHost) return
+  const host = el.value
+  try {
+    const res = await window.electronAPI.localPagesSetHost(host)
+    if (res && res.success) {
+      if (typeof showStatus === 'function') showStatus('已更新监听地址', 'success')
+      await refreshLocalPagesList()
+    }
+  } catch (e) {
+    console.error(e)
+    if (typeof showStatus === 'function') showStatus('更新失败', 'error')
+  }
+}
+
 async function refreshLocalPagesList() {
   const res = await window.electronAPI.localPagesGetPages()
   const listEl = document.getElementById('localPagesList')
   const folderEl = document.getElementById('localPagesFolder')
   const baseUrlEl = document.getElementById('localPagesBaseUrl')
+  const hostSelectEl = document.getElementById('localPagesHostSelect')
+  const lanIpHintEl = document.getElementById('lanIpHint')
+
   if (!listEl || !res || !res.success) return
+
+  const currentHost = res.currentHost || '127.0.0.1'
+  const interfaces = Array.isArray(res.interfaces) ? res.interfaces : []
+
+  if (hostSelectEl) {
+    // 重新生成选项
+    const options = []
+    options.push({ value: '127.0.0.1', label: '仅本机 (127.0.0.1)' })
+    // 添加 0.0.0.0 选项（自动检测）
+    options.push({ value: '0.0.0.0', label: '所有网络接口 (0.0.0.0)' })
+    
+    // 添加检测到的局域网 IP
+    interfaces.forEach(iface => {
+      // 避免重复显示 127.0.0.1
+      if (iface.address === '127.0.0.1') return
+      options.push({ 
+        value: iface.address, 
+        label: `${iface.name} (${iface.address})` 
+      })
+    })
+
+    hostSelectEl.innerHTML = options.map(opt => 
+      `<option value="${opt.value}" ${opt.value === currentHost ? 'selected' : ''}>${opt.label}</option>`
+    ).join('')
+  }
+  
+  const lanIp = res.lanIp || '未检测到'
+  if (lanIpHintEl) {
+    if (currentHost === '0.0.0.0') {
+      lanIpHintEl.textContent = `本机 IP: ${lanIp} (其他设备可通过此 IP 访问)`
+    } else if (currentHost === '127.0.0.1') {
+      lanIpHintEl.textContent = `当前仅本机可访问`
+    } else {
+      // 选择了特定 IP
+      const found = interfaces.find(i => i.address === currentHost)
+      const name = found ? found.name : '未知接口'
+      lanIpHintEl.textContent = `监听特定接口: ${name} (${currentHost})`
+    }
+  }
+
   localPagesBaseUrl = res.baseUrl || ''
-  const obsBaseUrl = localPagesBaseUrl.replace('://localhost:', '://127.0.0.1:')
+  let obsBaseUrl = localPagesBaseUrl
+  if (currentHost === '0.0.0.0') {
+    // 如果是 0.0.0.0，使用检测到的第一个 LAN IP 替换 URL 中的 localhost
+    obsBaseUrl = localPagesBaseUrl.replace('://localhost:', `://${lanIp}:`).replace('://127.0.0.1:', `://${lanIp}:`)
+  } else if (currentHost === '127.0.0.1') {
+    obsBaseUrl = localPagesBaseUrl.replace('://localhost:', '://127.0.0.1:')
+  } else {
+    // 如果选择了特定 IP，直接使用该 IP
+    obsBaseUrl = localPagesBaseUrl.replace('://localhost:', `://${currentHost}:`).replace('://127.0.0.1:', `://${currentHost}:`)
+  }
+
   if (folderEl) folderEl.textContent = res.dir || ''
   if (baseUrlEl) baseUrlEl.textContent = obsBaseUrl
   const pages = Array.isArray(res.pages) ? res.pages : []
@@ -556,7 +632,10 @@ async function refreshLocalPagesList() {
               <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${urlA}</div>
               <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${hint}</div>
             </div>
-            <button class="btn btn-ghost" onclick="copyLocalPageUrl('${urlA}')">复制</button>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" onclick="copyLocalPageUrl('${urlA}')">复制</button>
+              <button class="btn btn-ghost" onclick="showLocalPageQr('${urlA}')">二维码</button>
+            </div>
           </div>
           <div data-local-page="true" data-file="${p.fileName}" data-title="${p.title || p.fileName}" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-color);">
             <div style="flex:1; min-width:0;">
@@ -564,7 +643,10 @@ async function refreshLocalPagesList() {
               <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${urlB}</div>
               <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${hint}</div>
             </div>
-            <button class="btn btn-ghost" onclick="copyLocalPageUrl('${urlB}')">复制</button>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" onclick="copyLocalPageUrl('${urlB}')">复制</button>
+              <button class="btn btn-ghost" onclick="showLocalPageQr('${urlB}')">二维码</button>
+            </div>
           </div>
         `
       }
@@ -577,7 +659,10 @@ async function refreshLocalPagesList() {
               <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${base}</div>
               <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${hint}</div>
             </div>
-            <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+              <button class="btn btn-ghost" onclick="showLocalPageQr('${base}')">二维码</button>
+            </div>
           </div>
         `
       }
@@ -590,7 +675,10 @@ async function refreshLocalPagesList() {
               <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${base}</div>
               <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${hint}</div>
             </div>
-            <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+              <button class="btn btn-ghost" onclick="showLocalPageQr('${base}')">二维码</button>
+            </div>
           </div>
         `
       }
@@ -600,7 +688,10 @@ async function refreshLocalPagesList() {
             <div style="font-size:14px;">${p.title || p.fileName}</div>
             <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${base}</div>
           </div>
-          <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+            <button class="btn btn-ghost" onclick="showLocalPageQr('${base}')">二维码</button>
+          </div>
         </div>
       `
     })
@@ -786,4 +877,20 @@ function copyLocalPageUrl(url) {
     document.execCommand('copy')
     document.body.removeChild(input)
   }
+}
+
+function showLocalPageQr(url) {
+  const modal = document.getElementById('qrModal')
+  const img = document.getElementById('qrImage')
+  const text = document.getElementById('qrUrlText')
+  if (!modal || !img || !text) return
+  const api = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&format=png&color=000000&bgcolor=ffffff&margin=20&data=' + encodeURIComponent(url)
+  img.src = api
+  text.textContent = url
+  modal.style.display = 'block'
+}
+
+function closeQrModal() {
+  const modal = document.getElementById('qrModal')
+  if (modal) modal.style.display = 'none'
 }

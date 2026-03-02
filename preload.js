@@ -190,6 +190,7 @@ const electronAPI = {
   localPagesReadFile: (fileName) => ipcRenderer.invoke('local-pages:read-file', fileName),
   localPagesWriteFile: (fileName, content) => ipcRenderer.invoke('local-pages:write-file', fileName, content),
   localPagesGenerateWithAi: (payload) => ipcRenderer.invoke('local-pages:generate-with-ai', payload),
+  localPagesSetHost: (host) => ipcRenderer.invoke('local-pages:set-host', host),
   localBpAutoOpenGet: () => ipcRenderer.invoke('local-bp:auto-open:get'),
   localBpAutoOpenSet: (settings) => ipcRenderer.invoke('local-bp:auto-open:set', settings),
   getLocalBpConsoleBackground: () => ipcRenderer.invoke('local-bp-console-bg:get'),
