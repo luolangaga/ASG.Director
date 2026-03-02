@@ -187,6 +187,7 @@ const electronAPI = {
   switchEnvironment: (env) => ipcRenderer.invoke('switch-environment', env),
   localPagesGetPages: () => ipcRenderer.invoke('local-pages:get-pages'),
   localPagesGetStatus: () => ipcRenderer.invoke('local-pages:get-status'),
+  localPagesGetConnectionInfo: () => ipcRenderer.invoke('local-pages:get-connection-info'),
   localPagesReadFile: (fileName) => ipcRenderer.invoke('local-pages:read-file', fileName),
   localPagesWriteFile: (fileName, content) => ipcRenderer.invoke('local-pages:write-file', fileName, content),
   localPagesGenerateWithAi: (payload) => ipcRenderer.invoke('local-pages:generate-with-ai', payload),

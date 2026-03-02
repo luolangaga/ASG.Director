@@ -143,6 +143,42 @@
               </div>
             </div>
 
+            <div class="remote-access-card">
+              <div class="remote-access-header">
+                <h3>远程连接（局域网 / 云端）</h3>
+                <span class="remote-access-status" id="remoteAccessStatusText">检测中...</span>
+              </div>
+              <div class="remote-access-grid">
+                <div class="remote-access-block">
+                  <div class="remote-access-label">当前本机服务</div>
+                  <div class="remote-access-url-row">
+                    <input id="remoteAccessLocalUrl" class="player-name-input remote-access-input" readonly value="-">
+                    <button class="btn btn-secondary btn-small" onclick="copyRemoteAccessUrl('remoteAccessLocalUrl')">复制</button>
+                  </div>
+                </div>
+                <div class="remote-access-block">
+                  <div class="remote-access-label">云端中转链接（asg.director）</div>
+                  <div class="remote-access-url-row">
+                    <input id="remoteAccessCloudUrl" class="player-name-input remote-access-input" readonly value="-">
+                    <button class="btn btn-secondary btn-small" onclick="copyRemoteAccessUrl('remoteAccessCloudUrl')">复制</button>
+                  </div>
+                </div>
+              </div>
+              <div class="remote-access-qr-wrap">
+                <img id="remoteAccessQrImage" class="remote-access-qr" alt="连接二维码">
+                <div class="remote-access-qr-tip">扫码即可在浏览器打开链接；也可手动输入 IP 和端口加入。</div>
+              </div>
+              <div class="remote-access-manual">
+                <input id="remoteAccessManualIp" class="player-name-input" placeholder="输入IP，例如 192.168.1.20">
+                <input id="remoteAccessManualPort" class="player-name-input" type="number" min="1" max="65535" placeholder="端口，例如 9528">
+                <button class="btn btn-primary btn-small" onclick="buildManualRemoteAccessLink()">生成手动链接</button>
+              </div>
+              <div class="remote-access-url-row remote-access-manual-result">
+                <input id="remoteAccessManualUrl" class="player-name-input remote-access-input" readonly value="-">
+                <button class="btn btn-secondary btn-small" onclick="copyRemoteAccessUrl('remoteAccessManualUrl')">复制</button>
+              </div>
+            </div>
+
           </div>
         </div>
 
