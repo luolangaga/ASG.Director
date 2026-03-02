@@ -50,9 +50,13 @@
       <div class="row" style="margin-bottom:10px;">
         <button id="startScanBtn" class="secondary">打开摄像头扫码</button>
         <button id="stopScanBtn" class="secondary">停止扫码</button>
+        <label class="secondary" for="qrImageInput" style="display:inline-flex; align-items:center; cursor:pointer;">上传二维码图片</label>
+        <input id="qrImageInput" type="file" accept="image/*" style="display:none;">
       </div>
       <video id="video" playsinline muted></video>
+      <canvas id="scanCanvas" style="display:none;"></canvas>
       <p class="hint">扫码支持 URL 二维码；若扫码结果是云端中转链接（含 target 参数），会自动解析 target 并跳转。</p>
+      <p class="hint">若出现 <code>Permission denied</code>：请允许摄像头权限，并使用 HTTPS 或 localhost 访问；也可改用“上传二维码图片”。</p>
       <p id="scanResult" class="hint"></p>
     </div>
   </div>
@@ -64,6 +68,8 @@
   const pathSelect = document.getElementById('pathSelect');
   const preview = document.getElementById('preview');
   const video = document.getElementById('video');
+  const scanCanvas = document.getElementById('scanCanvas');
+  const qrImageInput = document.getElementById('qrImageInput');
   const scanResult = document.getElementById('scanResult');
   let mediaStream = null;
   let detector = null;
@@ -118,6 +124,9 @@
       return;
     }
     try {
+      if (window.isSecureContext !== true) {
+        scanResult.textContent = '当前页面不是安全上下文（需 HTTPS 或 localhost），摄像头可能被浏览器拦截。';
+      }
       detector = new BarcodeDetector({ formats: ['qr_code'] });
       mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       video.srcObject = mediaStream;
@@ -135,7 +144,55 @@
         }
       }, 500);
     } catch (e) {
-      scanResult.textContent = `扫码启动失败: ${e.message || e}`;
+      const name = e && e.name ? e.name : '';
+      const message = e && e.message ? e.message : String(e || '未知错误');
+      if (name === 'NotAllowedError' || /Permission denied/i.test(message)) {
+        scanResult.textContent = '扫码启动失败: 摄像头权限被拒绝。请在浏览器地址栏允许摄像头权限，或改用“上传二维码图片”。';
+        return;
+      }
+      if (name === 'NotFoundError') {
+        scanResult.textContent = '扫码启动失败: 未检测到可用摄像头。请改用“上传二维码图片”。';
+        return;
+      }
+      if (name === 'NotReadableError') {
+        scanResult.textContent = '扫码启动失败: 摄像头被其他应用占用。请关闭占用后重试。';
+        return;
+      }
+      scanResult.textContent = `扫码启动失败: ${message}`;
+    }
+  }
+
+  async function scanQrFromImageFile(file) {
+    if (!file) return;
+    if (!('BarcodeDetector' in window)) {
+      scanResult.textContent = '当前浏览器不支持二维码识别，请使用手动输入。';
+      return;
+    }
+    try {
+      detector = detector || new BarcodeDetector({ formats: ['qr_code'] });
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      scanCanvas.width = img.naturalWidth || img.width;
+      scanCanvas.height = img.naturalHeight || img.height;
+      const ctx = scanCanvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const codes = await detector.detect(scanCanvas);
+      URL.revokeObjectURL(objectUrl);
+      if (!codes || !codes.length) {
+        scanResult.textContent = '未识别到二维码，请更换清晰图片后重试。';
+        return;
+      }
+      const value = codes[0].rawValue || '';
+      const target = parseTarget(value);
+      scanResult.textContent = `图片识别结果: ${value}`;
+      if (target) window.location.href = target;
+    } catch (e) {
+      scanResult.textContent = `图片识别失败: ${e.message || e}`;
     }
   }
 
@@ -165,6 +222,11 @@
   document.getElementById('openBtn').addEventListener('click', connectNow);
   document.getElementById('startScanBtn').addEventListener('click', startScan);
   document.getElementById('stopScanBtn').addEventListener('click', stopScan);
+  qrImageInput.addEventListener('change', (event) => {
+    const file = event.target && event.target.files ? event.target.files[0] : null;
+    scanQrFromImageFile(file);
+    if (event.target) event.target.value = '';
+  });
   window.addEventListener('beforeunload', stopScan);
   updatePreview();
 })();
