@@ -60,6 +60,21 @@ body::before {
   transition: opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease;
 }
 
+#localBpCustomBgVideo {
+  position: fixed;
+  inset: -64px;
+  width: calc(100% + 128px);
+  height: calc(100% + 128px);
+  object-fit: cover;
+  filter: blur(var(--local-bp-custom-bg-blur));
+  transform: scale(var(--local-bp-custom-bg-scale));
+  transform-origin: center;
+  opacity: 0;
+  z-index: -2;
+  pointer-events: none;
+  transition: opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease;
+}
+
 body::after {
   content: '';
   position: fixed;
@@ -75,7 +90,11 @@ body.has-custom-bg {
   background: transparent;
 }
 
-body.has-custom-bg::before {
+body.has-custom-bg-image::before {
+  opacity: 1;
+}
+
+body.has-custom-bg-video #localBpCustomBgVideo {
   opacity: 1;
 }
 

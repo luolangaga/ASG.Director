@@ -439,11 +439,24 @@
                 </div>
               </div>
 
+              <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;" onclick="onWindowsNativeNotificationRowClick(event)">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <h4>Windows 原生通知</h4>
+                    <p style="font-size:12px; color:var(--text-secondary);">本地页面服务器启动、本地 BP 重置等关键操作时发送系统通知</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="windowsNativeNotificationToggle" onchange="toggleWindowsNativeNotification()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
               <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
                 <h4>本地BP控制台背景</h4>
-                <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 12px;">直接控制 `local-bp.html` 背景，修改后立即生效。</p>
+                <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 12px;">直接控制 `local-bp.html` 背景，支持图片或视频循环播放，修改后立即生效。</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                  <button class="btn btn-secondary" onclick="selectLocalBpConsoleBackgroundFromSettings()">选择图片</button>
+                  <button class="btn btn-secondary" onclick="selectLocalBpConsoleBackgroundFromSettings()">选择媒体</button>
                   <button class="btn btn-secondary" onclick="clearLocalBpConsoleBackgroundFromSettings()">清除背景</button>
                 </div>
                 <div id="localBpConsoleBackgroundPathSetting" class="form-input"
@@ -452,7 +465,7 @@
                 <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center;">
                   <div>
                     <div style="font-size:13px; color:var(--text-primary);">自动压缩过大图片</div>
-                    <div style="font-size:12px; color:var(--text-secondary);">建议开启，自动处理超大 JPG/PNG，减少渲染压力</div>
+                    <div style="font-size:12px; color:var(--text-secondary);">仅对图片生效，自动处理超大 JPG/PNG，减少渲染压力</div>
                   </div>
                   <label class="switch">
                     <input type="checkbox" id="localBpConsoleBackgroundAutoCompressSetting"
@@ -1741,6 +1754,62 @@
       toggleBpStartupWindowAnimation()
     }
 
+    // ==================== Windows 原生通知 ====================
+    async function loadWindowsNativeNotificationSetting() {
+      try {
+        const result = await window.electronAPI.getWindowsNativeNotificationSetting()
+        const toggle = document.getElementById('windowsNativeNotificationToggle')
+        if (!toggle || !result || !result.success) return
+
+        toggle.checked = !!result.enabled
+        if (!result.supported) {
+          toggle.disabled = true
+          toggle.title = '当前系统不支持 Windows 原生通知'
+        } else {
+          toggle.disabled = false
+          toggle.title = ''
+        }
+      } catch (e) {
+        console.warn('加载 Windows 原生通知设置失败:', e)
+      }
+    }
+
+    async function toggleWindowsNativeNotification() {
+      const toggle = document.getElementById('windowsNativeNotificationToggle')
+      const enabled = toggle ? toggle.checked : true
+      try {
+        const result = await window.electronAPI.setWindowsNativeNotificationSetting(enabled)
+        if (result && result.success) {
+          if (result.supported === false) {
+            if (toggle) {
+              toggle.checked = !!result.enabled
+              toggle.disabled = true
+            }
+            showStatus('当前系统不支持 Windows 原生通知', 'warning')
+            return
+          }
+          if (toggle) toggle.disabled = false
+          showStatus(enabled ? '✅ 已开启 Windows 原生通知' : '✅ 已关闭 Windows 原生通知', 'success')
+        } else {
+          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
+          if (toggle) toggle.checked = !enabled
+        }
+      } catch (e) {
+        showStatus('设置失败: ' + e.message, 'error')
+        if (toggle) toggle.checked = !enabled
+      }
+    }
+
+    function onWindowsNativeNotificationRowClick(e) {
+      const toggle = document.getElementById('windowsNativeNotificationToggle')
+      if (!toggle || toggle.disabled) return
+      const target = e?.target
+      if (target === toggle) return
+      if (target && typeof target.closest === 'function' && target.closest('.switch')) return
+      toggle.checked = !toggle.checked
+      toggleWindowsNativeNotification()
+    }
+
     // ==================== 本地BP控制台背景设置 ====================
     const LOCAL_BP_CONSOLE_BG_DEFAULTS = Object.freeze({
       imagePath: null,
@@ -1752,6 +1821,8 @@
     let localBpConsoleBgState = { ...LOCAL_BP_CONSOLE_BG_DEFAULTS }
     let localBpConsoleBgLoaded = false
     let localBpConsoleBgSaveTimer = null
+    const LOCAL_BP_CONSOLE_BG_IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp)$/i
+    const LOCAL_BP_CONSOLE_BG_VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogv)$/i
 
     function clampLocalBpConsoleBgNumber(value, min, max, fallback) {
       const num = Number(value)
@@ -1933,8 +2004,10 @@
         }
 
         const imagePath = result.path ? String(result.path) : ''
-        if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(imagePath)) {
-          showStatus('请选择常见图片格式（PNG/JPG/JPEG/GIF/WEBP/BMP）', 'warning')
+        const isImage = LOCAL_BP_CONSOLE_BG_IMAGE_EXT_RE.test(imagePath)
+        const isVideo = LOCAL_BP_CONSOLE_BG_VIDEO_EXT_RE.test(imagePath)
+        if (!isImage && !isVideo) {
+          showStatus('请选择图片或视频（PNG/JPG/JPEG/GIF/WEBP/BMP/MP4/WEBM/MOV/M4V/OGV）', 'warning')
           return
         }
 
@@ -1943,7 +2016,7 @@
         const compressed = result.compressed === true
         const originalSize = Number(result.originalSize) || 0
         const finalSize = Number(result.finalSize) || 0
-        const toastMessage = compressed && originalSize > 0 && finalSize > 0
+        const toastMessage = compressed && !isVideo && originalSize > 0 && finalSize > 0
           ? `✅ 本地BP控制台背景已更新（自动压缩 ${formatLocalBpConsoleBgFileSize(originalSize)} -> ${formatLocalBpConsoleBgFileSize(finalSize)}）`
           : '✅ 本地BP控制台背景已更新'
         await saveLocalBpConsoleBackgroundSettings(draft, { showToast: true, toastMessage })
@@ -2579,6 +2652,7 @@
     loadFrontendResizeLockSetting()
     loadTransparentBackgroundSetting()
     loadBpStartupWindowAnimationSetting()
+    loadWindowsNativeNotificationSetting()
     loadLocalBpConsoleBackgroundSettings()
     // 加载插件组件
     loadPluginComponents()

@@ -21,7 +21,7 @@ function switchView(viewId) {
 const SETTINGS_TAB_CONFIG = {
   plugins: { title: '扩展与插件', keywords: ['插件', '插件商店', '插件管理', '布局商店', '布局包', 'obs', '自动化', '规则', '导入', '导出', '重置'], defaultAnchorId: 'settings-plugin-center-card' },
   assets: { title: '资源与素材', keywords: ['资源', '角色图片', '字体', '组件', '动画'], defaultAnchorId: 'settings-assets-manage-card' },
-  render: { title: '输出与渲染', keywords: ['分辨率', '前台', '输出', '窗口', '锁定', '透明', '背景', '自动打开', '同步', '跨设备'], defaultAnchorId: 'settings-render-output-card' },
+  render: { title: '输出与渲染', keywords: ['分辨率', '前台', '输出', '窗口', '锁定', '透明', '背景', '自动打开', '同步', '跨设备', '通知', 'windows'], defaultAnchorId: 'settings-render-output-card' },
   '3d': { title: '3D 模型', keywords: ['3d', '模型', 'mmd', '动作', 'toon', '描边', '抗锯齿', 'fps'], defaultAnchorId: 'model3dSettingsCard' }
 }
 
@@ -35,6 +35,7 @@ const SETTINGS_SEARCH_INDEX = [
   { label: 'OBS 前台输出分辨率', keywords: ['obs', '前台', '输出', '分辨率', '1080p', '4k'], tabId: 'render', anchorId: 'settings-render-output-card' },
   { label: '锁定前台窗口大小', keywords: ['窗口', '锁定', '防误触'], tabId: 'render', anchorId: 'settings-render-output-card' },
   { label: '透明背景模式', keywords: ['透明', '背景', 'obs'], tabId: 'render', anchorId: 'settings-render-output-card' },
+  { label: 'Windows 原生通知', keywords: ['windows', '通知', '系统通知', '提醒'], tabId: 'render', anchorId: 'settings-render-output-card' },
   { label: '本地BP控制台背景', keywords: ['背景', '遮罩', '模糊', '透明度', 'bp'], tabId: 'render', anchorId: 'settings-render-output-card' },
   { label: '本地BP自动打开', keywords: ['自动打开', 'bp', '窗口', '比分板'], tabId: 'render', anchorId: 'settings-auto-open-card' },
   { label: '跨设备 ASG.Director 同步', keywords: ['同步', '跨设备', '主端', '副端', '连接'], tabId: 'render', anchorId: 'directorSyncCard' },

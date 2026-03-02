@@ -39,6 +39,9 @@ const LOCAL_BP_CONSOLE_BG_DEFAULTS = Object.freeze({
 })
 let localBpConsoleBackground = { ...LOCAL_BP_CONSOLE_BG_DEFAULTS }
 let localBpConsoleBgSaveTimer = null
+const LOCAL_BP_CONSOLE_BG_IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp)$/i
+const LOCAL_BP_CONSOLE_BG_VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogv)$/i
+const LOCAL_BP_CONSOLE_BG_VIDEO_ELEMENT_ID = 'localBpCustomBgVideo'
 
 function clampLocalBpConsoleBgNumber(value, min, max, fallback) {
   const num = Number(value)
@@ -68,6 +71,61 @@ function toLocalBpConsoleBgFileUrl(filePath, bustCache = false) {
     url += (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`
   }
   return url
+}
+
+function isLocalBpConsoleBgVideoPath(filePath) {
+  if (!filePath) return false
+  return LOCAL_BP_CONSOLE_BG_VIDEO_EXT_RE.test(String(filePath))
+}
+
+function ensureLocalBpConsoleBgVideoElement() {
+  const body = document.body
+  if (!body) return null
+  let video = document.getElementById(LOCAL_BP_CONSOLE_BG_VIDEO_ELEMENT_ID)
+  if (!video) {
+    video = document.createElement('video')
+    video.id = LOCAL_BP_CONSOLE_BG_VIDEO_ELEMENT_ID
+    video.muted = true
+    video.defaultMuted = true
+    video.loop = true
+    video.autoplay = true
+    video.playsInline = true
+    video.preload = 'auto'
+    video.setAttribute('playsinline', '')
+    video.setAttribute('webkit-playsinline', '')
+    video.setAttribute('aria-hidden', 'true')
+    video.tabIndex = -1
+    const firstChild = body.firstChild
+    if (firstChild) {
+      body.insertBefore(video, firstChild)
+    } else {
+      body.appendChild(video)
+    }
+  }
+  return video
+}
+
+function playLocalBpConsoleBgVideo(video) {
+  if (!video || typeof video.play !== 'function') return
+  const playPromise = video.play()
+  if (playPromise && typeof playPromise.catch === 'function') {
+    playPromise.catch(() => {})
+  }
+}
+
+function clearLocalBpConsoleBgVideoElement() {
+  const video = document.getElementById(LOCAL_BP_CONSOLE_BG_VIDEO_ELEMENT_ID)
+  if (!video) return
+  try {
+    video.pause()
+  } catch {}
+  if (video.getAttribute('src')) {
+    video.removeAttribute('src')
+    video.dataset.src = ''
+    try {
+      video.load()
+    } catch {}
+  }
 }
 
 function setLocalBpConsoleBgPathLabel(filePath) {
@@ -122,7 +180,8 @@ function applyLocalBpConsoleBgSettings(settings, options = {}) {
   const body = document.body
   if (!body) return
   const normalized = normalizeLocalBpConsoleBgSettings(settings)
-  const hasImage = !!normalized.imagePath
+  const hasMedia = !!normalized.imagePath
+  const isVideo = hasMedia && isLocalBpConsoleBgVideoPath(normalized.imagePath)
   const bustCache = options.bustCache === true
   const cardOpacity = clampLocalBpConsoleBgNumber(normalized.cardOpacity, 0, 1, 1)
   const cardAltOpacity = clampLocalBpConsoleBgNumber(cardOpacity * 0.92, 0, 1, 0.92)
@@ -136,14 +195,34 @@ function applyLocalBpConsoleBgSettings(settings, options = {}) {
   body.style.setProperty('--fluent-surface-alt', `rgba(250, 249, 248, ${cardAltOpacity})`)
   body.style.setProperty('--local-bp-top-menu-opacity', String(topMenuOpacity))
 
-  if (hasImage) {
-    const imageUrl = toLocalBpConsoleBgFileUrl(normalized.imagePath, bustCache)
-    const safeImageUrl = imageUrl.replace(/"/g, '\\"')
-    body.style.setProperty('--local-bp-custom-bg-image', `url("${safeImageUrl}")`)
-    body.classList.add('has-custom-bg')
+  if (hasMedia) {
+    const mediaUrl = toLocalBpConsoleBgFileUrl(normalized.imagePath, bustCache)
+    if (isVideo) {
+      const video = ensureLocalBpConsoleBgVideoElement()
+      if (video) {
+        if (video.dataset.src !== mediaUrl) {
+          video.src = mediaUrl
+          video.dataset.src = mediaUrl
+          try {
+            video.load()
+          } catch {}
+        }
+        playLocalBpConsoleBgVideo(video)
+      }
+      body.style.setProperty('--local-bp-custom-bg-image', 'none')
+      body.classList.add('has-custom-bg', 'has-custom-bg-video')
+      body.classList.remove('has-custom-bg-image')
+    } else {
+      const safeImageUrl = mediaUrl.replace(/"/g, '\\"')
+      body.style.setProperty('--local-bp-custom-bg-image', `url("${safeImageUrl}")`)
+      clearLocalBpConsoleBgVideoElement()
+      body.classList.add('has-custom-bg', 'has-custom-bg-image')
+      body.classList.remove('has-custom-bg-video')
+    }
   } else {
     body.style.setProperty('--local-bp-custom-bg-image', 'none')
-    body.classList.remove('has-custom-bg')
+    clearLocalBpConsoleBgVideoElement()
+    body.classList.remove('has-custom-bg', 'has-custom-bg-image', 'has-custom-bg-video')
   }
 }
 
@@ -241,8 +320,8 @@ async function selectLocalBpConsoleBackground() {
       return
     }
     const imagePath = result.path ? String(result.path) : ''
-    if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(imagePath)) {
-      console.error('[LocalBP] 控制台背景仅支持常见图片格式')
+    if (!LOCAL_BP_CONSOLE_BG_IMAGE_EXT_RE.test(imagePath) && !LOCAL_BP_CONSOLE_BG_VIDEO_EXT_RE.test(imagePath)) {
+      console.error('[LocalBP] 控制台背景仅支持常见图片/视频格式')
       return
     }
     const draft = collectLocalBpConsoleBgSettingsFromInputs()
@@ -266,6 +345,13 @@ if (window.electronAPI && typeof window.electronAPI.on === 'function') {
     applyLocalBpConsoleBgSettings(localBpConsoleBackground, { bustCache: true })
   })
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return
+  if (!document.body || !document.body.classList.contains('has-custom-bg-video')) return
+  const video = document.getElementById(LOCAL_BP_CONSOLE_BG_VIDEO_ELEMENT_ID)
+  playLocalBpConsoleBgVideo(video)
+})
 
 const AUTO_GLOBAL_BAN_KEY = 'localBp_autoGlobalBan'
 let autoGlobalBan = loadAutoGlobalBanState()

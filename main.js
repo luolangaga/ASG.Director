@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, screen, Notification } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
@@ -273,6 +273,41 @@ function normalizeFrontendResizeLockSetting(input) {
 
 function normalizeBpStartupWindowAnimationSetting(input) {
   return input === true
+}
+
+function normalizeWindowsNativeNotificationSetting(input) {
+  return input !== false
+}
+
+function isWindowsNativeNotificationSupported() {
+  return process.platform === 'win32' && Notification.isSupported()
+}
+
+function getWindowsNativeNotificationSettingFromConfig() {
+  const config = readJsonFileSafe(configPath, {})
+  return normalizeWindowsNativeNotificationSetting(config.windowsNativeNotification)
+}
+
+function showWindowsNativeNotification(options) {
+  if (!app.isReady()) return false
+  if (!isWindowsNativeNotificationSupported()) return false
+  if (!getWindowsNativeNotificationSettingFromConfig()) return false
+  const payload = options && typeof options === 'object' ? options : {}
+  const title = (typeof payload.title === 'string' && payload.title.trim()) ? payload.title.trim() : 'ASG Director'
+  const body = (typeof payload.body === 'string' && payload.body.trim()) ? payload.body.trim() : ''
+  if (!body) return false
+  try {
+    const notification = new Notification({
+      title,
+      body,
+      silent: payload.silent === true
+    })
+    notification.show()
+    return true
+  } catch (e) {
+    console.warn('[Notify] 发送 Windows 通知失败:', e && e.message ? e.message : e)
+    return false
+  }
 }
 
 function isWindowAnimatable(win) {
@@ -807,6 +842,21 @@ function getLocalPagesBaseUrl(port) {
   return `http://127.0.0.1:${port}`
 }
 
+function getLocalPagesNotificationUrl(host, port) {
+  const safeHost = (typeof host === 'string' && host.trim()) ? host.trim() : '127.0.0.1'
+  const safePort = Number.isFinite(Number(port)) ? Number(port) : 9528
+
+  if (safeHost === '0.0.0.0') {
+    const lanIp = getLanIp()
+    if (lanIp && lanIp !== '127.0.0.1') {
+      return { url: `http://${lanIp}:${safePort}`, note: '监听 0.0.0.0' }
+    }
+    return { url: `http://127.0.0.1:${safePort}`, note: '监听 0.0.0.0' }
+  }
+
+  return { url: `http://${safeHost}:${safePort}`, note: '' }
+}
+
 function getLocalPagesMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase()
   if (ext === '.html') return 'text/html; charset=utf-8'
@@ -826,6 +876,9 @@ function getLocalPagesMimeType(filePath) {
   if (ext === '.mp3') return 'audio/mpeg'
   if (ext === '.mp4') return 'video/mp4'
   if (ext === '.webm') return 'video/webm'
+  if (ext === '.mov') return 'video/quicktime'
+  if (ext === '.m4v') return 'video/x-m4v'
+  if (ext === '.ogv') return 'video/ogg'
   if (ext === '.pmx') return 'application/octet-stream'
   if (ext === '.vmd') return 'application/octet-stream'
   if (ext === '.gltf') return 'model/gltf+json'
@@ -1745,7 +1798,9 @@ let localPagesServer = null
 let localPagesServerPort = null
 let localPagesServerHost = null
 
-function startLocalPagesServer() {
+function startLocalPagesServer(options = {}) {
+  const opts = options && typeof options === 'object' ? options : {}
+  const notifyReason = typeof opts.reason === 'string' ? opts.reason : 'start'
   ensureLocalPagesStorage()
   const config = readLocalPagesConfig()
   const port = config.port
@@ -1754,7 +1809,7 @@ function startLocalPagesServer() {
     return Promise.resolve({ success: true, port, running: true })
   }
   if (localPagesServer) {
-    return stopLocalPagesServer().then(() => startLocalPagesServer())
+    return stopLocalPagesServer().then(() => startLocalPagesServer(opts))
   }
   return new Promise(resolve => {
     const server = http.createServer(handleLocalPagesRequest)
@@ -1765,6 +1820,14 @@ function startLocalPagesServer() {
       localPagesServer = server
       localPagesServerPort = port
       localPagesServerHost = host
+      const endpoint = getLocalPagesNotificationUrl(host, port)
+      const body = notifyReason === 'host-change'
+        ? `OBS 本地页面服务器监听地址已更新：${endpoint.url}${endpoint.note ? `（${endpoint.note}）` : ''}`
+        : `OBS 本地页面服务器已启动：${endpoint.url}${endpoint.note ? `（${endpoint.note}）` : ''}`
+      showWindowsNativeNotification({
+        title: 'ASG Director',
+        body
+      })
       try {
         const baseState = (typeof buildLocalBpFrontendState === 'function') ? buildLocalBpFrontendState() : localBpState
         if (baseState) {
@@ -1899,11 +1962,22 @@ ipcMain.handle('local-pages:get-pages', () => {
   return { success: true, config, pages, dir, baseUrl, lanIp, interfaces, currentHost: config.host }
 })
 
-ipcMain.handle('local-pages:set-host', (event, host) => {
+ipcMain.handle('local-pages:set-host', async (event, host) => {
   const config = readLocalPagesConfig()
-  config.host = host
+  const nextHost = (typeof host === 'string' && host.trim()) ? host.trim() : '127.0.0.1'
+  const prevHost = config.host || '127.0.0.1'
+  config.host = nextHost
   writeJsonFileSafe(localPagesConfigPath, config)
-  startLocalPagesServer()
+  const restartResult = await startLocalPagesServer({
+    reason: prevHost === nextHost ? 'start' : 'host-change'
+  })
+  if (!restartResult || restartResult.success === false) {
+    return {
+      success: false,
+      host: config.host,
+      message: (restartResult && restartResult.error) ? restartResult.error : '重启本地页面服务器失败'
+    }
+  }
   return { success: true, host: config.host }
 })
 
@@ -1995,6 +2069,27 @@ ipcMain.handle('bp-startup-window-animation:set', (event, enabled) => {
   config.bpStartupWindowAnimation = next
   writeJsonFileSafe(configPath, config)
   return { success: true, enabled: next }
+})
+
+ipcMain.handle('windows-native-notification:get', () => {
+  const enabled = getWindowsNativeNotificationSettingFromConfig()
+  return {
+    success: true,
+    enabled,
+    supported: isWindowsNativeNotificationSupported()
+  }
+})
+
+ipcMain.handle('windows-native-notification:set', (event, enabled) => {
+  const config = readJsonFileSafe(configPath, {})
+  const next = normalizeWindowsNativeNotificationSetting(enabled)
+  config.windowsNativeNotification = next
+  writeJsonFileSafe(configPath, config)
+  return {
+    success: true,
+    enabled: next,
+    supported: isWindowsNativeNotificationSupported()
+  }
 })
 
 ipcMain.handle('director-sync:get-settings', () => {
@@ -3131,7 +3226,12 @@ ipcMain.handle('load-layout', async () => {
   }
 })
 
-const LOCAL_BP_CONSOLE_BG_SUPPORTED_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'])
+const LOCAL_BP_CONSOLE_BG_IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'])
+const LOCAL_BP_CONSOLE_BG_VIDEO_EXTS = new Set(['.mp4', '.webm', '.mov', '.m4v', '.ogv'])
+const LOCAL_BP_CONSOLE_BG_SUPPORTED_EXTS = new Set([
+  ...LOCAL_BP_CONSOLE_BG_IMAGE_EXTS,
+  ...LOCAL_BP_CONSOLE_BG_VIDEO_EXTS
+])
 const LOCAL_BP_CONSOLE_BG_COMPRESSIBLE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp'])
 const LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_SIZE_THRESHOLD = 6 * 1024 * 1024
 const LOCAL_BP_CONSOLE_BG_AUTO_COMPRESS_MAX_DIMENSION = 3840
@@ -3149,7 +3249,7 @@ function cleanupLocalBpConsoleBackgroundFiles(keepPath) {
       try {
         fs.unlinkSync(fullPath)
       } catch (e) {
-        console.warn('[Main] 清理旧本地BP背景图片失败:', fullPath, e.message)
+        console.warn('[Main] 清理旧本地BP背景媒体失败:', fullPath, e.message)
       }
     }
   } catch (e) {
@@ -3160,14 +3260,16 @@ function cleanupLocalBpConsoleBackgroundFiles(keepPath) {
 async function saveLocalBpConsoleBackgroundImage(srcPath, options = {}) {
   const ext = path.extname(srcPath).toLowerCase()
   if (!LOCAL_BP_CONSOLE_BG_SUPPORTED_EXTS.has(ext)) {
-    throw new Error('仅支持 PNG/JPG/JPEG/GIF/WEBP/BMP')
+    throw new Error('仅支持 PNG/JPG/JPEG/GIF/WEBP/BMP/MP4/WEBM/MOV/M4V/OGV')
   }
 
   ensureDirectories()
 
+  const isVideo = LOCAL_BP_CONSOLE_BG_VIDEO_EXTS.has(ext)
   const autoCompressLargeImage = options.autoCompressLargeImage !== false
   const originalSize = fs.statSync(srcPath).size
-  const canCompress = autoCompressLargeImage
+  const canCompress = !isVideo
+    && autoCompressLargeImage
     && typeof sharp === 'function'
     && LOCAL_BP_CONSOLE_BG_COMPRESSIBLE_EXTS.has(ext)
 
@@ -3208,7 +3310,7 @@ async function saveLocalBpConsoleBackgroundImage(srcPath, options = {}) {
         return { path: destPath, compressed: true, originalSize, finalSize }
       }
     } catch (e) {
-      console.warn('[Main] 自动压缩本地BP背景失败，改为复制原图:', e.message)
+      console.warn('[Main] 自动压缩本地BP背景失败，改为复制原文件:', e.message)
     }
   }
 
@@ -3304,8 +3406,12 @@ ipcMain.handle('local-bp-console-bg:select-image', async (event, options) => {
   try {
     const opt = options && typeof options === 'object' ? options : {}
     const result = await dialog.showOpenDialog({
-      title: '选择本地BP控制台背景图片',
-      filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+      title: '选择本地BP控制台背景媒体',
+      filters: [
+        { name: '媒体文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'mp4', 'webm', 'mov', 'm4v', 'ogv'] },
+        { name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+        { name: '视频文件', extensions: ['mp4', 'webm', 'mov', 'm4v', 'ogv'] }
+      ],
       properties: ['openFile']
     })
 
@@ -3317,6 +3423,7 @@ ipcMain.handle('local-bp-console-bg:select-image', async (event, options) => {
       return {
         success: true,
         path: saved.path,
+        mediaType: LOCAL_BP_CONSOLE_BG_VIDEO_EXTS.has(path.extname(saved.path).toLowerCase()) ? 'video' : 'image',
         compressed: saved.compressed === true,
         originalSize: Number(saved.originalSize) || 0,
         finalSize: Number(saved.finalSize) || 0
@@ -3465,12 +3572,16 @@ ipcMain.handle('import-layout', async () => {
   }
 })
 
-// 选择背景图片
+// 选择背景媒体（图片/视频）
 ipcMain.handle('select-background', async () => {
   try {
     const result = await dialog.showOpenDialog({
-      title: '选择背景图片',
-      filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+      title: '选择背景媒体',
+      filters: [
+        { name: '媒体文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'mp4', 'webm', 'mov', 'm4v', 'ogv'] },
+        { name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+        { name: '视频文件', extensions: ['mp4', 'webm', 'mov', 'm4v', 'ogv'] }
+      ],
       properties: ['openFile']
     })
 
@@ -7049,6 +7160,10 @@ ipcMain.handle('localBp:reset', () => {
     }
     __persistCharacterDisplayLayoutToDisk__()
     broadcastLocalBpState()
+    showWindowsNativeNotification({
+      title: 'ASG Director',
+      body: '本地 BP 已重置'
+    })
     return { success: true }
   } catch (error) {
     return { success: false, error: error.message }

@@ -2434,7 +2434,7 @@ function setBackground(path) {
   }
 
   // 检测是否为视频 (根据扩展名)
-  const isVideo = /\.(mp4|webm|mkv|avi|mov)(\?|$|#)/i.test(String(path))
+  const isVideo = /\.(mp4|webm|mov|m4v|ogv|mkv|avi)(\?|$|#)/i.test(String(path))
   let finalUrl = ''
 
   // OBS 浏览器源禁止加载本地 file:/// 资源，必须改走 HTTP(/background/)
