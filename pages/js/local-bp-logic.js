@@ -4727,6 +4727,39 @@ let localBpOcrActiveRegion = 'survivors'
 let localBpOcrInstallPollTimer = null
 let localBpOcrInitDone = false
 let localBpOcrDrawState = null
+const LOCAL_BP_OCR_OPENAI_DEFAULT_PROMPT = [
+  '你是第五人格表演赛BP识别助手。请从图片里识别本局 BP 结果，并严格输出 JSON。',
+  '只输出 JSON，不要输出任何解释或 Markdown。',
+  '输出格式必须为：',
+  '{',
+  '  "raw": {',
+  '    "survivors": "原始求生者文本（字符串）",',
+  '    "hunter": "原始监管者文本（字符串）",',
+  '    "survivorBans": "原始求生Ban文本（字符串）",',
+  '    "hunterBans": "原始监管Ban文本（字符串）"',
+  '  },',
+  '  "matched": {',
+  '    "survivors": ["求生者1", "求生者2", "求生者3", "求生者4"],',
+  '    "hunter": "监管者名称或空字符串",',
+  '    "survivorBans": ["被Ban的求生者"],',
+  '    "hunterBans": ["被Ban的监管者"]',
+  '  }',
+  '}',
+  '要求：',
+  '1) matched 里的名称必须优先从候选名单选择。',
+  '2) survivors 最多 4 个，顺序按界面显示顺序。',
+  '3) 不确定时请留空字符串或空数组，不要编造。'
+].join('\n')
+
+function getDefaultLocalBpOpenAiConfig() {
+  return {
+    apiBaseUrl: '',
+    apiKey: '',
+    model: 'gpt-4o-mini',
+    prompt: LOCAL_BP_OCR_OPENAI_DEFAULT_PROMPT,
+    timeoutMs: 60000
+  }
+}
 
 function getDefaultLocalBpOcrConfig() {
   return {
@@ -4740,7 +4773,8 @@ function getDefaultLocalBpOcrConfig() {
       hunter: null,
       survivorBans: null,
       hunterBans: null
-    }
+    },
+    openai: getDefaultLocalBpOpenAiConfig()
   }
 }
 
@@ -4763,22 +4797,40 @@ function normalizeRegion(region) {
   return { x, y, width, height }
 }
 
+function normalizeLocalBpOpenAiConfig(input, base) {
+  const defaults = (base && typeof base === 'object') ? base : getDefaultLocalBpOpenAiConfig()
+  const cfg = input && typeof input === 'object' ? input : {}
+  return {
+    apiBaseUrl: typeof cfg.apiBaseUrl === 'string' ? cfg.apiBaseUrl.trim() : defaults.apiBaseUrl,
+    apiKey: typeof cfg.apiKey === 'string' ? cfg.apiKey.trim() : defaults.apiKey,
+    model: (typeof cfg.model === 'string' ? cfg.model.trim() : defaults.model) || defaults.model,
+    prompt: (typeof cfg.prompt === 'string' ? cfg.prompt.trim() : defaults.prompt) || defaults.prompt,
+    timeoutMs: Math.round(clampNumber(cfg.timeoutMs, 8000, 180000, defaults.timeoutMs))
+  }
+}
+
 function normalizeLocalBpOcrConfig(input) {
   const base = getDefaultLocalBpOcrConfig()
   const cfg = input && typeof input === 'object' ? input : {}
   const regions = cfg.regions && typeof cfg.regions === 'object' ? cfg.regions : {}
+  const preferredEngine = cfg.preferredEngine === 'paddleocr'
+    ? 'paddleocr'
+    : cfg.preferredEngine === 'openai'
+      ? 'openai'
+      : 'windows'
   return {
     windowSourceId: typeof cfg.windowSourceId === 'string' ? cfg.windowSourceId : base.windowSourceId,
     windowName: typeof cfg.windowName === 'string' ? cfg.windowName : base.windowName,
     intervalMs: Math.round(clampNumber(cfg.intervalMs, 1000, 30000, base.intervalMs)),
-    preferredEngine: cfg.preferredEngine === 'paddleocr' ? 'paddleocr' : 'windows',
+    preferredEngine,
     fuzzyThreshold: clampNumber(cfg.fuzzyThreshold, 0.3, 0.95, base.fuzzyThreshold),
     regions: {
       survivors: normalizeRegion(regions.survivors),
       hunter: normalizeRegion(regions.hunter),
       survivorBans: normalizeRegion(regions.survivorBans),
       hunterBans: normalizeRegion(regions.hunterBans)
-    }
+    },
+    openai: normalizeLocalBpOpenAiConfig(cfg.openai, base.openai)
   }
 }
 
@@ -4807,6 +4859,12 @@ function formatLocalBpOcrResult(payload) {
   const meta = payload.recognitionMeta || {}
   const engineUsed = meta.engineUsed || {}
   const imageVariant = meta.imageVariant || {}
+  const aiMeta = meta.ai || {}
+  const openAiMode = meta.engineRequested === 'openai' ||
+    engineUsed.survivors === 'openai' ||
+    engineUsed.hunter === 'openai' ||
+    engineUsed.survivorBans === 'openai' ||
+    engineUsed.hunterBans === 'openai'
   const hasText = (v) => String(v || '').trim().length > 0
   const timeText = payload.timestamp ? new Date(payload.timestamp).toLocaleTimeString() : ''
   const lines = []
@@ -4820,8 +4878,14 @@ function formatLocalBpOcrResult(payload) {
   lines.push(`监管者: ${matched.hunter || '无'}`)
   lines.push(`求生Ban: ${(matched.survivorBans || []).join(' / ') || '无'}`)
   lines.push(`监管Ban: ${(matched.hunterBans || []).join(' / ') || '无'}`)
-  lines.push(`引擎: 求生=${engineUsed.survivors || '-'} 监管=${engineUsed.hunter || '-'} 求生Ban=${engineUsed.survivorBans || '-'} 监管Ban=${engineUsed.hunterBans || '-'}`)
-  lines.push(`图像增强: 求生=${imageVariant.survivors || '-'} 监管=${imageVariant.hunter || '-'} 求生Ban=${imageVariant.survivorBans || '-'} 监管Ban=${imageVariant.hunterBans || '-'}`)
+  if (openAiMode) {
+    lines.push(`引擎: OpenAI兼容API（模型: ${aiMeta.model || localBpOcrConfig?.openai?.model || '-'}）`)
+    lines.push(`端点: ${aiMeta.endpoint || localBpOcrConfig?.openai?.apiBaseUrl || '-'}`)
+    lines.push(`解析: ${aiMeta.parser || 'json'}`)
+  } else {
+    lines.push(`引擎: 求生=${engineUsed.survivors || '-'} 监管=${engineUsed.hunter || '-'} 求生Ban=${engineUsed.survivorBans || '-'} 监管Ban=${engineUsed.hunterBans || '-'}`)
+    lines.push(`图像增强: 求生=${imageVariant.survivors || '-'} 监管=${imageVariant.hunter || '-'} 求生Ban=${imageVariant.survivorBans || '-'} 监管Ban=${imageVariant.hunterBans || '-'}`)
+  }
   if (meta.warning) {
     lines.push(`提示: ${meta.warning}`)
   }
@@ -4833,7 +4897,11 @@ function formatLocalBpOcrResult(payload) {
   lines.push(`原始监管Ban文本: ${raw.hunterBans || '-'}`)
   if (allRawEmpty) {
     lines.push('')
-    lines.push('提示: 4个区域都未识别到文字。请确认目标窗口未最小化、文本在框内，并尝试切换到 PaddleOCR。')
+    if (openAiMode) {
+      lines.push('提示: AI 未返回有效内容。请确认窗口画面清晰、API 可用，并检查模型与提示词。')
+    } else {
+      lines.push('提示: 4个区域都未识别到文字。请确认目标窗口未最小化、文本在框内，并尝试切换到 PaddleOCR。')
+    }
   }
   return lines.join('\n')
 }
@@ -4860,6 +4928,10 @@ async function saveLocalBpOcrConfigPatch(patch) {
     regions: {
       ...(localBpOcrConfig.regions || {}),
       ...((patch && patch.regions && typeof patch.regions === 'object') ? patch.regions : {})
+    },
+    openai: {
+      ...(localBpOcrConfig.openai || {}),
+      ...((patch && patch.openai && typeof patch.openai === 'object') ? patch.openai : {})
     }
   }
   const normalized = normalizeLocalBpOcrConfig(merged)
@@ -4894,6 +4966,28 @@ function updateLocalBpOcrInstallHint(status) {
   hintEl.textContent = status.paddleReady ? 'PaddleOCR 已可用。' : '可选增强引擎，首次安装较慢。'
 }
 
+function renderLocalBpOcrEngineUi() {
+  const engine = localBpOcrConfig?.preferredEngine || 'windows'
+  const openAiMode = engine === 'openai'
+  const openAiConfig = document.getElementById('localBpOcrOpenAiConfig')
+  const installBtn = document.getElementById('localBpOcrInstallPaddleBtn')
+  const installHint = document.getElementById('localBpOcrInstallHint')
+  const regionRow = document.querySelector('.local-ocr-region-row')
+
+  if (openAiConfig) {
+    openAiConfig.classList.toggle('visible', openAiMode)
+  }
+  if (installBtn) {
+    installBtn.style.display = openAiMode ? 'none' : ''
+  }
+  if (installHint) {
+    installHint.style.display = openAiMode ? 'none' : ''
+  }
+  if (regionRow) {
+    regionRow.style.display = openAiMode ? 'none' : ''
+  }
+}
+
 function renderLocalBpOcrConfigToUi() {
   if (!localBpOcrConfig) return
   const engineSelect = document.getElementById('localBpOcrEngine')
@@ -4904,6 +4998,15 @@ function renderLocalBpOcrConfigToUi() {
   if (windowSelect) {
     windowSelect.value = localBpOcrConfig.windowSourceId || ''
   }
+  const openAiApiBaseInput = document.getElementById('localBpOcrOpenAiApiBase')
+  const openAiApiKeyInput = document.getElementById('localBpOcrOpenAiApiKey')
+  const openAiModelInput = document.getElementById('localBpOcrOpenAiModel')
+  const openAiPromptInput = document.getElementById('localBpOcrOpenAiPrompt')
+  if (openAiApiBaseInput) openAiApiBaseInput.value = localBpOcrConfig.openai?.apiBaseUrl || ''
+  if (openAiApiKeyInput) openAiApiKeyInput.value = localBpOcrConfig.openai?.apiKey || ''
+  if (openAiModelInput) openAiModelInput.value = localBpOcrConfig.openai?.model || 'gpt-4o-mini'
+  if (openAiPromptInput) openAiPromptInput.value = localBpOcrConfig.openai?.prompt || LOCAL_BP_OCR_OPENAI_DEFAULT_PROMPT
+  renderLocalBpOcrEngineUi()
   setLocalBpOcrActiveRegion(localBpOcrActiveRegion)
   renderLocalBpOcrRegions()
 }
@@ -5007,6 +5110,7 @@ function renderLocalBpOcrRegions() {
   const height = stage.clientHeight
   overlay.innerHTML = ''
   if (!width || !height || !localBpOcrConfig) return
+  if (localBpOcrConfig.preferredEngine === 'openai') return
 
   for (const key of Object.keys(LOCAL_BP_OCR_REGION_META)) {
     const region = localBpOcrConfig.regions?.[key]
@@ -5055,6 +5159,7 @@ function bindLocalBpOcrDrawing() {
 
   overlay.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return
+    if (localBpOcrConfig?.preferredEngine === 'openai') return
     const stage = document.getElementById('localBpOcrPreviewStage')
     if (!stage || !stage.classList.contains('active')) return
     const point = getLocalBpOcrPointInStage(event)
@@ -5134,8 +5239,9 @@ async function runLocalBpOcrOnce() {
     setLocalBpOcrStatus('请先选择窗口', 'error')
     return
   }
+  const isOpenAiMode = localBpOcrConfig?.preferredEngine === 'openai'
   const hasAnyRegion = Object.values(localBpOcrConfig.regions || {}).some(Boolean)
-  if (!hasAnyRegion) {
+  if (!isOpenAiMode && !hasAnyRegion) {
     setLocalBpOcrStatus('请先在预览图上框选区域', 'error')
     return
   }
@@ -5238,6 +5344,11 @@ function bindLocalBpOcrEvents() {
   const engineSelect = document.getElementById('localBpOcrEngine')
   const intervalInput = document.getElementById('localBpOcrInterval')
   const windowSelect = document.getElementById('localBpOcrWindowSelect')
+  const openAiApiBaseInput = document.getElementById('localBpOcrOpenAiApiBase')
+  const openAiApiKeyInput = document.getElementById('localBpOcrOpenAiApiKey')
+  const openAiModelInput = document.getElementById('localBpOcrOpenAiModel')
+  const openAiPromptInput = document.getElementById('localBpOcrOpenAiPrompt')
+  const openAiPromptResetBtn = document.getElementById('localBpOcrOpenAiPromptResetBtn')
   const regionBtns = document.querySelectorAll('.local-ocr-region-btn')
 
   refreshBtn?.addEventListener('click', () => {
@@ -5265,9 +5376,14 @@ function bindLocalBpOcrEvents() {
   })
 
   engineSelect?.addEventListener('change', async () => {
-    const value = engineSelect.value === 'paddleocr' ? 'paddleocr' : 'windows'
+    const value = engineSelect.value === 'paddleocr'
+      ? 'paddleocr'
+      : engineSelect.value === 'openai'
+        ? 'openai'
+        : 'windows'
     localBpOcrConfig.preferredEngine = value
     await saveLocalBpOcrConfigPatch({ preferredEngine: value })
+    renderLocalBpOcrEngineUi()
   })
 
   intervalInput?.addEventListener('change', async () => {
@@ -5288,6 +5404,35 @@ function bindLocalBpOcrEvents() {
       windowSourceId: localBpOcrConfig.windowSourceId,
       windowName: localBpOcrConfig.windowName
     })
+  })
+
+  openAiApiBaseInput?.addEventListener('change', async () => {
+    const value = openAiApiBaseInput.value.trim()
+    localBpOcrConfig.openai.apiBaseUrl = value
+    await saveLocalBpOcrConfigPatch({ openai: { apiBaseUrl: value } })
+  })
+  openAiApiKeyInput?.addEventListener('change', async () => {
+    const value = openAiApiKeyInput.value.trim()
+    localBpOcrConfig.openai.apiKey = value
+    await saveLocalBpOcrConfigPatch({ openai: { apiKey: value } })
+  })
+  openAiModelInput?.addEventListener('change', async () => {
+    const value = openAiModelInput.value.trim() || 'gpt-4o-mini'
+    openAiModelInput.value = value
+    localBpOcrConfig.openai.model = value
+    await saveLocalBpOcrConfigPatch({ openai: { model: value } })
+  })
+  openAiPromptInput?.addEventListener('change', async () => {
+    const value = openAiPromptInput.value.trim() || LOCAL_BP_OCR_OPENAI_DEFAULT_PROMPT
+    openAiPromptInput.value = value
+    localBpOcrConfig.openai.prompt = value
+    await saveLocalBpOcrConfigPatch({ openai: { prompt: value } })
+  })
+  openAiPromptResetBtn?.addEventListener('click', async () => {
+    const value = LOCAL_BP_OCR_OPENAI_DEFAULT_PROMPT
+    if (openAiPromptInput) openAiPromptInput.value = value
+    localBpOcrConfig.openai.prompt = value
+    await saveLocalBpOcrConfigPatch({ openai: { prompt: value } })
   })
 
   regionBtns.forEach((btn) => {
@@ -6360,3 +6505,4 @@ async function executeCommand(rawCmd) {
     alert('执行失败: ' + e.message)
   }
 }
+

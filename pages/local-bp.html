@@ -335,9 +335,32 @@
               <select id="localBpOcrEngine" class="player-name-input local-ocr-select">
                 <option value="windows">Windows OCR（推荐）</option>
                 <option value="paddleocr">PaddleOCR（高精度）</option>
+                <option value="openai">OpenAI兼容API（图像理解）</option>
               </select>
               <button class="btn btn-secondary btn-small" id="localBpOcrInstallPaddleBtn">一键安装 PaddleOCR</button>
               <span id="localBpOcrInstallHint" class="local-ocr-hint">可选增强引擎，首次安装较慢。</span>
+            </div>
+
+            <div id="localBpOcrOpenAiConfig" class="local-ocr-openai-config">
+              <div class="local-ocr-row">
+                <label for="localBpOcrOpenAiApiBase">API地址</label>
+                <input id="localBpOcrOpenAiApiBase" type="text" class="player-name-input local-ocr-openai-api"
+                  placeholder="https://api.openai.com/v1">
+                <label for="localBpOcrOpenAiModel">模型</label>
+                <input id="localBpOcrOpenAiModel" type="text" class="player-name-input local-ocr-openai-model"
+                  placeholder="gpt-4o-mini">
+              </div>
+              <div class="local-ocr-row">
+                <label for="localBpOcrOpenAiApiKey">API Key</label>
+                <input id="localBpOcrOpenAiApiKey" type="password" class="player-name-input local-ocr-openai-key"
+                  placeholder="sk-...">
+                <button class="btn btn-secondary btn-small" id="localBpOcrOpenAiPromptResetBtn">重置默认提示词</button>
+              </div>
+              <div class="local-ocr-openai-prompt-wrap">
+                <label for="localBpOcrOpenAiPrompt">提示词</label>
+                <textarea id="localBpOcrOpenAiPrompt"
+                  class="player-name-input local-ocr-openai-prompt"></textarea>
+              </div>
             </div>
 
             <div class="local-ocr-row">

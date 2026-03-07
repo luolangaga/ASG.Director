@@ -4,6 +4,7 @@ const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 const { pinyin } = require('pinyin-pro')
+const { httpPost } = require('./downloader')
 let sharp = null
 try {
   sharp = require('sharp')
@@ -22,18 +23,53 @@ const REGION_KEYS = ['survivors', 'hunter', 'survivorBans', 'hunterBans']
 const WINDOWS_WORKER_MAX_REQUESTS = 120
 const PADDLE_WORKER_MAX_REQUESTS = 100
 const OCR_CAPTURE_THUMBNAIL_SIZE = { width: 1920, height: 1080 }
+const OCR_ENGINE_WINDOWS = 'windows'
+const OCR_ENGINE_PADDLE = 'paddleocr'
+const OCR_ENGINE_OPENAI = 'openai'
+const OPENAI_DEFAULT_MODEL = 'gpt-4o-mini'
+const OPENAI_DEFAULT_TIMEOUT_MS = 60000
+const OPENAI_DEFAULT_PROMPT = [
+  '你是第五人格表演赛BP识别助手。请从图片里识别本局 BP 结果，并严格输出 JSON。',
+  '只输出 JSON，不要输出任何解释或 Markdown。',
+  '输出格式必须为：',
+  '{',
+  '  "raw": {',
+  '    "survivors": "原始求生者文本（字符串）",',
+  '    "hunter": "原始监管者文本（字符串）",',
+  '    "survivorBans": "原始求生Ban文本（字符串）",',
+  '    "hunterBans": "原始监管Ban文本（字符串）"',
+  '  },',
+  '  "matched": {',
+  '    "survivors": ["求生者1", "求生者2", "求生者3", "求生者4"],',
+  '    "hunter": "监管者名称或空字符串",',
+  '    "survivorBans": ["被Ban的求生者"],',
+  '    "hunterBans": ["被Ban的监管者"]',
+  '  }',
+  '}',
+  '要求：',
+  '1) matched 里的名称必须优先从候选名单选择。',
+  '2) survivors 最多 4 个，顺序按界面显示顺序。',
+  '3) 不确定时请留空字符串或空数组，不要编造。'
+].join('\n')
 
 const DEFAULT_CONFIG = {
   windowSourceId: '',
   windowName: '',
   intervalMs: 4000,
-  preferredEngine: 'windows',
+  preferredEngine: OCR_ENGINE_WINDOWS,
   fuzzyThreshold: 0.56,
   regions: {
     survivors: null,
     hunter: null,
     survivorBans: null,
     hunterBans: null
+  },
+  openai: {
+    apiBaseUrl: '',
+    apiKey: '',
+    model: OPENAI_DEFAULT_MODEL,
+    prompt: OPENAI_DEFAULT_PROMPT,
+    timeoutMs: OPENAI_DEFAULT_TIMEOUT_MS
   }
 }
 
@@ -118,6 +154,81 @@ function similarity(a, b) {
   return 1 - dist / maxLen
 }
 
+function sanitizeTextList(list, maxCount = 0) {
+  const picked = []
+  for (const item of (Array.isArray(list) ? list : [])) {
+    const text = sanitizeText(item)
+    if (!text) continue
+    if (!picked.includes(text)) {
+      picked.push(text)
+    }
+    if (maxCount > 0 && picked.length >= maxCount) break
+  }
+  return picked
+}
+
+function extractProviderErrorMessage(payload) {
+  if (!payload) return ''
+  if (typeof payload === 'string') return payload
+  if (payload.error && typeof payload.error === 'object') {
+    if (typeof payload.error.message === 'string') return payload.error.message
+  }
+  if (typeof payload.message === 'string') return payload.message
+  return ''
+}
+
+function extractAiResponseText(payload) {
+  if (!payload || typeof payload !== 'object') return ''
+  const firstChoice = Array.isArray(payload.choices) ? payload.choices[0] : null
+  const content = firstChoice && firstChoice.message ? firstChoice.message.content : null
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    const text = content
+      .map((item) => {
+        if (typeof item === 'string') return item
+        if (item && typeof item.text === 'string') return item.text
+        if (item && typeof item.content === 'string') return item.content
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+    if (text) return text
+  }
+  if (typeof payload.output_text === 'string') return payload.output_text
+  if (Array.isArray(payload.output_text)) return payload.output_text.join('\n')
+  if (typeof payload.text === 'string') return payload.text
+  return ''
+}
+
+function extractJsonFromText(text) {
+  const raw = String(text || '').trim()
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {}
+
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fenced && fenced[1]) {
+    try {
+      return JSON.parse(fenced[1].trim())
+    } catch {}
+  }
+
+  const start = raw.indexOf('{')
+  if (start < 0) return null
+  for (let i = raw.length - 1; i > start; i--) {
+    if (raw[i] !== '}') continue
+    const candidate = raw.slice(start, i + 1)
+    try {
+      return JSON.parse(candidate)
+    } catch {}
+  }
+
+  return null
+}
+
 class LocalBpOcrService {
   constructor(options = {}) {
     this.userDataPath = options.userDataPath || process.cwd()
@@ -198,21 +309,45 @@ class LocalBpOcrService {
     return { x, y, width, height }
   }
 
+  _normalizeOpenAiConfig(input, baseOpenAi = {}) {
+    const cfg = (input && typeof input === 'object') ? input : {}
+    const base = (baseOpenAi && typeof baseOpenAi === 'object') ? baseOpenAi : {}
+    const apiBaseUrl = sanitizeText(cfg.apiBaseUrl ?? base.apiBaseUrl)
+    const apiKey = sanitizeText(cfg.apiKey ?? base.apiKey)
+    const model = sanitizeText(cfg.model ?? base.model) || OPENAI_DEFAULT_MODEL
+    const prompt = String(cfg.prompt ?? base.prompt ?? OPENAI_DEFAULT_PROMPT).trim() || OPENAI_DEFAULT_PROMPT
+    const timeoutMs = Math.round(clamp(cfg.timeoutMs ?? base.timeoutMs ?? OPENAI_DEFAULT_TIMEOUT_MS, 8000, 180000))
+    return {
+      apiBaseUrl,
+      apiKey,
+      model,
+      prompt,
+      timeoutMs
+    }
+  }
+
   _normalizeConfig(input) {
     const base = this._defaultConfig()
     const cfg = (input && typeof input === 'object') ? input : {}
+    const preferredEngineInput = sanitizeText(cfg.preferredEngine ?? base.preferredEngine).toLowerCase()
+    const preferredEngine = preferredEngineInput === OCR_ENGINE_PADDLE
+      ? OCR_ENGINE_PADDLE
+      : preferredEngineInput === OCR_ENGINE_OPENAI
+        ? OCR_ENGINE_OPENAI
+        : OCR_ENGINE_WINDOWS
     const out = {
       windowSourceId: typeof cfg.windowSourceId === 'string' ? cfg.windowSourceId : base.windowSourceId,
       windowName: typeof cfg.windowName === 'string' ? cfg.windowName : base.windowName,
       intervalMs: Math.round(clamp(cfg.intervalMs ?? base.intervalMs, 1000, 30000)),
-      preferredEngine: cfg.preferredEngine === 'paddleocr' ? 'paddleocr' : 'windows',
+      preferredEngine,
       fuzzyThreshold: clamp(cfg.fuzzyThreshold ?? base.fuzzyThreshold, 0.3, 0.95),
       regions: {
         survivors: null,
         hunter: null,
         survivorBans: null,
         hunterBans: null
-      }
+      },
+      openai: this._normalizeOpenAiConfig(cfg.openai, base.openai)
     }
     const inputRegions = (cfg.regions && typeof cfg.regions === 'object') ? cfg.regions : {}
     for (const key of REGION_KEYS) {
@@ -247,6 +382,10 @@ class LocalBpOcrService {
       regions: {
         ...(this.config.regions || {}),
         ...((patch && patch.regions && typeof patch.regions === 'object') ? patch.regions : {})
+      },
+      openai: {
+        ...(this.config.openai || {}),
+        ...((patch && patch.openai && typeof patch.openai === 'object') ? patch.openai : {})
       }
     }
     this.config = this._normalizeConfig(merged)
@@ -593,6 +732,240 @@ class LocalBpOcrService {
       return 10
     }
     return 18
+  }
+
+  _resolveOpenAiEndpoint(apiBaseUrl) {
+    const raw = sanitizeText(apiBaseUrl)
+    if (!raw) {
+      throw new Error('OpenAI 兼容模式：API 地址不能为空')
+    }
+    if (!/^https?:\/\//i.test(raw)) {
+      throw new Error('OpenAI 兼容模式：API 地址需以 http:// 或 https:// 开头')
+    }
+    return /\/chat\/completions$/i.test(raw)
+      ? raw
+      : `${raw.replace(/\/+$/, '')}/chat/completions`
+  }
+
+  _isMatchedEmpty(matched) {
+    const data = (matched && typeof matched === 'object') ? matched : {}
+    return !(Array.isArray(data.survivors) && data.survivors.length) &&
+      !sanitizeText(data.hunter) &&
+      !(Array.isArray(data.survivorBans) && data.survivorBans.length) &&
+      !(Array.isArray(data.hunterBans) && data.hunterBans.length)
+  }
+
+  _buildRawFromMatched(matched) {
+    const data = (matched && typeof matched === 'object') ? matched : {}
+    return {
+      survivors: sanitizeTextList(data.survivors, 4).join(' '),
+      hunter: sanitizeText(data.hunter),
+      survivorBans: sanitizeTextList(data.survivorBans).join(' '),
+      hunterBans: sanitizeTextList(data.hunterBans).join(' ')
+    }
+  }
+
+  _normalizeAiMatchedPayload(input, idx) {
+    const data = (input && typeof input === 'object') ? input : {}
+    const survivorsPool = Array.isArray(idx?.survivors) ? idx.survivors : []
+    const huntersPool = Array.isArray(idx?.hunters) ? idx.hunters : []
+
+    const toList = (value) => {
+      if (Array.isArray(value)) return sanitizeTextList(value)
+      const text = sanitizeText(value)
+      if (!text) return []
+      return text
+        .split(/[\r\n\t,，;；|/\\]+/g)
+        .map(item => sanitizeText(item))
+        .filter(Boolean)
+    }
+
+    const survivors = this._extractNames(toList(data.survivors).join(' '), survivorsPool, {
+      maxCount: 4,
+      threshold: 0.42,
+      allowWholeMatch: true,
+      allowSubstring: true,
+      minTokenLength: 1
+    })
+    const hunter = this._extractNames(
+      sanitizeText([].concat(toList(data.hunter), toList(data.hunterName || '')).join(' ')),
+      huntersPool,
+      {
+        maxCount: 1,
+        threshold: 0.48,
+        allowWholeMatch: true,
+        allowSubstring: false,
+        minTokenLength: 1
+      }
+    )[0] || null
+    const survivorBans = uniq(this._extractNames(toList(data.survivorBans).join(' '), survivorsPool, {
+      maxCount: 12,
+      threshold: 0.48,
+      allowWholeMatch: true,
+      allowSubstring: false,
+      minTokenLength: 1
+    }))
+    const hunterBans = uniq(this._extractNames(toList(data.hunterBans).join(' '), huntersPool, {
+      maxCount: 12,
+      threshold: 0.48,
+      allowWholeMatch: true,
+      allowSubstring: false,
+      minTokenLength: 1
+    }))
+
+    return {
+      survivors,
+      hunter,
+      survivorBans,
+      hunterBans
+    }
+  }
+
+  _buildOpenAiPrompt(basePrompt, survivorNames, hunterNames) {
+    const safeBase = String(basePrompt || OPENAI_DEFAULT_PROMPT).trim() || OPENAI_DEFAULT_PROMPT
+    const survivorList = sanitizeTextList(survivorNames, 220)
+    const hunterList = sanitizeTextList(hunterNames, 220)
+    const survivorOmitted = Math.max(0, (Array.isArray(survivorNames) ? survivorNames.length : 0) - survivorList.length)
+    const hunterOmitted = Math.max(0, (Array.isArray(hunterNames) ? hunterNames.length : 0) - hunterList.length)
+    const tail = [
+      '',
+      '候选求生者名单：',
+      survivorList.join('、') || '（空）',
+      survivorOmitted > 0 ? `（其余省略 ${survivorOmitted} 项）` : '',
+      '',
+      '候选监管者名单：',
+      hunterList.join('、') || '（空）',
+      hunterOmitted > 0 ? `（其余省略 ${hunterOmitted} 项）` : ''
+    ].filter(Boolean).join('\n')
+    return `${safeBase}\n${tail}`
+  }
+
+  async _recognizeWithOpenAi(source, cfg, windowSize) {
+    const openaiCfg = cfg?.openai || {}
+    const apiKey = sanitizeText(openaiCfg.apiKey)
+    if (!apiKey) {
+      throw new Error('OpenAI 兼容模式：请先填写 API Key')
+    }
+    const endpoint = this._resolveOpenAiEndpoint(openaiCfg.apiBaseUrl)
+    const model = sanitizeText(openaiCfg.model) || OPENAI_DEFAULT_MODEL
+    const timeoutMs = Math.round(clamp(openaiCfg.timeoutMs, 8000, 180000))
+
+    const idx = this.getCharacterIndex() || { survivors: [], hunters: [] }
+    const survivorNames = Array.isArray(idx.survivors) ? idx.survivors : []
+    const hunterNames = Array.isArray(idx.hunters) ? idx.hunters : []
+    const prompt = this._buildOpenAiPrompt(openaiCfg.prompt, survivorNames, hunterNames)
+
+    const body = {
+      model,
+      temperature: 0,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: source.thumbnail.toDataURL() } }
+          ]
+        }
+      ]
+    }
+
+    const response = await httpPost(endpoint, body, {
+      timeout: timeoutMs,
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      }
+    })
+
+    if (!response || !Number.isFinite(Number(response.status))) {
+      throw new Error('OpenAI 兼容模式：服务返回无效响应')
+    }
+    const statusCode = Number(response.status)
+    if (statusCode < 200 || statusCode >= 300) {
+      const detail = extractProviderErrorMessage(response.data)
+      throw new Error(`OpenAI 兼容模式请求失败（${statusCode}）${detail ? `: ${detail}` : ''}`)
+    }
+
+    const text = extractAiResponseText(response.data)
+    if (!text) {
+      throw new Error('OpenAI 兼容模式：模型未返回可解析文本')
+    }
+
+    const parsed = extractJsonFromText(text)
+    if (!parsed || typeof parsed !== 'object') {
+      const preview = text.replace(/\s+/g, ' ').slice(0, 160)
+      throw new Error(`OpenAI 兼容模式：未解析到 JSON（返回片段: ${preview}）`)
+    }
+
+    const payload = (parsed.data && typeof parsed.data === 'object') ? parsed.data : parsed
+    const rawInput = (payload.raw && typeof payload.raw === 'object') ? payload.raw : {}
+    const matchedInput = (payload.matched && typeof payload.matched === 'object') ? payload.matched : payload
+
+    const aiMatched = this._normalizeAiMatchedPayload(matchedInput, idx)
+    const rawByAi = {
+      survivors: sanitizeText(rawInput.survivors),
+      hunter: sanitizeText(rawInput.hunter),
+      survivorBans: sanitizeText(rawInput.survivorBans),
+      hunterBans: sanitizeText(rawInput.hunterBans)
+    }
+    const rawFallback = this._buildRawFromMatched(aiMatched)
+    const raw = {
+      survivors: rawByAi.survivors || rawFallback.survivors,
+      hunter: rawByAi.hunter || rawFallback.hunter,
+      survivorBans: rawByAi.survivorBans || rawFallback.survivorBans,
+      hunterBans: rawByAi.hunterBans || rawFallback.hunterBans
+    }
+
+    const matchedFromRaw = this._matchRecognized(raw)
+    const matched = this._isMatchedEmpty(aiMatched)
+      ? matchedFromRaw
+      : {
+          survivors: aiMatched.survivors.length ? aiMatched.survivors : matchedFromRaw.survivors,
+          hunter: aiMatched.hunter || matchedFromRaw.hunter,
+          survivorBans: aiMatched.survivorBans.length ? aiMatched.survivorBans : matchedFromRaw.survivorBans,
+          hunterBans: aiMatched.hunterBans.length ? aiMatched.hunterBans : matchedFromRaw.hunterBans
+        }
+
+    const emptyRegions = {
+      survivors: !raw.survivors,
+      hunter: !raw.hunter,
+      survivorBans: !raw.survivorBans,
+      hunterBans: !raw.hunterBans
+    }
+
+    const recognitionMeta = {
+      engineRequested: OCR_ENGINE_OPENAI,
+      engineUsed: {
+        survivors: OCR_ENGINE_OPENAI,
+        hunter: OCR_ENGINE_OPENAI,
+        survivorBans: OCR_ENGINE_OPENAI,
+        hunterBans: OCR_ENGINE_OPENAI
+      },
+      fallbackRegions: {},
+      cropSize: {
+        fullWindow: {
+          width: windowSize?.width || 0,
+          height: windowSize?.height || 0
+        }
+      },
+      imageVariant: {
+        survivors: 'full-window',
+        hunter: 'full-window',
+        survivorBans: 'full-window',
+        hunterBans: 'full-window'
+      },
+      emptyRegions,
+      ai: {
+        endpoint,
+        model,
+        parser: 'json',
+        rawResponseLength: text.length
+      }
+    }
+    if (REGION_KEYS.every(key => emptyRegions[key])) {
+      recognitionMeta.warning = 'OpenAI 兼容模式返回为空。请确认窗口内容完整可见，并检查提示词/模型设置。'
+    }
+
+    return { raw, matched, recognitionMeta }
   }
 
   _cleanupTempFiles(files) {
@@ -1981,74 +2354,87 @@ Write-Output 'PADDLE_INSTALL_DONE'
         emptyRegions: {}
       }
 
-      for (const key of REGION_KEYS) {
-        const region = cfg.regions[key]
-        if (!region) continue
-        const rect = this._regionToRect(region, windowSize.width, windowSize.height)
-        if (!rect) continue
-        const cropImage = source.thumbnail.crop(rect)
-        const size = cropImage.getSize()
-        if (!size.width || !size.height) continue
+      let matched = null
+      if (cfg.preferredEngine === OCR_ENGINE_OPENAI) {
+        const openAiResult = await this._recognizeWithOpenAi(source, cfg, windowSize)
+        raw.survivors = sanitizeText(openAiResult?.raw?.survivors)
+        raw.hunter = sanitizeText(openAiResult?.raw?.hunter)
+        raw.survivorBans = sanitizeText(openAiResult?.raw?.survivorBans)
+        raw.hunterBans = sanitizeText(openAiResult?.raw?.hunterBans)
+        Object.assign(recognitionMeta, openAiResult?.recognitionMeta || {})
+        matched = openAiResult?.matched || null
+      } else {
+        for (const key of REGION_KEYS) {
+          const region = cfg.regions[key]
+          if (!region) continue
+          const rect = this._regionToRect(region, windowSize.width, windowSize.height)
+          if (!rect) continue
+          const cropImage = source.thumbnail.crop(rect)
+          const size = cropImage.getSize()
+          if (!size.width || !size.height) continue
 
-        recognitionMeta.cropSize[key] = size
+          recognitionMeta.cropSize[key] = size
 
-        const { candidates, files } = await this._buildOcrImageCandidates(cropImage.toPNG(), key)
-        let bestRec = null
-        let bestScore = -1
-        let bestLabel = 'orig'
-        let lastError = null
+          const { candidates, files } = await this._buildOcrImageCandidates(cropImage.toPNG(), key)
+          let bestRec = null
+          let bestScore = -1
+          let bestLabel = 'orig'
+          let lastError = null
 
-        try {
-          const activeCandidates = cfg.preferredEngine === 'paddleocr'
-            ? candidates.filter(item => item.label !== 'contrast')
-            : candidates
-          const earlyStopScore = this._getEarlyStopScore(key, cfg.preferredEngine)
+          try {
+            const activeCandidates = cfg.preferredEngine === OCR_ENGINE_PADDLE
+              ? candidates.filter(item => item.label !== 'contrast')
+              : candidates
+            const earlyStopScore = this._getEarlyStopScore(key, cfg.preferredEngine)
 
-          for (const candidate of activeCandidates) {
-            try {
-              const rec = await this._recognizeWithEngine(candidate.path, cfg.preferredEngine)
-              const text = sanitizeText(rec.text)
-              const score = this._scoreRecognizedText(text)
-              if (!bestRec || score > bestScore) {
-                bestRec = { ...rec, text }
-                bestScore = score
-                bestLabel = candidate.label || 'orig'
+            for (const candidate of activeCandidates) {
+              try {
+                const rec = await this._recognizeWithEngine(candidate.path, cfg.preferredEngine)
+                const text = sanitizeText(rec.text)
+                const score = this._scoreRecognizedText(text)
+                if (!bestRec || score > bestScore) {
+                  bestRec = { ...rec, text }
+                  bestScore = score
+                  bestLabel = candidate.label || 'orig'
+                }
+                if (bestScore >= earlyStopScore) break
+              } catch (error) {
+                lastError = error
               }
-              if (bestScore >= earlyStopScore) break
-            } catch (error) {
-              lastError = error
             }
-          }
 
-          if (!bestRec) {
-            if (lastError) throw lastError
-            raw[key] = ''
-            recognitionMeta.emptyRegions[key] = true
-            continue
-          }
+            if (!bestRec) {
+              if (lastError) throw lastError
+              raw[key] = ''
+              recognitionMeta.emptyRegions[key] = true
+              continue
+            }
 
-          raw[key] = sanitizeText(bestRec.text)
-          recognitionMeta.engineUsed[key] = bestRec.engineUsed
-          recognitionMeta.imageVariant[key] = bestLabel
-          if (!raw[key]) {
-            recognitionMeta.emptyRegions[key] = true
+            raw[key] = sanitizeText(bestRec.text)
+            recognitionMeta.engineUsed[key] = bestRec.engineUsed
+            recognitionMeta.imageVariant[key] = bestLabel
+            if (!raw[key]) {
+              recognitionMeta.emptyRegions[key] = true
+            }
+            if (bestRec.fallback) {
+              recognitionMeta.fallbackRegions[key] = bestRec.fallbackReason || 'fallback'
+            }
+          } finally {
+            this._cleanupTempFiles(files)
           }
-          if (bestRec.fallback) {
-            recognitionMeta.fallbackRegions[key] = bestRec.fallbackReason || 'fallback'
-          }
-        } finally {
-          this._cleanupTempFiles(files)
+        }
+
+        const allRawEmpty = REGION_KEYS.every((key) => !sanitizeText(raw[key]))
+        if (allRawEmpty) {
+          recognitionMeta.warning = cfg.preferredEngine === OCR_ENGINE_WINDOWS
+            ? 'Windows OCR 结果为空。请确认窗口可见、文本足够清晰，并优先安装 PaddleOCR。'
+            : 'OCR 结果为空。请确认窗口可见、文本足够清晰。'
         }
       }
 
-      const allRawEmpty = REGION_KEYS.every((key) => !sanitizeText(raw[key]))
-      if (allRawEmpty) {
-        recognitionMeta.warning = cfg.preferredEngine === 'windows'
-          ? 'Windows OCR 结果为空。请确认窗口可见、文本足够清晰，并优先安装 PaddleOCR。'
-          : 'OCR 结果为空。请确认窗口可见、文本足够清晰。'
+      if (!matched) {
+        matched = this._matchRecognized(raw)
       }
-
-      const matched = this._matchRecognized(raw)
       const applyResult = apply ? (this.applyMatchedResult(matched, raw) || { applied: false }) : { applied: false, reason: 'apply disabled' }
 
       const payload = {
@@ -2204,3 +2590,4 @@ Write-Output 'PADDLE_INSTALL_DONE'
 module.exports = {
   LocalBpOcrService
 }
+
