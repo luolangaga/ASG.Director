@@ -716,6 +716,18 @@ h1 {
   margin-top: 4px;
 }
 
+
+.slot-swap-tip {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--fluent-subtle);
+}
+
+.slot.drag-over {
+  border-color: var(--fluent-accent);
+  background: rgba(0, 120, 212, 0.08);
+}
+
 .selected-display {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
