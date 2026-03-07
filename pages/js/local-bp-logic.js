@@ -2922,6 +2922,67 @@ function updateDisplay() {
   }
 }
 
+
+function initSurvivorSlotSwapDnD() {
+  const survivorSlots = [0, 1, 2, 3].map(i => document.getElementById(`slot-${i}`)).filter(Boolean)
+  if (survivorSlots.length === 0) return
+
+  const clearDragOver = () => {
+    survivorSlots.forEach(slot => slot.classList.remove('drag-over'))
+  }
+
+  survivorSlots.forEach((slot, index) => {
+    slot.setAttribute('draggable', 'true')
+
+    slot.addEventListener('dragstart', (event) => {
+      if (event.target.closest('.slot-search, .slot-blink-btn')) {
+        event.preventDefault()
+        return
+      }
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', String(index))
+    })
+
+    slot.addEventListener('dragover', (event) => {
+      event.preventDefault()
+      slot.classList.add('drag-over')
+    })
+
+    slot.addEventListener('dragleave', () => {
+      slot.classList.remove('drag-over')
+    })
+
+    slot.addEventListener('drop', async (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      clearDragOver()
+      const fromIndex = parseInt(event.dataTransfer.getData('text/plain'), 10)
+      const toIndex = index
+      if (!Number.isInteger(fromIndex) || fromIndex < 0 || fromIndex > 3 || fromIndex === toIndex) return
+      await swapSurvivorSlotCharacter(fromIndex, toIndex)
+    })
+
+    slot.addEventListener('dragend', clearDragOver)
+  })
+}
+
+async function swapSurvivorSlotCharacter(fromIndex, toIndex) {
+  try {
+    const fromCharacter = state.survivors[fromIndex] || null
+    const toCharacter = state.survivors[toIndex] || null
+
+    await window.electronAPI.invoke('localBp:setSurvivor', { index: fromIndex, character: toCharacter })
+    await window.electronAPI.invoke('localBp:setSurvivor', { index: toIndex, character: fromCharacter })
+
+    state.survivors[fromIndex] = toCharacter
+    state.survivors[toIndex] = fromCharacter
+    updateDisplay()
+    updateCharacterStatus()
+  } catch (e) {
+    alert('交换求生者选角失败：' + (e?.message || e))
+  }
+}
+
 // ========== 默认图像右键菜单功能 ==========
 
 // 显示槽位右键菜单
@@ -6155,6 +6216,7 @@ window.addEventListener('DOMContentLoaded', () => {
   loadLocalBpConsoleBgSettings()
   syncDefaultImagesToMainProcess()
   updateDisplay()
+  initSurvivorSlotSwapDnD()
   initGlobalShortcuts()
   renderAutoGlobalBanUI()
   initAutoGlobalBanDnD()
