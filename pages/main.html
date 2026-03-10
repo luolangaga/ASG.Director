@@ -709,7 +709,8 @@
                 <input id="render3dLightPosX"><input id="render3dLightPosY"><input id="render3dLightPosZ">
               </div>
 
-              <div style="margin-top:20px; display:flex; gap:10px;">
+              <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-ghost" onclick="installBlenderBpSyncAddon()">自动安装 Blender 插件</button>
                 <button class="btn btn-secondary" onclick="loadModel3dSettings()">刷新设置</button>
                 <button class="btn btn-primary" onclick="applyModel3dSettings(true)">保存并应用</button>
               </div>
@@ -2333,6 +2334,31 @@
         }
       } catch (e) {
         showStatus('选择文件失败: ' + (e?.message || e), 'error')
+      }
+    }
+
+    async function installBlenderBpSyncAddon() {
+      try {
+        if (!window.electronAPI || typeof window.electronAPI.installBlenderBpSyncAddon !== 'function') {
+          showStatus('当前版本不支持自动安装 Blender 插件', 'error')
+          return
+        }
+        showStatus('正在安装 Blender 插件...', 'info')
+        const result = await window.electronAPI.installBlenderBpSyncAddon()
+        if (!result || !result.success) {
+          showStatus('安装失败: ' + (result?.error || '未知错误'), 'error')
+          return
+        }
+
+        const installed = Array.isArray(result.installed) ? result.installed : []
+        const failed = Array.isArray(result.failed) ? result.failed : []
+        if (failed.length) {
+          showStatus(`已安装到 ${installed.length} 个版本，${failed.length} 个失败`, 'warning')
+          return
+        }
+        showStatus(`✅ Blender 插件安装完成（${installed.length} 个版本）`, 'success')
+      } catch (e) {
+        showStatus('安装失败: ' + (e?.message || e), 'error')
       }
     }
 

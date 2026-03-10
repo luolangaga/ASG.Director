@@ -3524,6 +3524,15 @@ async function openCharacterDisplay() {
   }
 }
 
+// 打开角色模型3D展示窗口
+async function openCharacterModel3D() {
+  try {
+    await window.electronAPI.invoke('localBp:openCharacterModel3D')
+  } catch (error) {
+    alert('打开角色模型3D展示失败: ' + error.message)
+  }
+}
+
 // ========== 天赋、技能、选手名字功能 ==========
 
 // 更新选手名字
@@ -4196,6 +4205,8 @@ async function openAllFrontendWindows() {
     window.electronAPI.openPostMatch('local-bp')
     // 3. 打开角色展示
     window.electronAPI.invoke('localBp:openCharacterDisplay')
+    // 4. 打开角色模型3D展示
+    window.electronAPI.invoke('localBp:openCharacterModel3D')
   } catch (e) {
     console.error(e)
     alert('打开窗口失败: ' + e.message)

@@ -436,6 +436,12 @@
 
         element.style.animation = 'none'
         element.offsetHeight // 强制reflow
+        // 清理内联 animation，避免 "none" 残留影响后续首次动画
+        requestAnimationFrame(() => {
+            if (element.style.animation === 'none') {
+                element.style.animation = ''
+            }
+        })
         AnimationSystem.activeAnimations.delete(element)
     }
 
@@ -485,27 +491,8 @@
         if (animation) {
             applyAnimation(targetId, animation.id)
 
-            // 联动播放
-            if (animation.targets) {
-                animation.targets.forEach(t => {
-                    if (t === targetId) return
-                    // 对于targets中的元素，直接尝试应用动画（内部会自动广播）
-                    // 自定义组件的特殊判断需要保留吗？
-                    // 如果无法判断是否为 custom-component (因为在远程)，我们最好怎么做？
-                    // 假设用户配置的 targets 都是想要动画的。
-                    // 但是 customComponents 这个特殊标记是针对 class 的。
-                    if (t === 'customComponents') {
-                        document.querySelectorAll('.custom-component').forEach(comp => {
-                            applyAnimation(comp, animation.id)
-                        })
-                        // 无法广播 generic class selector without significant changes. 
-                        // Suggest user to use explicit IDs for cross-window linkage.
-                    } else {
-                        // 直接应用，由 applyAnimation 处理存在性
-                        applyAnimation(t, animation.id)
-                    }
-                })
-            }
+            // [Fix] 与 blink 一致：targets 只作为“适用目标白名单”，不做默认联动广播。
+            // 需要联动时请使用 `select-<targetId>` 分类动画显式配置。
         }
 
         // 3. 触发特定角色的选择事件

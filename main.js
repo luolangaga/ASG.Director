@@ -87,6 +87,7 @@ let pluginManagerWindow = null
 let localBpWindow = null
 let localBpGuideWindow = null
 let characterDisplayWindow = null
+let characterModel3DWindow = null
 let welcomeWindow = null
 let startupLoadingWindow = null
 let startupBootstrapFallbackTimer = null
@@ -96,6 +97,7 @@ let obsAutomationService = null
 const SUPPORTS_NATIVE_RESIZE_WITH_TRANSPARENT = process.platform !== 'win32'
 const FRONTEND_MAIN_WINDOW_ID = 'frontend-main'
 const customFrontendWindows = new Map()
+const BLENDER_VERSION_DIR_RE = /^\d+\.\d+$/
 
 function getCustomFrontendWindowList() {
   return Array.from(customFrontendWindows.values()).filter(w => w && !w.isDestroyed())
@@ -114,6 +116,52 @@ function getAllFrontendWindows() {
   if (frontendWindow && !frontendWindow.isDestroyed()) windows.push(frontendWindow)
   windows.push(...getCustomFrontendWindowList())
   return windows
+}
+
+function parseBlenderVersionNumber(versionText) {
+  const parts = String(versionText || '').split('.')
+  const major = Number(parts[0] || 0)
+  const minor = Number(parts[1] || 0)
+  if (!Number.isFinite(major) || !Number.isFinite(minor)) return 0
+  return major * 100 + minor
+}
+
+function collectBlenderAddonsDirs() {
+  const roots = []
+  const appData = process.env.APPDATA
+  const userProfile = process.env.USERPROFILE
+
+  if (appData) {
+    roots.push(path.join(appData, 'Blender Foundation', 'Blender'))
+  }
+  if (userProfile) {
+    roots.push(path.join(userProfile, 'AppData', 'Roaming', 'Blender Foundation', 'Blender'))
+  }
+
+  const uniqueRoots = Array.from(new Set(roots.filter(Boolean)))
+  const dirs = []
+  for (const root of uniqueRoots) {
+    if (!fs.existsSync(root)) continue
+    let entries = []
+    try {
+      entries = fs.readdirSync(root, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const version = String(entry.name || '').trim()
+      if (!BLENDER_VERSION_DIR_RE.test(version)) continue
+      dirs.push({
+        root,
+        version,
+        addonsDir: path.join(root, version, 'scripts', 'addons')
+      })
+    }
+  }
+
+  dirs.sort((a, b) => parseBlenderVersionNumber(b.version) - parseBlenderVersionNumber(a.version))
+  return dirs
 }
 
 function broadcastToFrontendWindows(channel, ...args) {
@@ -198,7 +246,8 @@ function broadcastToAllWindows(channel, ...args) {
     mainWindow,
     localBpWindow,
     localBpGuideWindow,
-    characterDisplayWindow
+    characterDisplayWindow,
+    characterModel3DWindow
   ].filter(w => w && !w.isDestroyed())
 
   for (const win of targets) {
@@ -1443,6 +1492,7 @@ function localPagesHandleApi(req, res, pathname) {
           localBpState.hunterSkills = __normalizeLocalBpArray__(data?.skills)
         } else if (action === 'reset') {
           const preservedLayout = localBpState.characterDisplayLayout
+          const preservedModel3DLayout = localBpState.characterModel3DLayout
           localBpState = {
             enabled: true,
             survivors: [null, null, null, null],
@@ -1458,7 +1508,8 @@ function localPagesHandleApi(req, res, pathname) {
             teamA: localBpState?.teamA || { name: '求生者队', logo: '', meta: '' },
             teamB: localBpState?.teamB || { name: '监管者队', logo: '', meta: '' },
             mapName: '',
-            characterDisplayLayout: preservedLayout || { positions: {} }
+            characterDisplayLayout: preservedLayout || { positions: {} },
+            characterModel3DLayout: preservedModel3DLayout || {}
           }
         }
 
@@ -3943,6 +3994,7 @@ ipcMain.handle('import-bp-pack', async () => {
 
       // 布局包会写入 layout.json：把角色展示布局回填到本地BP状态并广播
       __loadCharacterDisplayLayoutFromDiskIntoState__()
+      __loadCharacterModel3DLayoutFromDiskIntoState__()
       __normalizeLocalBpStateInPlace__()
       broadcastLocalBpState()
 
@@ -5580,6 +5632,22 @@ let localBpState = {
     backgroundImage: null,
     positions: {},
     transparentBackground: false
+  },
+  // 角色模型3D展示窗口布局
+  characterModel3DLayout: {
+    mode: 'edit',
+    transparentBackground: true,
+    scene: {
+      modelPath: '',
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 }
+    },
+    slots: {},
+    camera: {
+      position: { x: 0, y: 2, z: 8 },
+      target: { x: 0, y: 1, z: 0 }
+    }
   }
 }
 
@@ -5622,6 +5690,43 @@ function __normalizeLocalBpStateInPlace__() {
     localBpState.characterDisplayLayout.positions = {}
   }
   localBpState.characterDisplayLayout.transparentBackground = !!localBpState.characterDisplayLayout.transparentBackground
+
+  // 角色模型3D展示布局结构兜底
+  if (!localBpState.characterModel3DLayout || typeof localBpState.characterModel3DLayout !== 'object') {
+    localBpState.characterModel3DLayout = {}
+  }
+  const m3d = localBpState.characterModel3DLayout
+  m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
+  m3d.transparentBackground = m3d.transparentBackground !== false
+
+  const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
+    const src = (v && typeof v === 'object') ? v : {}
+    const next = {
+      x: Number.isFinite(Number(src.x)) ? Number(src.x) : fallback.x,
+      y: Number.isFinite(Number(src.y)) ? Number(src.y) : fallback.y,
+      z: Number.isFinite(Number(src.z)) ? Number(src.z) : fallback.z
+    }
+    return next
+  }
+
+  if (!m3d.scene || typeof m3d.scene !== 'object') m3d.scene = {}
+  m3d.scene.modelPath = (typeof m3d.scene.modelPath === 'string') ? m3d.scene.modelPath : ''
+  m3d.scene.position = ensureVec3(m3d.scene.position, { x: 0, y: 0, z: 0 })
+  m3d.scene.rotation = ensureVec3(m3d.scene.rotation, { x: 0, y: 0, z: 0 })
+  m3d.scene.scale = ensureVec3(m3d.scene.scale, { x: 1, y: 1, z: 1 })
+
+  if (!m3d.slots || typeof m3d.slots !== 'object') m3d.slots = {}
+  const slotKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  for (const key of slotKeys) {
+    if (!m3d.slots[key] || typeof m3d.slots[key] !== 'object') m3d.slots[key] = {}
+    m3d.slots[key].position = ensureVec3(m3d.slots[key].position, { x: 0, y: 0, z: 0 })
+    m3d.slots[key].rotation = ensureVec3(m3d.slots[key].rotation, { x: 0, y: 0, z: 0 })
+    m3d.slots[key].scale = ensureVec3(m3d.slots[key].scale, { x: 1, y: 1, z: 1 })
+  }
+
+  if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
+  m3d.camera.position = ensureVec3(m3d.camera.position, { x: 0, y: 2, z: 8 })
+  m3d.camera.target = ensureVec3(m3d.camera.target, { x: 0, y: 1, z: 0 })
 }
 
 function __readLayoutJsonSafe__() {
@@ -5654,6 +5759,16 @@ function __persistCharacterDisplayLayoutToDisk__() {
     __writeLayoutJsonSafe__(root)
   } catch (e) {
     console.warn('[LocalBP] 持久化角色展示布局失败:', e.message)
+  }
+}
+
+function __persistCharacterModel3DLayoutToDisk__() {
+  try {
+    const root = __readLayoutJsonSafe__()
+    root.characterModel3DLayout = localBpState.characterModel3DLayout || null
+    __writeLayoutJsonSafe__(root)
+  } catch (e) {
+    console.warn('[LocalBP] 持久化角色模型3D展示布局失败:', e.message)
   }
 }
 
@@ -5699,6 +5814,40 @@ function __loadCharacterDisplayLayoutFromDiskIntoState__() {
     return true
   } catch (e) {
     console.warn('[LocalBP] 从 layout.json 回填角色展示布局失败:', e.message)
+    return false
+  }
+}
+
+function __loadCharacterModel3DLayoutFromDiskIntoState__() {
+  try {
+    const root = __readLayoutJsonSafe__()
+    const fromDisk = root.characterModel3DLayout
+    if (!fromDisk || typeof fromDisk !== 'object') return false
+
+    const existing = (localBpState.characterModel3DLayout && typeof localBpState.characterModel3DLayout === 'object')
+      ? localBpState.characterModel3DLayout
+      : {}
+
+    localBpState.characterModel3DLayout = {
+      ...existing,
+      ...fromDisk,
+      scene: {
+        ...(existing.scene || {}),
+        ...(fromDisk.scene || {})
+      },
+      slots: {
+        ...(existing.slots || {}),
+        ...(fromDisk.slots || {})
+      },
+      camera: {
+        ...(existing.camera || {}),
+        ...(fromDisk.camera || {})
+      }
+    }
+    __normalizeLocalBpStateInPlace__()
+    return true
+  } catch (e) {
+    console.warn('[LocalBP] 从 layout.json 回填角色模型3D展示布局失败:', e.message)
     return false
   }
 }
@@ -6268,7 +6417,8 @@ function broadcastUpdateData(data) {
     mainWindow,
     localBpWindow,
     localBpGuideWindow,
-    characterDisplayWindow
+    characterDisplayWindow,
+    characterModel3DWindow
   ].filter(w => w && !w.isDestroyed())
 
   for (const win of targets) {
@@ -6340,6 +6490,7 @@ function buildLocalBpFrontendState() {
     gameLabel: localBpState.gameLabel || '',
     mapName: localBpState.mapName || '',
     characterDisplayLayout: localBpState.characterDisplayLayout || null,
+    characterModel3DLayout: localBpState.characterModel3DLayout || null,
     characterDisplayBackground: localBpState.characterDisplayBackground || null,
     defaultImages: localBpState.defaultImages || null
   }
@@ -6592,6 +6743,7 @@ ipcMain.handle('open-local-bp', async () => {
   try {
     localBpState.enabled = true
     __loadCharacterDisplayLayoutFromDiskIntoState__()
+    __loadCharacterModel3DLayoutFromDiskIntoState__()
     __normalizeLocalBpStateInPlace__()
     const config = readJsonFileSafe(configPath, {})
     const autoOpen = normalizeLocalBpAutoOpenSettings(config.localBpAutoOpen)
@@ -6627,6 +6779,7 @@ ipcMain.handle('open-local-bp-guide', () => {
   try {
     localBpState.enabled = true
     __loadCharacterDisplayLayoutFromDiskIntoState__()
+    __loadCharacterModel3DLayoutFromDiskIntoState__()
     __normalizeLocalBpStateInPlace__()
     createLocalBpGuideWindow()
     broadcastLocalBpState()
@@ -6691,6 +6844,7 @@ ipcMain.handle('open-font-settings', () => {
 
 ipcMain.handle('localBp:getState', () => {
   __loadCharacterDisplayLayoutFromDiskIntoState__()
+  __loadCharacterModel3DLayoutFromDiskIntoState__()
   __normalizeLocalBpStateInPlace__()
   return { success: true, data: localBpState }
 })
@@ -6925,6 +7079,7 @@ try {
 
   global.__asgLocalBp.getState = () => {
     __loadCharacterDisplayLayoutFromDiskIntoState__()
+    __loadCharacterModel3DLayoutFromDiskIntoState__()
     __normalizeLocalBpStateInPlace__()
     return localBpState
   }
@@ -7131,6 +7286,18 @@ ipcMain.handle('localBp:reset', () => {
       } catch {}
       return null
     })()
+    const preservedModel3DLayout = (() => {
+      const stateLayout = (localBpState && typeof localBpState.characterModel3DLayout === 'object')
+        ? localBpState.characterModel3DLayout
+        : null
+      if (stateLayout) return JSON.parse(JSON.stringify(stateLayout))
+      try {
+        const root = __readLayoutJsonSafe__()
+        const diskLayout = (root && typeof root.characterModel3DLayout === 'object') ? root.characterModel3DLayout : null
+        if (diskLayout) return JSON.parse(JSON.stringify(diskLayout))
+      } catch {}
+      return null
+    })()
 
     localBpState = {
       enabled: true,
@@ -7153,12 +7320,17 @@ ipcMain.handle('localBp:reset', () => {
         backgroundImage: null,
         positions: {},
         transparentBackground: false
-      }
+      },
+      characterModel3DLayout: {}
     }
     if (preservedLayout && typeof preservedLayout === 'object') {
       localBpState.characterDisplayLayout = preservedLayout
     }
+    if (preservedModel3DLayout && typeof preservedModel3DLayout === 'object') {
+      localBpState.characterModel3DLayout = preservedModel3DLayout
+    }
     __persistCharacterDisplayLayoutToDisk__()
+    __persistCharacterModel3DLayoutToDisk__()
     broadcastLocalBpState()
     showWindowsNativeNotification({
       title: 'ASG Director',
@@ -7366,6 +7538,213 @@ ipcMain.handle('localBp:setCharacterDisplayTransparentBackground', (event, enabl
   }
 })
 
+function normalizeCharacterModel3DLayoutInput(input) {
+  const base = (input && typeof input === 'object') ? input : {}
+  const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
+    const src = (v && typeof v === 'object') ? v : {}
+    return {
+      x: Number.isFinite(Number(src.x)) ? Number(src.x) : fallback.x,
+      y: Number.isFinite(Number(src.y)) ? Number(src.y) : fallback.y,
+      z: Number.isFinite(Number(src.z)) ? Number(src.z) : fallback.z
+    }
+  }
+
+  const out = {
+    mode: base.mode === 'render' ? 'render' : 'edit',
+    transparentBackground: base.transparentBackground !== false,
+    scene: {
+      modelPath: typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : '',
+      position: ensureVec3(base?.scene?.position, { x: 0, y: 0, z: 0 }),
+      rotation: ensureVec3(base?.scene?.rotation, { x: 0, y: 0, z: 0 }),
+      scale: ensureVec3(base?.scene?.scale, { x: 1, y: 1, z: 1 })
+    },
+    slots: {},
+    camera: {
+      position: ensureVec3(base?.camera?.position, { x: 0, y: 2, z: 8 }),
+      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 })
+    }
+  }
+
+  const slotKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  for (const key of slotKeys) {
+    out.slots[key] = {
+      position: ensureVec3(base?.slots?.[key]?.position, { x: 0, y: 0, z: 0 }),
+      rotation: ensureVec3(base?.slots?.[key]?.rotation, { x: 0, y: 0, z: 0 }),
+      scale: ensureVec3(base?.slots?.[key]?.scale, { x: 1, y: 1, z: 1 })
+    }
+  }
+
+  return out
+}
+
+function sanitizeOfficialRoleName(value) {
+  if (!value || typeof value !== 'string') return ''
+  return value.replace(/["'“”‘’]/g, '').replace(/[\\/:*?<>|]/g, '_').trim()
+}
+
+function normalizeOfficialRoleMatchKey(value) {
+  return sanitizeOfficialRoleName(value).replace(/\s+/g, '').toLowerCase()
+}
+
+function listOfficialModelCandidates(modelsRoot) {
+  const records = []
+  if (!fs.existsSync(modelsRoot)) return records
+  const entries = fs.readdirSync(modelsRoot)
+  for (const entry of entries) {
+    const full = path.join(modelsRoot, entry)
+    let stat = null
+    try { stat = fs.statSync(full) } catch { continue }
+
+    if (stat.isDirectory()) {
+      let modelPath = ''
+      const preferred = [path.join(full, `${entry}.gltf`), path.join(full, `${entry}.glb`)]
+      for (const p of preferred) {
+        if (fs.existsSync(p)) {
+          modelPath = p
+          break
+        }
+      }
+      if (!modelPath) {
+        try {
+          const files = fs.readdirSync(full)
+            .filter(f => /\.(gltf|glb)$/i.test(f))
+            .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+          if (files.length > 0) modelPath = path.join(full, files[0])
+        } catch {}
+      }
+      if (modelPath) {
+        records.push({
+          name: entry,
+          key: normalizeOfficialRoleMatchKey(entry),
+          path: modelPath
+        })
+      }
+      continue
+    }
+
+    if (/\.(gltf|glb)$/i.test(entry)) {
+      const base = path.basename(entry, path.extname(entry))
+      records.push({
+        name: base,
+        key: normalizeOfficialRoleMatchKey(base),
+        path: full
+      })
+    }
+  }
+  return records
+}
+
+function resolveOfficialModelLocalPathByRoleName(roleName) {
+  try {
+    const raw = (typeof roleName === 'string') ? roleName.trim() : ''
+    const clean = sanitizeOfficialRoleName(raw)
+    if (!clean && !raw) return ''
+
+    const modelsRoot = path.join(userDataPath, 'official-models')
+    if (!fs.existsSync(modelsRoot)) return ''
+    const records = listOfficialModelCandidates(modelsRoot)
+    if (!records.length) return ''
+    const targetKeys = Array.from(new Set([raw, clean].filter(Boolean).map(normalizeOfficialRoleMatchKey).filter(Boolean)))
+
+    // 1) 精确匹配：原名/去引号名对应目录名或文件名
+    for (const tk of targetKeys) {
+      const hit = records.find(r => r.key === tk)
+      if (hit && hit.path) return hit.path
+    }
+
+    // 2) 模糊匹配：包含关系（处理命名差异）
+    for (const tk of targetKeys) {
+      const hits = records
+        .filter(r => r.key && (r.key.includes(tk) || tk.includes(r.key)))
+        .sort((a, b) => a.key.length - b.key.length)
+      if (hits.length > 0 && hits[0].path) return hits[0].path
+    }
+
+    // 最后兜底：若官方映射里是本地已下载路径，则使用之
+    try {
+      const map = (officialModelService && typeof officialModelService.loadOfficialModelMap === 'function')
+        ? officialModelService.loadOfficialModelMap()
+        : {}
+      const mapped = (map && (map[raw] || map[clean])) ? (map[raw] || map[clean]) : ''
+      if (mapped && typeof mapped === 'string' && fs.existsSync(mapped)) return mapped
+    } catch {}
+
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+function buildOfficialModelHttpUrl(modelPath) {
+  try {
+    if (!modelPath || typeof modelPath !== 'string') return ''
+    const modelsRoot = path.join(userDataPath, 'official-models')
+    const absRoot = path.resolve(modelsRoot) + path.sep
+    const absPath = path.resolve(modelPath)
+    if (!absPath.startsWith(absRoot)) return ''
+    const rel = absPath.slice(absRoot.length).replace(/\\/g, '/')
+    const encoded = rel
+      .split('/')
+      .filter(Boolean)
+      .map(seg => encodeURIComponent(seg))
+      .join('/')
+    const baseUrl = getLocalPagesBaseUrl(readLocalPagesConfig().port)
+    return `${baseUrl}/official-models/${encoded}`
+  } catch {
+    return ''
+  }
+}
+
+try { ipcMain.removeHandler('localBp:saveCharacterModel3DLayout') } catch { /* ignore */ }
+ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
+  try {
+    const prev = (localBpState.characterModel3DLayout && typeof localBpState.characterModel3DLayout === 'object')
+      ? localBpState.characterModel3DLayout
+      : {}
+    const incoming = normalizeCharacterModel3DLayoutInput(layout)
+    localBpState.characterModel3DLayout = {
+      ...prev,
+      ...incoming,
+      scene: { ...(prev.scene || {}), ...(incoming.scene || {}) },
+      slots: { ...(prev.slots || {}), ...(incoming.slots || {}) },
+      camera: { ...(prev.camera || {}), ...(incoming.camera || {}) }
+    }
+    __normalizeLocalBpStateInPlace__()
+    __persistCharacterModel3DLayoutToDisk__()
+    broadcastLocalBpState()
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+try { ipcMain.removeHandler('localBp:setCharacterModel3DTransparentBackground') } catch { /* ignore */ }
+ipcMain.handle('localBp:setCharacterModel3DTransparentBackground', (event, enabled) => {
+  try {
+    if (!localBpState.characterModel3DLayout || typeof localBpState.characterModel3DLayout !== 'object') {
+      localBpState.characterModel3DLayout = {}
+    }
+    localBpState.characterModel3DLayout.transparentBackground = !!enabled
+    __normalizeLocalBpStateInPlace__()
+    __persistCharacterModel3DLayoutToDisk__()
+    broadcastLocalBpState()
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+try { ipcMain.removeHandler('localBp:getOfficialModelLocalPath') } catch { /* ignore */ }
+ipcMain.handle('localBp:getOfficialModelLocalPath', (event, roleName) => {
+  try {
+    const modelPath = resolveOfficialModelLocalPathByRoleName(roleName)
+    const httpUrl = modelPath ? buildOfficialModelHttpUrl(modelPath) : ''
+    return { success: true, path: modelPath || '', httpUrl: httpUrl || '' }
+  } catch (error) {
+    return { success: false, error: error.message, path: '', httpUrl: '' }
+  }
+})
+
 function openCharacterDisplayWindow() {
   if (characterDisplayWindow && !characterDisplayWindow.isDestroyed()) {
     characterDisplayWindow.focus()
@@ -7395,10 +7774,48 @@ function openCharacterDisplayWindow() {
   return { success: true }
 }
 
+function openCharacterModel3DWindow() {
+  if (characterModel3DWindow && !characterModel3DWindow.isDestroyed()) {
+    characterModel3DWindow.focus()
+    return { success: true }
+  }
+
+  characterModel3DWindow = new BrowserWindow({
+    width: 1920,
+    height: 1080,
+    title: '角色模型3D展示',
+    resizable: true,
+    transparent: true,
+    frame: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false
+    }
+  })
+
+  characterModel3DWindow.loadFile(path.join(__dirname, 'pages', 'character-model-3d.html'))
+
+  characterModel3DWindow.on('closed', () => {
+    characterModel3DWindow = null
+  })
+
+  return { success: true }
+}
+
 // 打开角色展示窗口
 ipcMain.handle('localBp:openCharacterDisplay', () => {
   try {
     return openCharacterDisplayWindow()
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:openCharacterModel3D', () => {
+  try {
+    return openCharacterModel3DWindow()
   } catch (error) {
     return { success: false, error: error.message }
   }
@@ -7654,6 +8071,58 @@ ipcMain.handle('select-folder', async () => {
     return { success: false, canceled: true }
   } catch (error) {
     return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('blender-plugin:install-asg-bp-sync', async () => {
+  try {
+    const addonSrcPath = path.join(app.getAppPath(), 'scripts', 'blender', 'asg_director_bp_sync_addon.py')
+    if (!fs.existsSync(addonSrcPath)) {
+      return { success: false, error: `插件文件不存在: ${addonSrcPath}` }
+    }
+
+    const candidates = collectBlenderAddonsDirs()
+    if (!candidates.length) {
+      return {
+        success: false,
+        error: '未检测到 Blender 用户目录。请先安装并至少启动一次 Blender。'
+      }
+    }
+
+    const installed = []
+    const failed = []
+    for (const item of candidates) {
+      try {
+        fs.mkdirSync(item.addonsDir, { recursive: true })
+        const targetFile = path.join(item.addonsDir, 'asg_director_bp_sync_addon.py')
+        fs.copyFileSync(addonSrcPath, targetFile)
+        installed.push({
+          version: item.version,
+          path: targetFile
+        })
+      } catch (e) {
+        failed.push({
+          version: item.version,
+          path: item.addonsDir,
+          error: e?.message || String(e)
+        })
+      }
+    }
+
+    if (!installed.length) {
+      return { success: false, error: '安装失败', failed }
+    }
+
+    return {
+      success: true,
+      installed,
+      failed,
+      message: failed.length
+        ? `已安装到 ${installed.length} 个 Blender 版本，${failed.length} 个失败`
+        : `已安装到 ${installed.length} 个 Blender 版本`
+    }
+  } catch (error) {
+    return { success: false, error: error?.message || String(error) }
   }
 })
 
