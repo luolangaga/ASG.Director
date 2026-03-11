@@ -201,11 +201,14 @@
 
   function createSceneGraph() {
     scene = new THREE.Scene()
-    camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000)
+    const initW = dom.renderRoot.clientWidth || window.innerWidth || 1920
+    const initH = dom.renderRoot.clientHeight || window.innerHeight || 1080
+    camera = new THREE.PerspectiveCamera(45, initW / Math.max(1, initH), 0.1, 5000)
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-    renderer.setSize(dom.renderRoot.clientWidth || window.innerWidth, dom.renderRoot.clientHeight || window.innerHeight)
+    renderer.setSize(initW, initH)
+    camera.updateProjectionMatrix()
     dom.renderRoot.innerHTML = ''
     dom.renderRoot.appendChild(renderer.domElement)
 

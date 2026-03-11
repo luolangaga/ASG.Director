@@ -624,95 +624,19 @@
               <p>配置 MMD 模型路径、渲染参数与性能选项。</p>
             </div>
             <div class="feature-card" id="model3dSettingsCard">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <label
-                  style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:16px; font-weight:bold;">
-                  <input type="checkbox" id="enable3dModels" class="switch-input"> 启用 3D 模型
-                </label>
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <button class="btn btn-sm btn-secondary" onclick="ASGOnboarding.startMMDTutorial()">📖 配置教程</button>
-                  <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                    <input type="checkbox" id="model3dAutoApply"> 实时应用修改
-                  </label>
+              <div style="display:flex; flex-direction:column; gap:14px;">
+                <div style="font-size:14px; color:var(--text-secondary);">
+                  旧版前台 3D 参数设置已下线。请使用“角色模型3D展示”窗口进行场景编辑与渲染。
                 </div>
-              </div>
-
-              <div class="settings-grid">
-                <div class="control-group">
-                  <label class="control-label">官方模型</label>
-                  <div style="display:flex; align-items:center; gap:10px;">
-                    <input type="checkbox" id="useOfficialModels"> <span>启用官方联网模型</span>
-                  </div>
+                <div id="model3dStatusText" style="font-size:13px; color:var(--text-secondary);">
+                  官方模型状态：检测中...
                 </div>
-                <div class="control-group">
-                  <label class="control-label">求生者模型目录</label>
-                  <div style="display:flex; gap:8px;">
-                    <input id="survivorModelDir" class="form-input" placeholder="Path...">
-                    <button class="btn btn-secondary" onclick="pickFolderFor('survivorModelDir')">...</button>
-                  </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn btn-primary" onclick="openCharacterModel3DFromSettings()">打开角色模型3D展示</button>
+                  <button class="btn btn-secondary" onclick="checkOfficialModelsAndDownloadFromSettings()">检测/下载官方模型</button>
+                  <button class="btn btn-secondary" onclick="refreshCharacterModel3DSettingsStatus()">刷新状态</button>
+                  <button class="btn btn-ghost" onclick="openCharacterManager()">🎭 角色图片管理</button>
                 </div>
-                <div class="control-group">
-                  <label class="control-label">监管者模型目录</label>
-                  <div style="display:flex; gap:8px;">
-                    <input id="hunterModelDir" class="form-input" placeholder="Path...">
-                    <button class="btn btn-secondary" onclick="pickFolderFor('hunterModelDir')">...</button>
-                  </div>
-                </div>
-                <div class="control-group">
-                  <label class="control-label">求生者动作目录</label>
-                  <div style="display:flex; gap:8px;">
-                    <input id="survivorMotionDir" class="form-input" placeholder="Path...">
-                    <button class="btn btn-secondary" onclick="pickFolderFor('survivorMotionDir')">...</button>
-                  </div>
-                </div>
-                <div class="control-group">
-                  <label class="control-label">监管者动作目录</label>
-                  <div style="display:flex; gap:8px;">
-                    <input id="hunterMotionDir" class="form-input" placeholder="Path...">
-                    <button class="btn btn-secondary" onclick="pickFolderFor('hunterMotionDir')">...</button>
-                  </div>
-                </div>
-
-                <div class="control-group"><label class="control-label">抗锯齿</label><select id="render3dAntialias"
-                    class="form-select">
-                    <option value="true">开启</option>
-                    <option value="false">关闭</option>
-                  </select></div>
-                <div class="control-group"><label class="control-label">像素比</label><select id="render3dPixelRatio"
-                    class="form-select">
-                    <option value="1">1x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                  </select></div>
-                <div class="control-group"><label class="control-label">目标 FPS</label><input type="number"
-                    id="model3dTargetFPS" class="form-input" value="30"></div>
-                <div class="control-group"><label class="control-label">阴影质量</label><select id="render3dShadowQuality"
-                    class="form-select">
-                    <option value="1024">中</option>
-                    <option value="2048">高</option>
-                  </select></div>
-                <div class="control-group"><label class="control-label">Toon 风格</label>
-                  <div style="display:flex; align-items:center; gap:10px;"><input type="checkbox"
-                      id="render3dEnableToon"> <span>启用 Toon</span></div>
-                </div>
-                <div class="control-group"><label class="control-label">描边</label>
-                  <div style="display:flex; align-items:center; gap:10px;"><input type="checkbox"
-                      id="render3dEnableOutline"> <span>启用描边</span></div>
-                </div>
-              </div>
-
-              <div style="display:none">
-                <input id="defaultMotionVmd"><input id="render3dEnableShadows"><input id="render3dToonGradient">
-                <input id="render3dOutlineThickness"><input id="render3dOutlineColor"><input id="render3dOutlineAlpha">
-                <input id="render3dAmbientColor"><input id="render3dAmbientIntensity">
-                <input id="render3dDirectionalColor"><input id="render3dDirectionalIntensity">
-                <input id="render3dLightPosX"><input id="render3dLightPosY"><input id="render3dLightPosZ">
-              </div>
-
-              <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
-                <button class="btn btn-ghost" onclick="installBlenderBpSyncAddon()">自动安装 Blender 插件</button>
-                <button class="btn btn-secondary" onclick="loadModel3dSettings()">刷新设置</button>
-                <button class="btn btn-primary" onclick="applyModel3dSettings(true)">保存并应用</button>
               </div>
             </div>
           </div>
@@ -2169,108 +2093,20 @@
       }
     })
 
-    // 前台 3D 模型设置快捷入口
+    // 新 3D 角色模型窗口快捷入口
     const openModelSettingsBtn = document.getElementById('openModelSettingsBtn')
     openModelSettingsBtn?.addEventListener('click', async () => {
       try {
+        switchSettingTab('3d')
         const card = document.getElementById('model3dSettingsCard')
-        if (card && card.classList.contains('collapsed')) {
-          setModel3dCardCollapsed(false)
-        }
         card?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        showStatus('已定位到“前台 3D模型设置”', 'info')
+        showStatus('已定位到“角色模型3D展示设置”', 'info')
       } catch (error) {
         showStatus(`打开失败: ${error.message}`, 'error')
       }
     })
 
     // ==================== 3D 模型设置（主页） ====================
-    let __model3dApplyTimer = null
-    const MODEL3D_CARD_STATE_KEY = 'homepageModel3dCardCollapsed'
-
-    function getDefaultModel3dConfig() {
-      return {
-        enabled: false,
-        useOfficialModels: false,
-        targetFPS: 30,
-        survivorModelDir: null,
-        hunterModelDir: null,
-        survivorMotionDir: null,
-        hunterMotionDir: null,
-        defaultMotionVmd: null,
-
-        // 渲染质量
-        antialias: true,
-        pixelRatio: 1,
-        enableShadows: false,
-        shadowQuality: 1024,
-
-        // 风格化渲染
-        enableOutline: true,
-        outlineThickness: 0.003,
-        outlineColor: '#000000',
-        outlineAlpha: 1.0,
-        enableToon: false,
-        toonGradient: 5,
-
-        // 光照
-        ambientColor: '#ffffff',
-        ambientIntensity: 0.5,
-        directionalColor: '#ffffff',
-        directionalIntensity: 0.7,
-        lightPosX: 10,
-        lightPosY: 20,
-        lightPosZ: 10,
-
-        // 3D 视口（前台保存的高级设置）
-        viewports: {}
-      }
-    }
-
-    function bindModel3dAutoApply() {
-      const auto = document.getElementById('model3dAutoApply')
-      const ids = [
-        'enable3dModels',
-        'useOfficialModels',
-        'model3dTargetFPS',
-        'survivorModelDir',
-        'hunterModelDir',
-        'survivorMotionDir',
-        'hunterMotionDir',
-        'defaultMotionVmd',
-        'render3dAntialias',
-        'render3dPixelRatio',
-        'render3dEnableShadows',
-        'render3dShadowQuality',
-        'render3dEnableOutline',
-        'render3dOutlineThickness',
-        'render3dOutlineColor',
-        'render3dOutlineAlpha',
-        'render3dEnableToon',
-        'render3dToonGradient',
-        'render3dAmbientColor',
-        'render3dAmbientIntensity',
-        'render3dDirectionalColor',
-        'render3dDirectionalIntensity',
-        'render3dLightPosX',
-        'render3dLightPosY',
-        'render3dLightPosZ'
-      ]
-
-      const handler = () => {
-        if (!auto?.checked) return
-        if (__model3dApplyTimer) clearTimeout(__model3dApplyTimer)
-        __model3dApplyTimer = setTimeout(() => applyModel3dSettings(false), 450)
-      }
-
-      for (const id of ids) {
-        const el = document.getElementById(id)
-        if (!el) continue
-        el.addEventListener('change', handler)
-        el.addEventListener('input', handler)
-      }
-    }
-
     let __officialModelsProgressTick = 0
     function initOfficialModelsDownloadProgress() {
       if (!window.electronAPI || typeof window.electronAPI.onOfficialModelsDownloadProgress !== 'function') return
@@ -2281,9 +2117,7 @@
         const count = document.getElementById('downloadProgressCount')
         const currentFile = document.getElementById('downloadCurrentFile')
 
-        if (modal && !modal.classList.contains('show')) {
-          modal.classList.add('show')
-        }
+        if (modal && !modal.classList.contains('show')) modal.classList.add('show')
 
         const now = Date.now()
         if (now - __officialModelsProgressTick < 50) return
@@ -2302,257 +2136,76 @@
         if (current >= total && overall >= 100) {
           setTimeout(() => {
             if (modal) modal.classList.remove('show')
-          }, 1000)
+          }, 1200)
         }
       })
     }
 
-    async function pickFolderFor(inputId) {
+    async function refreshCharacterModel3DSettingsStatus() {
       try {
-        const res = await window.electronAPI.selectFolder()
-        if (res && res.success && res.path) {
-          const el = document.getElementById(inputId)
-          if (el) el.value = res.path
-          const auto = document.getElementById('model3dAutoApply')
-          if (auto?.checked) applyModel3dSettings(false)
+        const statusEl = document.getElementById('model3dStatusText')
+        const status = await window.electronAPI.getOfficialModelsDownloadStatus?.()
+        if (!statusEl) return
+        if (!status || typeof status !== 'object') {
+          statusEl.textContent = '官方模型状态：未知'
+          return
+        }
+        const total = Number(status.total || 0)
+        const downloaded = Number(status.downloaded || 0)
+        if (status.complete) {
+          statusEl.textContent = `官方模型状态：已就绪（${downloaded}/${total}）`
+        } else if (downloaded > 0) {
+          statusEl.textContent = `官方模型状态：部分已下载（${downloaded}/${total}）`
+        } else {
+          statusEl.textContent = `官方模型状态：未下载（0/${total}）`
         }
       } catch (e) {
-        showStatus('选择文件夹失败: ' + (e?.message || e), 'error')
+        const statusEl = document.getElementById('model3dStatusText')
+        if (statusEl) statusEl.textContent = '官方模型状态：检测失败'
       }
     }
 
-    async function pickVmdFor(inputId) {
+    async function checkOfficialModelsAndDownloadFromSettings() {
       try {
-        const res = await window.electronAPI.selectFileWithFilter({
-          filters: [{ name: 'VMD 动作文件', extensions: ['vmd'] }, { name: '所有文件', extensions: ['*'] }]
-        })
-        if (res && res.success && res.path) {
-          const el = document.getElementById(inputId)
-          if (el) el.value = res.path
-          const auto = document.getElementById('model3dAutoApply')
-          if (auto?.checked) applyModel3dSettings(false)
+        const status = await window.electronAPI.getOfficialModelsDownloadStatus?.()
+        if (status && status.complete) {
+          showStatus('官方模型已就绪，无需下载', 'success')
+          await refreshCharacterModel3DSettingsStatus()
+          return
         }
+        const ok = confirm('检测到官方模型未就绪，是否立即下载？')
+        if (!ok) return
+        const res = await window.electronAPI.prepareOfficialModels?.()
+        if (!res || !res.success) {
+          showStatus('官方模型下载失败: ' + (res?.error || '未知错误'), 'error')
+          await refreshCharacterModel3DSettingsStatus()
+          return
+        }
+        showStatus(`官方模型下载完成（${res.downloaded || 0}）`, 'success')
+        await refreshCharacterModel3DSettingsStatus()
       } catch (e) {
-        showStatus('选择文件失败: ' + (e?.message || e), 'error')
+        showStatus('官方模型下载失败: ' + (e?.message || e), 'error')
       }
     }
 
-    async function installBlenderBpSyncAddon() {
+    async function openCharacterModel3DFromSettings() {
       try {
-        if (!window.electronAPI || typeof window.electronAPI.installBlenderBpSyncAddon !== 'function') {
-          showStatus('当前版本不支持自动安装 Blender 插件', 'error')
+        const res = await window.electronAPI.invoke('localBp:openCharacterModel3D')
+        if (!res || !res.success) {
+          if (!res?.canceled) {
+            showStatus('打开角色模型3D展示失败: ' + (res?.error || '未知错误'), 'error')
+          }
           return
         }
-        showStatus('正在安装 Blender 插件...', 'info')
-        const result = await window.electronAPI.installBlenderBpSyncAddon()
-        if (!result || !result.success) {
-          showStatus('安装失败: ' + (result?.error || '未知错误'), 'error')
-          return
-        }
-
-        const installed = Array.isArray(result.installed) ? result.installed : []
-        const failed = Array.isArray(result.failed) ? result.failed : []
-        if (failed.length) {
-          showStatus(`已安装到 ${installed.length} 个版本，${failed.length} 个失败`, 'warning')
-          return
-        }
-        showStatus(`✅ Blender 插件安装完成（${installed.length} 个版本）`, 'success')
+        showStatus('角色模型3D展示窗口已打开', 'success')
+        await refreshCharacterModel3DSettingsStatus()
       } catch (e) {
-        showStatus('安装失败: ' + (e?.message || e), 'error')
+        showStatus('打开角色模型3D展示失败: ' + (e?.message || e), 'error')
       }
-    }
-
-    function __setVal(id, v) {
-      const el = document.getElementById(id)
-      if (!el) return
-      if (el.type === 'checkbox') {
-        el.checked = !!v
-        return
-      }
-      el.value = (v ?? '')
     }
 
     async function loadModel3dSettings() {
-      try {
-        const result = await window.electronAPI.loadLayout()
-        const layout = (result && result.success && result.layout) ? result.layout : {}
-        const def = getDefaultModel3dConfig()
-        const m0 = (layout && layout.model3d && typeof layout.model3d === 'object') ? layout.model3d : {}
-        const m = { ...def, ...m0, viewports: (m0 && m0.viewports) ? m0.viewports : {} }
-
-        __setVal('enable3dModels', !!m.enabled)
-        __setVal('useOfficialModels', !!m.useOfficialModels)
-        __setVal('model3dTargetFPS', Number(m.targetFPS || 30))
-        __setVal('survivorModelDir', m.survivorModelDir || '')
-        __setVal('hunterModelDir', m.hunterModelDir || '')
-        __setVal('survivorMotionDir', m.survivorMotionDir || '')
-        __setVal('hunterMotionDir', m.hunterMotionDir || '')
-        __setVal('defaultMotionVmd', m.defaultMotionVmd || '')
-
-        __setVal('render3dAntialias', String(m.antialias !== false))
-        __setVal('render3dPixelRatio', String(Number(m.pixelRatio ?? 1)))
-        __setVal('render3dEnableShadows', !!m.enableShadows)
-        __setVal('render3dShadowQuality', String(Number(m.shadowQuality || 1024)))
-
-        __setVal('render3dEnableOutline', m.enableOutline !== false)
-        __setVal('render3dOutlineThickness', String(Number(m.outlineThickness || 0.003)))
-        __setVal('render3dOutlineColor', m.outlineColor || '#000000')
-        __setVal('render3dOutlineAlpha', String(Number(m.outlineAlpha ?? 1.0)))
-        __setVal('render3dEnableToon', !!m.enableToon)
-        __setVal('render3dToonGradient', String(Number(m.toonGradient || 5)))
-
-        __setVal('render3dAmbientColor', m.ambientColor || '#ffffff')
-        __setVal('render3dAmbientIntensity', String(Number(m.ambientIntensity ?? 0.5)))
-        __setVal('render3dDirectionalColor', m.directionalColor || '#ffffff')
-        __setVal('render3dDirectionalIntensity', String(Number(m.directionalIntensity ?? 0.7)))
-        __setVal('render3dLightPosX', String(Number(m.lightPosX ?? 10)))
-        __setVal('render3dLightPosY', String(Number(m.lightPosY ?? 20)))
-        __setVal('render3dLightPosZ', String(Number(m.lightPosZ ?? 10)))
-
-        showStatus('已读取 3D 模型配置', 'success')
-      } catch (e) {
-        console.error('读取 3D 模型配置失败:', e)
-        showStatus('读取失败: ' + (e?.message || e), 'error')
-      }
-    }
-
-    async function applyModel3dSettings(showToast) {
-      try {
-        const useOfficialEl = document.getElementById('useOfficialModels')
-        const wantOfficial = !!useOfficialEl?.checked
-        if (wantOfficial && window.electronAPI && typeof window.electronAPI.prepareOfficialModels === 'function') {
-          const status = await window.electronAPI.getOfficialModelsDownloadStatus?.()
-          if (!status || !status.complete) {
-            const ok = confirm('将开始下载官方模型资源，下载完成后才会启用。是否继续？')
-            if (!ok) {
-              if (useOfficialEl) useOfficialEl.checked = false
-              return
-            }
-            if (useOfficialEl) useOfficialEl.disabled = true
-            
-            const modal = document.getElementById('downloadProgressModal')
-            if (modal) {
-              modal.classList.add('show')
-              const text = document.getElementById('downloadProgressText')
-              if (text) text.textContent = '准备下载...'
-              const bar = document.getElementById('downloadProgressBar')
-              if (bar) bar.style.width = '0%'
-              const count = document.getElementById('downloadProgressCount')
-              if (count) count.textContent = '0/0'
-            }
-            
-            try {
-              const res = await window.electronAPI.prepareOfficialModels()
-              if (!res || !res.success) {
-                throw new Error(res?.error || '下载失败')
-              }
-              showStatus('官方模型下载完成', 'success')
-            } catch (e) {
-              if (modal) modal.classList.remove('show')
-              showStatus('官方模型下载失败: ' + (e?.message || e), 'error')
-              if (useOfficialEl) useOfficialEl.checked = false
-              return
-            } finally {
-              if (useOfficialEl) useOfficialEl.disabled = false
-            }
-          }
-        }
-        const result = await window.electronAPI.loadLayout()
-        const layout = (result && result.success && result.layout) ? result.layout : {}
-        const def = getDefaultModel3dConfig()
-        const prev = (layout && layout.model3d && typeof layout.model3d === 'object') ? layout.model3d : {}
-
-        const m = {
-          enabled: !!document.getElementById('enable3dModels')?.checked,
-          useOfficialModels: !!document.getElementById('useOfficialModels')?.checked,
-          targetFPS: Number(document.getElementById('model3dTargetFPS')?.value) || def.targetFPS,
-          survivorModelDir: document.getElementById('survivorModelDir')?.value || null,
-          hunterModelDir: document.getElementById('hunterModelDir')?.value || null,
-          survivorMotionDir: document.getElementById('survivorMotionDir')?.value || null,
-          hunterMotionDir: document.getElementById('hunterMotionDir')?.value || null,
-          defaultMotionVmd: document.getElementById('defaultMotionVmd')?.value || null,
-
-          antialias: document.getElementById('render3dAntialias')?.value === 'true',
-          pixelRatio: Number(document.getElementById('render3dPixelRatio')?.value) || def.pixelRatio,
-          enableShadows: !!document.getElementById('render3dEnableShadows')?.checked,
-          shadowQuality: Number(document.getElementById('render3dShadowQuality')?.value) || def.shadowQuality,
-
-          enableOutline: document.getElementById('render3dEnableOutline')?.checked !== false,
-          outlineThickness: Number(document.getElementById('render3dOutlineThickness')?.value) || def.outlineThickness,
-          outlineColor: document.getElementById('render3dOutlineColor')?.value || def.outlineColor,
-          outlineAlpha: Number(document.getElementById('render3dOutlineAlpha')?.value ?? def.outlineAlpha),
-          enableToon: !!document.getElementById('render3dEnableToon')?.checked,
-          toonGradient: Number(document.getElementById('render3dToonGradient')?.value) || def.toonGradient,
-
-          ambientColor: document.getElementById('render3dAmbientColor')?.value || def.ambientColor,
-          ambientIntensity: Number(document.getElementById('render3dAmbientIntensity')?.value ?? def.ambientIntensity),
-          directionalColor: document.getElementById('render3dDirectionalColor')?.value || def.directionalColor,
-          directionalIntensity: Number(document.getElementById('render3dDirectionalIntensity')?.value ?? def.directionalIntensity),
-          lightPosX: Number(document.getElementById('render3dLightPosX')?.value ?? def.lightPosX),
-          lightPosY: Number(document.getElementById('render3dLightPosY')?.value ?? def.lightPosY),
-          lightPosZ: Number(document.getElementById('render3dLightPosZ')?.value ?? def.lightPosZ),
-
-          viewports: prev.viewports ? prev.viewports : {}
-        }
-
-        layout.model3d = m
-
-        const saveRes = await window.electronAPI.saveLayout(layout)
-        if (!saveRes || !saveRes.success) {
-          throw new Error(saveRes?.error || '保存失败')
-        }
-
-        // 让前台刷新布局（立即生效）
-        try {
-          if (window.electronAPI && window.electronAPI.sendToFrontend) {
-            window.electronAPI.sendToFrontend({ type: 'layout-updated' })
-          }
-        } catch { }
-
-        if (showToast) showStatus('✅ 3D 模型设置已保存并同步到前台', 'success')
-      } catch (e) {
-        console.error('保存 3D 模型配置失败:', e)
-        showStatus('保存失败: ' + (e?.message || e), 'error')
-      }
-    }
-
-    function setModel3dCardCollapsed(collapsed, options = {}) {
-      const card = document.getElementById('model3dSettingsCard')
-      if (!card) return
-      card.classList.toggle('collapsed', collapsed)
-      const toggle = document.getElementById('model3dToggleBtn')
-      if (toggle) {
-        toggle.setAttribute('aria-expanded', String(!collapsed))
-        const label = toggle.querySelector('.toggle-label')
-        const icon = toggle.querySelector('.toggle-icon')
-        if (label) label.textContent = collapsed ? '展开' : '收起'
-        if (icon) icon.textContent = collapsed ? '▸' : '▾'
-      }
-      if (options.persist !== false && typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem(MODEL3D_CARD_STATE_KEY, collapsed ? '1' : '0')
-        } catch { }
-      }
-    }
-
-    function toggleModel3dCard() {
-      const card = document.getElementById('model3dSettingsCard')
-      if (!card) return
-      setModel3dCardCollapsed(!card.classList.contains('collapsed'))
-    }
-
-    function initModel3dCardToggle() {
-      const toggle = document.getElementById('model3dToggleBtn')
-      if (!toggle) return
-      toggle.addEventListener('click', toggleModel3dCard)
-    }
-
-    function restoreModel3dCardState() {
-      if (typeof localStorage === 'undefined') return
-      const stored = localStorage.getItem(MODEL3D_CARD_STATE_KEY)
-      // 默认折叠：仅当用户曾经手动展开（存了 0）才展开
-      const collapsed = stored == null ? true : stored === '1'
-      setModel3dCardCollapsed(collapsed, { persist: false })
+      await refreshCharacterModel3DSettingsStatus()
     }
 
     // ==================== 更新检查功能 ====================
@@ -2682,9 +2335,7 @@
     loadLocalBpConsoleBackgroundSettings()
     // 加载插件组件
     loadPluginComponents()
-    restoreModel3dCardState()
-    initModel3dCardToggle()
-    bindModel3dAutoApply()
+    refreshCharacterModel3DSettingsStatus()
     initOfficialModelsDownloadProgress()
 
     // 延迟静默检查更新

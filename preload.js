@@ -181,7 +181,6 @@ const electronAPI = {
 
   // 插件系统
   openPluginManager: () => ipcRenderer.invoke('open-plugin-manager'),
-  installBlenderBpSyncAddon: () => ipcRenderer.invoke('blender-plugin:install-asg-bp-sync'),
   getOfficialModelMap: () => ipcRenderer.invoke('get-official-model-map'),
   getOfficialModelsDownloadStatus: () => ipcRenderer.invoke('get-official-model-download-status'),
   prepareOfficialModels: () => ipcRenderer.invoke('prepare-official-models'),

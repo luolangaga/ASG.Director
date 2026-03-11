@@ -97,7 +97,6 @@ let obsAutomationService = null
 const SUPPORTS_NATIVE_RESIZE_WITH_TRANSPARENT = process.platform !== 'win32'
 const FRONTEND_MAIN_WINDOW_ID = 'frontend-main'
 const customFrontendWindows = new Map()
-const BLENDER_VERSION_DIR_RE = /^\d+\.\d+$/
 
 function getCustomFrontendWindowList() {
   return Array.from(customFrontendWindows.values()).filter(w => w && !w.isDestroyed())
@@ -116,52 +115,6 @@ function getAllFrontendWindows() {
   if (frontendWindow && !frontendWindow.isDestroyed()) windows.push(frontendWindow)
   windows.push(...getCustomFrontendWindowList())
   return windows
-}
-
-function parseBlenderVersionNumber(versionText) {
-  const parts = String(versionText || '').split('.')
-  const major = Number(parts[0] || 0)
-  const minor = Number(parts[1] || 0)
-  if (!Number.isFinite(major) || !Number.isFinite(minor)) return 0
-  return major * 100 + minor
-}
-
-function collectBlenderAddonsDirs() {
-  const roots = []
-  const appData = process.env.APPDATA
-  const userProfile = process.env.USERPROFILE
-
-  if (appData) {
-    roots.push(path.join(appData, 'Blender Foundation', 'Blender'))
-  }
-  if (userProfile) {
-    roots.push(path.join(userProfile, 'AppData', 'Roaming', 'Blender Foundation', 'Blender'))
-  }
-
-  const uniqueRoots = Array.from(new Set(roots.filter(Boolean)))
-  const dirs = []
-  for (const root of uniqueRoots) {
-    if (!fs.existsSync(root)) continue
-    let entries = []
-    try {
-      entries = fs.readdirSync(root, { withFileTypes: true })
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      const version = String(entry.name || '').trim()
-      if (!BLENDER_VERSION_DIR_RE.test(version)) continue
-      dirs.push({
-        root,
-        version,
-        addonsDir: path.join(root, version, 'scripts', 'addons')
-      })
-    }
-  }
-
-  dirs.sort((a, b) => parseBlenderVersionNumber(b.version) - parseBlenderVersionNumber(a.version))
-  return dirs
 }
 
 function broadcastToFrontendWindows(channel, ...args) {
@@ -7804,6 +7757,76 @@ function openCharacterModel3DWindow() {
   return { success: true }
 }
 
+function countDownloadedOfficialModelsQuick() {
+  try {
+    const modelsRoot = path.join(userDataPath, 'official-models')
+    if (!fs.existsSync(modelsRoot)) return 0
+    let count = 0
+    const stack = [modelsRoot]
+    while (stack.length) {
+      const dir = stack.pop()
+      const list = fs.readdirSync(dir, { withFileTypes: true })
+      for (const item of list) {
+        const p = path.join(dir, item.name)
+        if (item.isDirectory()) {
+          stack.push(p)
+          continue
+        }
+        if (/\.(gltf|glb)$/i.test(item.name)) count++
+      }
+    }
+    return count
+  } catch {
+    return 0
+  }
+}
+
+async function ensureOfficialModelsReadyForCharacterModel3D() {
+  try {
+    const status = (officialModelService && typeof officialModelService.getOfficialModelDownloadStatus === 'function')
+      ? officialModelService.getOfficialModelDownloadStatus()
+      : null
+    const downloaded = Number(status?.downloaded || 0)
+    const quickDownloaded = countDownloadedOfficialModelsQuick()
+    const exists = Math.max(downloaded, quickDownloaded) > 0
+    if (exists) return { success: true, skipped: true }
+
+    const answer = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['下载并继续', '取消'],
+      defaultId: 0,
+      cancelId: 1,
+      title: '角色模型3D展示',
+      message: '检测到本机尚未下载官方角色模型',
+      detail: '打开角色模型3D展示前需要下载官方模型资源。是否现在下载？'
+    })
+    if (answer.response !== 0) {
+      return { success: false, canceled: true, error: '用户取消下载官方模型' }
+    }
+
+    showWindowsNativeNotification({
+      title: 'ASG Director',
+      body: '开始下载官方模型资源，请稍候…'
+    })
+    const res = await officialModelService.prepareOfficialModels()
+    if (!res || !res.success) {
+      const msg = res?.error || '下载失败'
+      showWindowsNativeNotification({
+        title: 'ASG Director',
+        body: `官方模型下载失败：${msg}`
+      })
+      return { success: false, error: msg }
+    }
+    showWindowsNativeNotification({
+      title: 'ASG Director',
+      body: `官方模型下载完成（${res.downloaded || 0} 个）`
+    })
+    return { success: true, downloaded: res.downloaded || 0 }
+  } catch (error) {
+    return { success: false, error: error?.message || String(error) }
+  }
+}
+
 // 打开角色展示窗口
 ipcMain.handle('localBp:openCharacterDisplay', () => {
   try {
@@ -7813,8 +7836,12 @@ ipcMain.handle('localBp:openCharacterDisplay', () => {
   }
 })
 
-ipcMain.handle('localBp:openCharacterModel3D', () => {
+ipcMain.handle('localBp:openCharacterModel3D', async () => {
   try {
+    const ensure = await ensureOfficialModelsReadyForCharacterModel3D()
+    if (!ensure.success) {
+      return { success: false, canceled: !!ensure.canceled, error: ensure.error || '官方模型未就绪' }
+    }
     return openCharacterModel3DWindow()
   } catch (error) {
     return { success: false, error: error.message }
@@ -8071,58 +8098,6 @@ ipcMain.handle('select-folder', async () => {
     return { success: false, canceled: true }
   } catch (error) {
     return { success: false, error: error.message }
-  }
-})
-
-ipcMain.handle('blender-plugin:install-asg-bp-sync', async () => {
-  try {
-    const addonSrcPath = path.join(app.getAppPath(), 'scripts', 'blender', 'asg_director_bp_sync_addon.py')
-    if (!fs.existsSync(addonSrcPath)) {
-      return { success: false, error: `插件文件不存在: ${addonSrcPath}` }
-    }
-
-    const candidates = collectBlenderAddonsDirs()
-    if (!candidates.length) {
-      return {
-        success: false,
-        error: '未检测到 Blender 用户目录。请先安装并至少启动一次 Blender。'
-      }
-    }
-
-    const installed = []
-    const failed = []
-    for (const item of candidates) {
-      try {
-        fs.mkdirSync(item.addonsDir, { recursive: true })
-        const targetFile = path.join(item.addonsDir, 'asg_director_bp_sync_addon.py')
-        fs.copyFileSync(addonSrcPath, targetFile)
-        installed.push({
-          version: item.version,
-          path: targetFile
-        })
-      } catch (e) {
-        failed.push({
-          version: item.version,
-          path: item.addonsDir,
-          error: e?.message || String(e)
-        })
-      }
-    }
-
-    if (!installed.length) {
-      return { success: false, error: '安装失败', failed }
-    }
-
-    return {
-      success: true,
-      installed,
-      failed,
-      message: failed.length
-        ? `已安装到 ${installed.length} 个 Blender 版本，${failed.length} 个失败`
-        : `已安装到 ${installed.length} 个 Blender 版本`
-    }
-  } catch (error) {
-    return { success: false, error: error?.message || String(error) }
   }
 })
 

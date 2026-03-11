@@ -155,59 +155,75 @@ function createOfficialModelService(options) {
     }
   }
 
+  async function prepareOfficialModels(options = {}) {
+    const notifyProgress = (typeof options.onProgress === 'function') ? options.onProgress : null
+    const event = options.event || null
+    if (officialModelDownloadPromise) return officialModelDownloadPromise
+    officialModelDownloadPromise = (async () => {
+      const entries = buildOfficialModelEntries()
+      const total = entries.length
+      let downloaded = 0
+      let skipped = 0
+      for (let i = 0; i < entries.length; i++) {
+        const item = entries[i]
+        if (!item || !item.modelUrl || !item.localPath) continue
+
+        if (!fs.existsSync(item.localPath)) {
+          await downloadFile(item.modelUrl, item.localPath, {
+            maxRetries: 3,
+            onProgress: (progress) => {
+              const overall = Math.round(((i + (progress / 100)) / Math.max(1, total)) * 100)
+              const payload = {
+                current: i + 1,
+                total,
+                roleName: item.name,
+                progress,
+                overall
+              }
+              if (event && event.sender && typeof event.sender.send === 'function') {
+                event.sender.send('official-models-download-progress', payload)
+              }
+              if (notifyProgress) notifyProgress(payload)
+            }
+          })
+        } else {
+          skipped++
+        }
+
+        if (item.localPath.toLowerCase().endsWith('.gltf')) {
+          await ensureGltfDependencies(item.modelUrl, item.localPath)
+        }
+
+        downloaded++
+        const donePayload = {
+          current: i + 1,
+          total,
+          roleName: item.name,
+          progress: 100,
+          overall: Math.round((downloaded / Math.max(1, total)) * 100)
+        }
+        if (event && event.sender && typeof event.sender.send === 'function') {
+          event.sender.send('official-models-download-progress', donePayload)
+        }
+        if (notifyProgress) notifyProgress(donePayload)
+      }
+      officialModelMapCache = null
+      return { success: true, total, downloaded, skipped }
+    })().finally(() => {
+      officialModelDownloadPromise = null
+    })
+    return officialModelDownloadPromise
+  }
+
   function register() {
     ipcMain.handle('get-official-model-map', () => loadOfficialModelMap())
 
     ipcMain.handle('get-official-model-download-status', () => getOfficialModelDownloadStatus())
 
     ipcMain.handle('prepare-official-models', async (event) => {
-      if (officialModelDownloadPromise) return officialModelDownloadPromise
-      officialModelDownloadPromise = (async () => {
-        const entries = buildOfficialModelEntries()
-        const total = entries.length
-        let downloaded = 0
-        let skipped = 0
-        for (let i = 0; i < entries.length; i++) {
-          const item = entries[i]
-          if (!item || !item.modelUrl || !item.localPath) continue
-
-          if (!fs.existsSync(item.localPath)) {
-            await downloadFile(item.modelUrl, item.localPath, {
-              maxRetries: 3,
-              onProgress: (progress) => {
-                const overall = Math.round(((i + (progress / 100)) / Math.max(1, total)) * 100)
-                event.sender.send('official-models-download-progress', {
-                  current: i + 1,
-                  total,
-                  roleName: item.name,
-                  progress,
-                  overall
-                })
-              }
-            })
-          } else {
-            skipped++
-          }
-
-          if (item.localPath.toLowerCase().endsWith('.gltf')) {
-            await ensureGltfDependencies(item.modelUrl, item.localPath)
-          }
-
-          downloaded++
-          event.sender.send('official-models-download-progress', {
-            current: i + 1,
-            total,
-            roleName: item.name,
-            progress: 100,
-            overall: Math.round((downloaded / Math.max(1, total)) * 100)
-          })
-        }
-        officialModelMapCache = null
-        return { success: true, total, downloaded, skipped }
-      })().finally(() => {
-        officialModelDownloadPromise = null
+      return prepareOfficialModels({
+        event
       })
-      return officialModelDownloadPromise
     })
 
     ipcMain.handle('list-map-assets', async () => {
@@ -238,7 +254,8 @@ function createOfficialModelService(options) {
   return {
     register,
     loadOfficialModelMap,
-    getOfficialModelDownloadStatus
+    getOfficialModelDownloadStatus,
+    prepareOfficialModels
   }
 }
 
