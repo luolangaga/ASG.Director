@@ -209,6 +209,7 @@ const electronAPI = {
   storeGetMyPacks: () => ipcRenderer.invoke('store-get-my-packs'),
   storeDeletePack: (id) => ipcRenderer.invoke('store-delete-pack', id),
   storeRatePack: (id, rating) => ipcRenderer.invoke('store-rate-pack', id, rating),
+  storeSelectPackFile: () => ipcRenderer.invoke('store-select-pack-file'),
   storeSelectPreview: () => ipcRenderer.invoke('store-select-preview'),
 
   // 插件商店

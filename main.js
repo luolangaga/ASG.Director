@@ -4860,114 +4860,135 @@ ipcMain.handle('plugin-store-upload-pack', async (event, metadata) => {
 
 // 上传布局包到商店
 ipcMain.handle('store-upload-pack', async (event, metadata) => {
+  let tempDir = null
+  let generatedPackFilePath = null
   try {
     if (!authToken) {
       return { success: false, error: '请先登录账号再上传' }
     }
 
     console.log('[Store] Starting upload for:', metadata.name)
-    // 先导出当前布局包到临时文件
-    const tempDir = path.join(os.tmpdir(), 'bppack-upload-' + Date.now())
-    fs.mkdirSync(tempDir, { recursive: true })
-    console.log('[Store] Temp dir created:', tempDir)
+    let packFilePath = String(metadata?.filePath || '').trim()
 
-    // 创建临时布局包
-    if (fs.existsSync(layoutPath)) {
-      console.log('[Store] 复制布局文件:', layoutPath)
-      fs.copyFileSync(layoutPath, path.join(tempDir, 'layout.json'))
-
-      // 验证复制
-      const copiedLayoutPath = path.join(tempDir, 'layout.json')
-      if (fs.existsSync(copiedLayoutPath)) {
-        const content = fs.readFileSync(copiedLayoutPath, 'utf8')
-        console.log('[Store] 布局文件已复制，大小:', content.length, '字节')
-      } else {
-        console.error('[Store] 布局文件复制失败!')
+    if (packFilePath) {
+      if (!fs.existsSync(packFilePath)) {
+        return { success: false, error: '选择的 .bppack 文件不存在' }
       }
+      const ext = path.extname(packFilePath).toLowerCase()
+      if (ext !== '.bppack') {
+        return { success: false, error: '仅支持上传 .bppack 布局包文件' }
+      }
+      console.log('[Store] 使用手动选择的布局包文件:', packFilePath)
     } else {
-      console.warn('[Store] 布局文件不存在:', layoutPath)
-    }
+      // 未选择文件时，导出当前布局包到临时文件后上传（兼容旧流程）
+      tempDir = path.join(os.tmpdir(), 'bppack-upload-' + Date.now())
+      fs.mkdirSync(tempDir, { recursive: true })
+      console.log('[Store] Temp dir created:', tempDir)
 
-    // 收集窗口配置数据
-    const packData = {}
-    if (frontendWindow && !frontendWindow.isDestroyed()) {
-      packData.frontendBounds = frontendWindow.getBounds()
-    }
-    if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
-      packData.scoreboardABounds = scoreboardWindowA.getBounds()
-      packData.scoreboardLayoutA = packData.scoreboardABounds
-    }
-    if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
-      packData.scoreboardBBounds = scoreboardWindowB.getBounds()
-      packData.scoreboardLayoutB = packData.scoreboardBBounds
-    }
-    if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
-      packData.scoreboardOverviewBounds = scoreboardOverviewWindow.getBounds()
-    }
-    if (postMatchWindow && !postMatchWindow.isDestroyed()) {
-      packData.postMatchBounds = postMatchWindow.getBounds()
-    }
+      // 创建临时布局包
+      if (fs.existsSync(layoutPath)) {
+        console.log('[Store] 复制布局文件:', layoutPath)
+        fs.copyFileSync(layoutPath, path.join(tempDir, 'layout.json'))
 
-    if (Object.keys(packData).length > 0) {
-      fs.writeFileSync(
-        path.join(tempDir, 'pack-config.json'),
-        JSON.stringify(packData, null, 2)
-      )
-    }
-
-    // 复制所有图片文件
-    if (fs.existsSync(bgImagePath)) {
-      const files = fs.readdirSync(bgImagePath)
-      console.log('[Store] 背景图片目录文件数:', files.length)
-      files.forEach(file => {
-        const srcPath = path.join(bgImagePath, file)
-        const destPath = path.join(tempDir, file)
-        if (fs.statSync(srcPath).isFile()) {
-          fs.copyFileSync(srcPath, destPath)
-          console.log('[Store] 复制图片:', file)
-        }
-      })
-    } else {
-      console.warn('[Store] 背景图片目录不存在:', bgImagePath)
-    }
-
-    // 列出临时目录中的所有文件
-    const tempFiles = fs.readdirSync(tempDir)
-    console.log('[Store] 临时目录文件列表:', tempFiles)
-    console.log('[Store] 临时目录文件数:', tempFiles.length)
-
-    // 打包成zip
-    const packFileName = `${metadata.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_v${metadata.version}.bppack`
-    const packFilePath = path.join(os.tmpdir(), packFileName)
-
-    console.log('[Store] Packing files from:', tempDir, 'to:', packFilePath)
-
-    await new Promise((resolve, reject) => {
-      const output = fs.createWriteStream(packFilePath)
-      const archive = archiver('zip', { zlib: { level: 9 } })
-
-      output.on('close', () => {
-        console.log(`[Store] 打包完成: ${archive.pointer()} bytes`)
-        resolve()
-      })
-
-      archive.on('error', (err) => {
-        console.error('[Store] 打包错误:', err)
-        reject(err)
-      })
-
-      archive.on('warning', (err) => {
-        if (err.code === 'ENOENT') {
-          console.warn('[Store] 打包警告:', err)
+        // 验证复制
+        const copiedLayoutPath = path.join(tempDir, 'layout.json')
+        if (fs.existsSync(copiedLayoutPath)) {
+          const content = fs.readFileSync(copiedLayoutPath, 'utf8')
+          console.log('[Store] 布局文件已复制，大小:', content.length, '字节')
         } else {
-          reject(err)
+          console.error('[Store] 布局文件复制失败!')
         }
+      } else {
+        console.warn('[Store] 布局文件不存在:', layoutPath)
+      }
+
+      // 收集窗口配置数据
+      const packData = {}
+      if (frontendWindow && !frontendWindow.isDestroyed()) {
+        packData.frontendBounds = frontendWindow.getBounds()
+      }
+      if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
+        packData.scoreboardABounds = scoreboardWindowA.getBounds()
+        packData.scoreboardLayoutA = packData.scoreboardABounds
+      }
+      if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
+        packData.scoreboardBBounds = scoreboardWindowB.getBounds()
+        packData.scoreboardLayoutB = packData.scoreboardBBounds
+      }
+      if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+        packData.scoreboardOverviewBounds = scoreboardOverviewWindow.getBounds()
+      }
+      if (postMatchWindow && !postMatchWindow.isDestroyed()) {
+        packData.postMatchBounds = postMatchWindow.getBounds()
+      }
+
+      if (Object.keys(packData).length > 0) {
+        fs.writeFileSync(
+          path.join(tempDir, 'pack-config.json'),
+          JSON.stringify(packData, null, 2)
+        )
+      }
+
+      // 复制所有图片文件
+      if (fs.existsSync(bgImagePath)) {
+        const files = fs.readdirSync(bgImagePath)
+        console.log('[Store] 背景图片目录文件数:', files.length)
+        files.forEach(file => {
+          const srcPath = path.join(bgImagePath, file)
+          const destPath = path.join(tempDir, file)
+          if (fs.statSync(srcPath).isFile()) {
+            fs.copyFileSync(srcPath, destPath)
+            console.log('[Store] 复制图片:', file)
+          }
+        })
+      } else {
+        console.warn('[Store] 背景图片目录不存在:', bgImagePath)
+      }
+
+      // 列出临时目录中的所有文件
+      const tempFiles = fs.readdirSync(tempDir)
+      console.log('[Store] 临时目录文件列表:', tempFiles)
+      console.log('[Store] 临时目录文件数:', tempFiles.length)
+
+      // 打包成zip
+      const packFileName = `${metadata.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_v${metadata.version}.bppack`
+      generatedPackFilePath = path.join(os.tmpdir(), packFileName)
+
+      console.log('[Store] Packing files from:', tempDir, 'to:', generatedPackFilePath)
+
+      await new Promise((resolve, reject) => {
+        const output = fs.createWriteStream(generatedPackFilePath)
+        const archive = archiver('zip', { zlib: { level: 9 } })
+
+        output.on('close', () => {
+          console.log(`[Store] 打包完成: ${archive.pointer()} bytes`)
+          resolve()
+        })
+
+        archive.on('error', (err) => {
+          console.error('[Store] 打包错误:', err)
+          reject(err)
+        })
+
+        archive.on('warning', (err) => {
+          if (err.code === 'ENOENT') {
+            console.warn('[Store] 打包警告:', err)
+          } else {
+            reject(err)
+          }
+        })
+
+        archive.pipe(output)
+        archive.directory(tempDir, false)
+        archive.finalize()
       })
 
-      archive.pipe(output)
-      archive.directory(tempDir, false)
-      archive.finalize()
-    })
+      packFilePath = generatedPackFilePath
+    }
+
+    if (!packFilePath) {
+      return { success: false, error: '未找到可上传的布局包文件' }
+    }
 
     // 使用multipart/form-data上传
     const FormData = require('form-data')
@@ -5024,14 +5045,51 @@ ipcMain.handle('store-upload-pack', async (event, metadata) => {
       form.pipe(req)
     })
 
-    // 清理临时文件
-    fs.rmSync(tempDir, { recursive: true, force: true })
-    fs.unlinkSync(packFilePath)
-
     if (uploadResult.status >= 200 && uploadResult.status < 300) {
       return { success: true, data: uploadResult.data }
     } else {
       return { success: false, error: uploadResult.data.message || '上传失败' }
+    }
+  } catch (error) {
+    return { success: false, error: error.message }
+  } finally {
+    // 仅清理本次临时生成的文件，手动选择的文件不做任何删除
+    if (tempDir && fs.existsSync(tempDir)) {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+      } catch {
+        // ignore
+      }
+    }
+    if (generatedPackFilePath && fs.existsSync(generatedPackFilePath)) {
+      try {
+        fs.unlinkSync(generatedPackFilePath)
+      } catch {
+        // ignore
+      }
+    }
+  }
+})
+
+// 选择布局包文件（.bppack）
+ipcMain.handle('store-select-pack-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: '选择布局包文件',
+      filters: [{ name: '布局包', extensions: ['bppack'] }],
+      properties: ['openFile']
+    })
+
+    if (result.canceled || !result.filePaths?.length) {
+      return { success: true, canceled: true }
+    }
+
+    const filePath = result.filePaths[0]
+    return {
+      success: true,
+      canceled: false,
+      filePath,
+      fileName: path.basename(filePath)
     }
   } catch (error) {
     return { success: false, error: error.message }

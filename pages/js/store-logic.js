@@ -439,6 +439,7 @@ function showUploadModal() {
   ; (async () => {
     const ok = await ensureLoggedIn('上传布局包')
     if (!ok) return
+    updateUploadSourceUI()
     document.getElementById('uploadModal').classList.add('show')
   })()
 }
@@ -446,6 +447,36 @@ function showUploadModal() {
 // 关闭上传弹窗
 function closeUploadModal() {
   document.getElementById('uploadModal').classList.remove('show')
+}
+
+function updateUploadSourceUI() {
+  const useManualFile = document.getElementById('uploadSourceFile')?.checked
+  const fileGroup = document.getElementById('uploadPackFileGroup')
+  const layoutOptions = document.getElementById('uploadLayoutOptions')
+  if (fileGroup) {
+    fileGroup.style.display = useManualFile ? 'block' : 'none'
+  }
+  if (layoutOptions) {
+    layoutOptions.style.opacity = useManualFile ? '0.5' : '1'
+    layoutOptions.querySelectorAll('input[type="checkbox"]').forEach(el => {
+      el.disabled = !!useManualFile
+    })
+  }
+}
+
+async function selectPackFile() {
+  try {
+    const result = await window.electronAPI.storeSelectPackFile()
+    if (!result?.success) {
+      throw new Error(result?.error || '选择文件失败')
+    }
+    if (result.canceled) return
+
+    document.getElementById('uploadPackFilePath').value = result.filePath || ''
+    document.getElementById('uploadPackFileLabel').textContent = result.fileName || result.filePath || '已选择文件'
+  } catch (error) {
+    showToast('选择布局包失败：' + error.message, 'error')
+  }
 }
 
 // 选择预览图片
@@ -475,6 +506,8 @@ async function uploadPack() {
   const isPublic = document.getElementById('uploadPublic').checked
   const autoIncrementVersion = document.getElementById('uploadAutoIncrementVersion').checked
   const packageId = document.getElementById('uploadPackageId').value.trim()
+  const manualPackPath = document.getElementById('uploadPackFilePath').value.trim()
+  const useManualFile = document.getElementById('uploadSourceFile')?.checked
 
   // 获取选中的布局类型
   const includeFrontendA = document.getElementById('uploadFrontendA').checked
@@ -489,7 +522,12 @@ async function uploadPack() {
     return
   }
 
-  if (!includeFrontendA && !includeFrontendB && !includeScoreboardA && !includeScoreboardB && !includeScoreboardOverview && !includeCharacterDisplay) {
+  if (useManualFile && !manualPackPath) {
+    showToast('请先选择要上传的 .bppack 文件', 'error')
+    return
+  }
+
+  if (!useManualFile && !includeFrontendA && !includeFrontendB && !includeScoreboardA && !includeScoreboardB && !includeScoreboardOverview && !includeCharacterDisplay) {
     showToast('请至少选择一个布局类型', 'error')
     return
   }
@@ -501,6 +539,7 @@ async function uploadPack() {
     description,
     tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [],
     previewPath: previewPath || null,
+    filePath: useManualFile ? manualPackPath : null,
     isPublic,
     autoIncrementVersion,
     packageId: packageId || null,

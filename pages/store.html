@@ -116,12 +116,35 @@
       <div class="upload-form">
         <h2 style="color: #ffd700; margin-bottom: 20px;">📤 上传布局包</h2>
         <p style="color: #888; font-size: 13px; margin-bottom: 20px;">
-          将你的当前布局打包上传到商店，与其他用户分享。
+          支持两种上传方式：直接打包当前布局，或手动上传本地 .bppack 文件。
         </p>
 
         <div class="form-group">
-          <label>选择要上传的布局 *</label>
+          <label>上传方式 *</label>
           <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;">
+            <label
+              style="display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
+              <input type="radio" name="uploadSource" id="uploadSourceCurrent" checked onchange="updateUploadSourceUI()"> 打包当前布局
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
+              <input type="radio" name="uploadSource" id="uploadSourceFile" onchange="updateUploadSourceUI()"> 手动上传 .bppack
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="uploadPackFileGroup" style="display: none;">
+          <label>选择布局包文件（.bppack） *</label>
+          <div class="preview-select">
+            <button class="btn btn-outline" onclick="selectPackFile()">选择文件</button>
+            <span id="uploadPackFileLabel" style="color: #888; font-size: 13px;">未选择文件</span>
+            <input type="hidden" id="uploadPackFilePath">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>选择要上传的布局（打包当前布局时生效） *</label>
+          <div id="uploadLayoutOptions" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;">
             <label
               style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background: rgba(255,215,0,0.1); border-radius: 5px; border: 1px solid rgba(255,215,0,0.3);">
               <input type="checkbox" id="uploadFrontendA" checked> 前台 (A队)
