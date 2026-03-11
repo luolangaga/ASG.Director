@@ -5591,6 +5591,7 @@ let localBpState = {
     mode: 'edit',
     transparentBackground: true,
     survivorScale: 1,
+    hunterScale: 1.1,
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -5601,6 +5602,14 @@ let localBpState = {
     camera: {
       position: { x: 0, y: 2, z: 8 },
       target: { x: 0, y: 1, z: 0 }
+    },
+    cameraTransitionMs: 900,
+    cameraKeyframes: {
+      survivor1: null,
+      survivor2: null,
+      survivor3: null,
+      survivor4: null,
+      hunterSelected: null
     }
   }
 }
@@ -5653,6 +5662,9 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
   m3d.transparentBackground = m3d.transparentBackground !== false
   m3d.survivorScale = Math.max(0.001, Number.isFinite(Number(m3d.survivorScale)) ? Number(m3d.survivorScale) : 1)
+  m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
+    ? Number(m3d.hunterScale)
+    : Number.isFinite(Number(m3d?.slots?.hunter?.scale?.x)) ? Number(m3d.slots.hunter.scale.x) : 1.1)
 
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
     const src = (v && typeof v === 'object') ? v : {}
@@ -5679,12 +5691,28 @@ function __normalizeLocalBpStateInPlace__() {
     m3d.slots[key].scale = ensureVec3(m3d.slots[key].scale, { x: 1, y: 1, z: 1 })
     if (key.startsWith('survivor')) {
       m3d.slots[key].scale = { x: m3d.survivorScale, y: m3d.survivorScale, z: m3d.survivorScale }
+    } else if (key === 'hunter') {
+      m3d.slots[key].scale = { x: m3d.hunterScale, y: m3d.hunterScale, z: m3d.hunterScale }
     }
   }
 
   if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
   m3d.camera.position = ensureVec3(m3d.camera.position, { x: 0, y: 2, z: 8 })
   m3d.camera.target = ensureVec3(m3d.camera.target, { x: 0, y: 1, z: 0 })
+  m3d.cameraTransitionMs = Math.max(50, Math.min(10000, Number.isFinite(Number(m3d.cameraTransitionMs)) ? Number(m3d.cameraTransitionMs) : 900))
+  if (!m3d.cameraKeyframes || typeof m3d.cameraKeyframes !== 'object') m3d.cameraKeyframes = {}
+  const cameraEventKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunterSelected']
+  for (const key of cameraEventKeys) {
+    const frame = m3d.cameraKeyframes[key]
+    if (!frame || typeof frame !== 'object') {
+      m3d.cameraKeyframes[key] = null
+      continue
+    }
+    m3d.cameraKeyframes[key] = {
+      position: ensureVec3(frame.position, { x: 0, y: 2, z: 8 }),
+      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 })
+    }
+  }
 }
 
 function __readLayoutJsonSafe__() {
@@ -7507,10 +7535,21 @@ function normalizeCharacterModel3DLayoutInput(input) {
     }
   }
 
+  const normalizeCameraKeyframe = (v) => {
+    if (!v || typeof v !== 'object') return null
+    return {
+      position: ensureVec3(v.position, { x: 0, y: 2, z: 8 }),
+      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 })
+    }
+  }
+
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
     transparentBackground: base.transparentBackground !== false,
     survivorScale: Math.max(0.001, Number.isFinite(Number(base.survivorScale)) ? Number(base.survivorScale) : 1),
+    hunterScale: Math.max(0.001, Number.isFinite(Number(base.hunterScale))
+      ? Number(base.hunterScale)
+      : Number.isFinite(Number(base?.slots?.hunter?.scale?.x)) ? Number(base.slots.hunter.scale.x) : 1.1),
     scene: {
       modelPath: typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : '',
       position: ensureVec3(base?.scene?.position, { x: 0, y: 0, z: 0 }),
@@ -7521,6 +7560,14 @@ function normalizeCharacterModel3DLayoutInput(input) {
     camera: {
       position: ensureVec3(base?.camera?.position, { x: 0, y: 2, z: 8 }),
       target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 })
+    },
+    cameraTransitionMs: Math.max(50, Math.min(10000, Number.isFinite(Number(base.cameraTransitionMs)) ? Number(base.cameraTransitionMs) : 900)),
+    cameraKeyframes: {
+      survivor1: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor1),
+      survivor2: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor2),
+      survivor3: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor3),
+      survivor4: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor4),
+      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected)
     }
   }
 
@@ -7533,6 +7580,8 @@ function normalizeCharacterModel3DLayoutInput(input) {
     }
     if (key.startsWith('survivor')) {
       out.slots[key].scale = { x: out.survivorScale, y: out.survivorScale, z: out.survivorScale }
+    } else if (key === 'hunter') {
+      out.slots[key].scale = { x: out.hunterScale, y: out.hunterScale, z: out.hunterScale }
     }
   }
 

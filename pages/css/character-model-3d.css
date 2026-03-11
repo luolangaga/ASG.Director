@@ -104,7 +104,20 @@ body {
   background: rgba(255, 255, 255, 0.22);
 }
 
+.btn-move.active {
+  background: rgba(76, 175, 80, 0.36);
+  border-color: rgba(76, 175, 80, 0.8);
+}
+
 input[type="number"] {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+select {
   border: 1px solid rgba(255, 255, 255, 0.24);
   background: rgba(0, 0, 0, 0.3);
   color: #fff;
@@ -131,6 +144,16 @@ input[type="number"] {
 .slot-tab.active {
   background: rgba(76, 175, 80, 0.36);
   border-color: rgba(76, 175, 80, 0.8);
+}
+
+.camera-move-row {
+  align-items: center;
+}
+
+.camera-move-pad {
+  display: inline-grid;
+  grid-template-columns: repeat(6, minmax(40px, auto));
+  gap: 6px;
 }
 
 .hint {

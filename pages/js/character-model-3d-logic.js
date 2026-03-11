@@ -8,11 +8,19 @@
     { key: 'survivor4', label: '求生者4', roleType: 'survivor', index: 3 },
     { key: 'hunter', label: '监管者', roleType: 'hunter', index: 0 }
   ]
+  const CAMERA_EVENT_OPTIONS = [
+    { key: 'survivor1', label: '求生者选了1个' },
+    { key: 'survivor2', label: '求生者选了2个' },
+    { key: 'survivor3', label: '求生者选了3个' },
+    { key: 'survivor4', label: '求生者选了4个' },
+    { key: 'hunterSelected', label: '监管者选了' }
+  ]
 
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     transparentBackground: true,
     survivorScale: 1,
+    hunterScale: 1.1,
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -38,6 +46,14 @@
     camera: {
       position: { x: 0, y: 2, z: 8 },
       target: { x: 0, y: 1, z: 0 }
+    },
+    cameraTransitionMs: 900,
+    cameraKeyframes: {
+      survivor1: null,
+      survivor2: null,
+      survivor3: null,
+      survivor4: null,
+      hunterSelected: null
     }
   }
 
@@ -51,7 +67,11 @@
     selectedSlot: 'survivor1',
     slotModelPaths: {},
     slotDisplayNames: {},
-    roleModelPathCache: {}
+    roleModelPathCache: {},
+    bpSelectionState: {
+      survivorCount: 0,
+      hunterSelected: false
+    }
   }
 
   let THREE = null
@@ -62,22 +82,36 @@
   let grid = null
   let axes = null
   let gltfLoader = null
+  let objLoader = null
+  let mtlLoader = null
   const slotRuntime = new Map()
   const mixers = new Map()
   const lightRigs = new Map()
   let rafId = 0
   let clock = null
   let saveTimer = null
+  let cameraTransition = null
+  const CAMERA_EPSILON_RADIUS = 1e-6
+  const CAMERA_ZOOM_FACTOR = 0.00105
 
   const orbit = {
     target: { x: 0, y: 1, z: 0 },
+    desiredTarget: { x: 0, y: 1, z: 0 },
     yaw: 0,
+    desiredYaw: 0,
     pitch: 0.18,
+    desiredPitch: 0.18,
     radius: 8,
+    desiredRadius: 8,
+    smoothing: 0.2,
     dragging: false,
     panning: false,
     lastX: 0,
     lastY: 0
+  }
+  const cameraMoveState = {
+    dir: '',
+    activeBtn: null
   }
 
   const dom = {
@@ -95,7 +129,15 @@
     rotY: document.getElementById('rotY'),
     rotZ: document.getElementById('rotZ'),
     uniScale: document.getElementById('uniScale'),
-    applyTransformBtn: document.getElementById('applyTransformBtn')
+    applyTransformBtn: document.getElementById('applyTransformBtn'),
+    cameraEventSelect: document.getElementById('cameraEventSelect'),
+    saveCameraKeyframeBtn: document.getElementById('saveCameraKeyframeBtn'),
+    previewCameraKeyframeBtn: document.getElementById('previewCameraKeyframeBtn'),
+    clearCameraKeyframeBtn: document.getElementById('clearCameraKeyframeBtn'),
+    cameraTransitionMs: document.getElementById('cameraTransitionMs'),
+    cameraEventInfo: document.getElementById('cameraEventInfo')
+    , cameraMoveStep: document.getElementById('cameraMoveStep')
+    , cameraMoveButtons: Array.from(document.querySelectorAll('[data-cam-move]'))
     , lightColor: document.getElementById('lightColor')
     , lightIntensity: document.getElementById('lightIntensity')
     , applyLightBtn: document.getElementById('applyLightBtn')
@@ -123,12 +165,21 @@
     }
   }
 
+  function normalizeCameraKeyframe(input, fallback = null) {
+    if (!input || typeof input !== 'object') return fallback
+    return {
+      position: ensureVec3(input.position, fallback?.position || { x: 0, y: 2, z: 8 }),
+      target: ensureVec3(input.target, fallback?.target || { x: 0, y: 1, z: 0 })
+    }
+  }
+
   function normalizeLayout(raw) {
     const base = (raw && typeof raw === 'object') ? raw : {}
     const out = deepClone(DEFAULT_LAYOUT)
     out.mode = base.mode === 'render' ? 'render' : 'edit'
     out.transparentBackground = base.transparentBackground !== false
     out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
+    out.hunterScale = Math.max(0.001, asNumber(base?.hunterScale, out.slots.hunter.scale.x))
     out.scene.modelPath = typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : ''
     out.scene.position = ensureVec3(base?.scene?.position, out.scene.position)
     out.scene.rotation = ensureVec3(base?.scene?.rotation, out.scene.rotation)
@@ -148,6 +199,7 @@
       const key = `survivor${i}`
       out.slots[key].scale = { x: out.survivorScale, y: out.survivorScale, z: out.survivorScale }
     }
+    out.slots.hunter.scale = { x: out.hunterScale, y: out.hunterScale, z: out.hunterScale }
     out.lights = deepClone(DEFAULT_LAYOUT.lights)
     out.lights.light1.color = typeof base?.lights?.light1?.color === 'string' ? base.lights.light1.color : out.lights.light1.color
     out.lights.light1.intensity = Math.max(0, asNumber(base?.lights?.light1?.intensity, out.lights.light1.intensity))
@@ -155,6 +207,11 @@
     out.lights.light1.decay = Math.max(0, asNumber(base?.lights?.light1?.decay, out.lights.light1.decay))
     out.camera.position = ensureVec3(base?.camera?.position, out.camera.position)
     out.camera.target = ensureVec3(base?.camera?.target, out.camera.target)
+    out.cameraTransitionMs = Math.max(50, Math.min(10000, asNumber(base?.cameraTransitionMs, out.cameraTransitionMs)))
+    out.cameraKeyframes = deepClone(DEFAULT_LAYOUT.cameraKeyframes)
+    for (const eventCfg of CAMERA_EVENT_OPTIONS) {
+      out.cameraKeyframes[eventCfg.key] = normalizeCameraKeyframe(base?.cameraKeyframes?.[eventCfg.key], null)
+    }
     return out
   }
 
@@ -193,7 +250,7 @@
   }
 
   async function ensureThreeRuntime() {
-    if (window.THREE && window.THREE.GLTFLoader) {
+    if (window.THREE && window.THREE.GLTFLoader && window.THREE.OBJLoader && window.THREE.MTLLoader) {
       THREE = window.THREE
       return true
     }
@@ -201,8 +258,12 @@
     if (!coreOk) return false
     const gltfOk = await loadScript('./js/three/GLTFLoader.js')
     if (!gltfOk) return false
+    const objOk = await loadScript('./js/three/OBJLoader.js')
+    if (!objOk) return false
+    const mtlOk = await loadScript('./js/three/MTLLoader.js')
+    if (!mtlOk) return false
     THREE = window.THREE
-    return !!(THREE && THREE.GLTFLoader)
+    return !!(THREE && THREE.GLTFLoader && THREE.OBJLoader && THREE.MTLLoader)
   }
 
   function createSceneGraph() {
@@ -258,7 +319,49 @@
     }
 
     gltfLoader = new THREE.GLTFLoader()
+    objLoader = new THREE.OBJLoader()
+    mtlLoader = new THREE.MTLLoader()
     clock = new THREE.Clock()
+  }
+
+  function getPathExt(pathValue) {
+    try {
+      const clean = String(pathValue || '').split('?')[0].split('#')[0]
+      const m = clean.match(/\.([a-zA-Z0-9]+)$/)
+      return m ? `.${m[1].toLowerCase()}` : ''
+    } catch {
+      return ''
+    }
+  }
+
+  function replacePathExt(pathValue, newExtWithDot) {
+    const src = String(pathValue || '')
+    const qIndex = src.indexOf('?')
+    const hIndex = src.indexOf('#')
+    const cut = [qIndex, hIndex].filter(i => i >= 0).reduce((a, b) => Math.min(a, b), src.length)
+    const base = src.slice(0, cut)
+    const tail = src.slice(cut)
+    return base.replace(/\.[^.\\/]+$/, newExtWithDot) + tail
+  }
+
+  function loadObjModelWithOptionalMtl(objUrl, onSuccess, onError) {
+    const tryPlainObj = () => {
+      objLoader.load(objUrl, (obj) => onSuccess(obj), undefined, (err) => onError(err))
+    }
+    const mtlUrl = replacePathExt(objUrl, '.mtl')
+    mtlLoader.load(mtlUrl, (materials) => {
+      try {
+        if (materials && typeof materials.preload === 'function') materials.preload()
+      } catch { }
+      objLoader.setMaterials(materials || null)
+      objLoader.load(objUrl, (obj) => onSuccess(obj), undefined, () => {
+        objLoader.setMaterials(null)
+        tryPlainObj()
+      })
+    }, undefined, () => {
+      objLoader.setMaterials(null)
+      tryPlainObj()
+    })
   }
 
   function attachLightRig(key, group) {
@@ -308,16 +411,28 @@
   function applyOrbitFromLayout() {
     const cam = state.layout.camera
     orbit.target = { ...cam.target }
+    orbit.desiredTarget = { ...cam.target }
     const dx = cam.position.x - cam.target.x
     const dy = cam.position.y - cam.target.y
     const dz = cam.position.z - cam.target.z
-    orbit.radius = Math.max(0.3, Math.sqrt(dx * dx + dy * dy + dz * dz))
+    orbit.radius = Math.max(CAMERA_EPSILON_RADIUS, Math.sqrt(dx * dx + dy * dy + dz * dz))
     orbit.yaw = Math.atan2(dx, dz)
     orbit.pitch = Math.asin(Math.max(-0.99, Math.min(0.99, dy / Math.max(0.0001, orbit.radius))))
-    updateCameraFromOrbit()
+    orbit.desiredRadius = orbit.radius
+    orbit.desiredYaw = orbit.yaw
+    orbit.desiredPitch = orbit.pitch
+    updateCameraFromOrbit(true)
   }
 
-  function updateCameraFromOrbit() {
+  function updateCameraFromOrbit(force = false) {
+    const lerpK = force ? 1 : orbit.smoothing
+    orbit.yaw += (orbit.desiredYaw - orbit.yaw) * lerpK
+    orbit.pitch += (orbit.desiredPitch - orbit.pitch) * lerpK
+    orbit.radius += (orbit.desiredRadius - orbit.radius) * lerpK
+    orbit.target.x += (orbit.desiredTarget.x - orbit.target.x) * lerpK
+    orbit.target.y += (orbit.desiredTarget.y - orbit.target.y) * lerpK
+    orbit.target.z += (orbit.desiredTarget.z - orbit.target.z) * lerpK
+
     const cosPitch = Math.cos(orbit.pitch)
     const x = orbit.target.x + orbit.radius * Math.sin(orbit.yaw) * cosPitch
     const y = orbit.target.y + orbit.radius * Math.sin(orbit.pitch)
@@ -342,6 +457,179 @@
     scheduleSaveLayout()
   }
 
+  function getCameraMoveStep() {
+    const raw = asNumber(dom.cameraMoveStep ? dom.cameraMoveStep.value : 0.25, 0.25)
+    return Math.max(0.001, raw)
+  }
+
+  function moveCameraByDirection(dir, scale = 1, immediate = false, shouldSave = false) {
+    if (!camera || !dir) return
+    cancelCameraTransition()
+    const step = getCameraMoveStep() * Math.max(0.0001, scale)
+    const forward = new THREE.Vector3()
+    camera.getWorldDirection(forward).normalize()
+    const up = new THREE.Vector3().copy(camera.up).normalize()
+    const right = new THREE.Vector3().crossVectors(forward, up).normalize()
+    const delta = new THREE.Vector3()
+
+    if (dir === 'forward') delta.addScaledVector(forward, step)
+    else if (dir === 'back') delta.addScaledVector(forward, -step)
+    else if (dir === 'left') delta.addScaledVector(right, -step)
+    else if (dir === 'right') delta.addScaledVector(right, step)
+    else if (dir === 'up') delta.addScaledVector(up, step)
+    else if (dir === 'down') delta.addScaledVector(up, -step)
+    else return
+
+    orbit.desiredTarget.x += delta.x
+    orbit.desiredTarget.y += delta.y
+    orbit.desiredTarget.z += delta.z
+    if (immediate) {
+      orbit.target.x += delta.x
+      orbit.target.y += delta.y
+      orbit.target.z += delta.z
+      updateCameraFromOrbit(true)
+    }
+    if (shouldSave) saveCameraToLayout()
+  }
+
+  function stopCameraMoveHold() {
+    if (cameraMoveState.activeBtn) {
+      cameraMoveState.activeBtn.classList.remove('active')
+    }
+    cameraMoveState.activeBtn = null
+    cameraMoveState.dir = ''
+    saveCameraToLayout()
+  }
+
+  function countSelectedSurvivors(list) {
+    if (!Array.isArray(list)) return 0
+    return list.filter(v => typeof v === 'string' && v.trim()).length
+  }
+
+  function isHunterSelected(value) {
+    return typeof value === 'string' && value.trim().length > 0
+  }
+
+  function cancelCameraTransition() {
+    cameraTransition = null
+  }
+
+  function startCameraTransition(targetFrame, durationMs, reason = '') {
+    if (!camera || !targetFrame) return
+    const duration = Math.max(50, Math.min(10000, asNumber(durationMs, 900)))
+    const toPosition = ensureVec3(targetFrame.position, state.layout.camera.position)
+    const toTarget = ensureVec3(targetFrame.target, state.layout.camera.target)
+    cameraTransition = {
+      startAt: performance.now(),
+      duration,
+      fromPosition: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      fromTarget: { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z },
+      toPosition,
+      toTarget,
+      reason
+    }
+  }
+
+  function updateCameraTransition() {
+    if (!cameraTransition || !camera) return
+    const now = performance.now()
+    const t = Math.max(0, Math.min(1, (now - cameraTransition.startAt) / Math.max(1, cameraTransition.duration)))
+    const eased = 1 - Math.pow(1 - t, 3)
+
+    const p = {
+      x: cameraTransition.fromPosition.x + (cameraTransition.toPosition.x - cameraTransition.fromPosition.x) * eased,
+      y: cameraTransition.fromPosition.y + (cameraTransition.toPosition.y - cameraTransition.fromPosition.y) * eased,
+      z: cameraTransition.fromPosition.z + (cameraTransition.toPosition.z - cameraTransition.fromPosition.z) * eased
+    }
+    orbit.target = {
+      x: cameraTransition.fromTarget.x + (cameraTransition.toTarget.x - cameraTransition.fromTarget.x) * eased,
+      y: cameraTransition.fromTarget.y + (cameraTransition.toTarget.y - cameraTransition.fromTarget.y) * eased,
+      z: cameraTransition.fromTarget.z + (cameraTransition.toTarget.z - cameraTransition.fromTarget.z) * eased
+    }
+    orbit.desiredTarget = { ...orbit.target }
+    camera.position.set(p.x, p.y, p.z)
+    camera.lookAt(orbit.target.x, orbit.target.y, orbit.target.z)
+
+    const dx = p.x - orbit.target.x
+    const dy = p.y - orbit.target.y
+    const dz = p.z - orbit.target.z
+    orbit.radius = Math.max(CAMERA_EPSILON_RADIUS, Math.sqrt(dx * dx + dy * dy + dz * dz))
+    orbit.yaw = Math.atan2(dx, dz)
+    orbit.pitch = Math.asin(Math.max(-0.99, Math.min(0.99, dy / Math.max(0.0001, orbit.radius))))
+    orbit.desiredRadius = orbit.radius
+    orbit.desiredYaw = orbit.yaw
+    orbit.desiredPitch = orbit.pitch
+
+    if (t >= 1) {
+      const reason = cameraTransition.reason
+      cameraTransition = null
+      saveCameraToLayout()
+      if (reason) setStatus(`镜头已切换: ${reason}`)
+    }
+  }
+
+  function getSelectedCameraEventKey() {
+    const key = dom.cameraEventSelect ? String(dom.cameraEventSelect.value || '') : ''
+    return CAMERA_EVENT_OPTIONS.some(item => item.key === key) ? key : CAMERA_EVENT_OPTIONS[0].key
+  }
+
+  function syncCameraEditorInputs() {
+    if (dom.cameraTransitionMs) {
+      dom.cameraTransitionMs.value = String(Math.max(50, Math.min(10000, asNumber(state.layout.cameraTransitionMs, 900))))
+    }
+    const eventKey = getSelectedCameraEventKey()
+    const frame = state.layout?.cameraKeyframes?.[eventKey]
+    if (!dom.cameraEventInfo) return
+    if (frame && frame.position && frame.target) {
+      dom.cameraEventInfo.textContent = '已录制'
+    } else {
+      dom.cameraEventInfo.textContent = '未录制'
+    }
+  }
+
+  function saveCurrentCameraAsKeyframe() {
+    const eventKey = getSelectedCameraEventKey()
+    if (!state.layout.cameraKeyframes) state.layout.cameraKeyframes = deepClone(DEFAULT_LAYOUT.cameraKeyframes)
+    state.layout.cameraKeyframes[eventKey] = {
+      position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      target: { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z }
+    }
+    syncCameraEditorInputs()
+    scheduleSaveLayout()
+    const eventLabel = CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey
+    setStatus(`已记录关键帧: ${eventLabel}`)
+  }
+
+  function clearSelectedCameraKeyframe() {
+    const eventKey = getSelectedCameraEventKey()
+    if (!state.layout.cameraKeyframes) state.layout.cameraKeyframes = deepClone(DEFAULT_LAYOUT.cameraKeyframes)
+    state.layout.cameraKeyframes[eventKey] = null
+    syncCameraEditorInputs()
+    scheduleSaveLayout()
+    const eventLabel = CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey
+    setStatus(`已清除关键帧: ${eventLabel}`)
+  }
+
+  function previewSelectedCameraKeyframe() {
+    const eventKey = getSelectedCameraEventKey()
+    const frame = state.layout?.cameraKeyframes?.[eventKey]
+    if (!frame) {
+      setStatus('该事件尚未录制关键帧')
+      return
+    }
+    const duration = Math.max(50, Math.min(10000, asNumber(dom.cameraTransitionMs ? dom.cameraTransitionMs.value : state.layout.cameraTransitionMs, state.layout.cameraTransitionMs)))
+    state.layout.cameraTransitionMs = duration
+    startCameraTransition(frame, duration, `预览 ${CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey}`)
+    scheduleSaveLayout()
+  }
+
+  function triggerCameraEvent(eventKey) {
+    const frame = state.layout?.cameraKeyframes?.[eventKey]
+    if (!frame) return
+    const eventLabel = CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey
+    startCameraTransition(frame, state.layout.cameraTransitionMs, eventLabel)
+  }
+
   function applyTransformToGroup(key, transform) {
     const runtime = slotRuntime.get(key)
     if (!runtime || !runtime.group) return
@@ -358,6 +646,8 @@
     } else {
       const uniform = (key.startsWith('survivor'))
         ? Math.max(0.001, asNumber(state.layout?.survivorScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
+        : (key === 'hunter')
+          ? Math.max(0.001, asNumber(state.layout?.hunterScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
         : Math.max(0.001, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1))))
       runtime.group.scale.set(uniform, uniform, uniform)
     }
@@ -410,16 +700,15 @@
     const seq = runtime.loadSeq
     const url = normalizeFileUrl(nextPath)
     if (!url) return
+    const ext = getPathExt(nextPath)
 
     const shortPath = String(modelPath).split(/[\\/]/).slice(-2).join('/')
     setStatus(`加载模型: ${runtime.cfg.label} (${shortPath})`)
-    gltfLoader.load(url, (gltf) => {
+    const onLoadedObject = (obj, animations = []) => {
       if (runtime.loadSeq !== seq) {
-        // 旧请求返回，直接丢弃，避免重复实例残留
-        try { if (gltf && gltf.scene) disposeObject(gltf.scene) } catch { }
+        try { if (obj) disposeObject(obj) } catch { }
         return
       }
-      const obj = gltf && gltf.scene ? gltf.scene : null
       if (!obj) {
         runtime.loadingPath = ''
         setStatus(`模型无效: ${runtime.cfg.label}`)
@@ -430,21 +719,32 @@
       runtime.modelPath = nextPath
       runtime.model = obj
       runtime.group.add(obj)
-      if (Array.isArray(gltf.animations) && gltf.animations.length) {
+      if (Array.isArray(animations) && animations.length) {
         const mixer = new THREE.AnimationMixer(obj)
-        gltf.animations.forEach((clip) => {
+        animations.forEach((clip) => {
           try { mixer.clipAction(clip).play() } catch { }
         })
         mixers.set(key, mixer)
       }
       runtime.loadingPath = ''
       setStatus(`加载完成: ${runtime.cfg.label}`)
-    }, undefined, (error) => {
+    }
+    const onError = (error) => {
       if (runtime.loadSeq !== seq) return
       runtime.loadingPath = ''
       setStatus(`加载失败: ${runtime.cfg.label}`)
       console.error('[CharacterModel3D] 模型加载失败:', key, modelPath, error)
-    })
+    }
+
+    if (ext === '.obj') {
+      loadObjModelWithOptionalMtl(url, (obj) => onLoadedObject(obj, []), onError)
+      return
+    }
+
+    gltfLoader.load(url, (gltf) => {
+      const obj = gltf && gltf.scene ? gltf.scene : null
+      onLoadedObject(obj, (gltf && Array.isArray(gltf.animations)) ? gltf.animations : [])
+    }, undefined, onError)
   }
 
   function sanitizeRoleName(name) {
@@ -524,6 +824,8 @@
         state.layout.slots[slotKey].scale = { x: uniform, y: uniform, z: uniform }
         if (slotKey !== key) applyTransformToGroup(slotKey, state.layout.slots[slotKey])
       }
+    } else if (key === 'hunter') {
+      state.layout.hunterScale = uniform
     }
     state.layout.slots[key].position = { x: g.position.x, y: g.position.y, z: g.position.z }
     state.layout.slots[key].rotation = { x: toDegrees(g.rotation.x), y: toDegrees(g.rotation.y), z: toDegrees(g.rotation.z) }
@@ -553,6 +855,8 @@
       dom.uniScale.disabled = false
       if (state.selectedSlot.startsWith('survivor')) {
         dom.uniScale.value = asNumber(state.layout?.survivorScale, asNumber(tr.scale?.x, 1)).toFixed(3)
+      } else if (state.selectedSlot === 'hunter') {
+        dom.uniScale.value = asNumber(state.layout?.hunterScale, asNumber(tr.scale?.x, 1)).toFixed(3)
       } else {
         dom.uniScale.value = asNumber(tr.scale?.x, 1).toFixed(3)
       }
@@ -601,6 +905,9 @@
       }
       scheduleSaveLayout()
       return
+    } else if (state.selectedSlot === 'hunter') {
+      state.layout.hunterScale = uniformScale
+      state.layout.slots.hunter = { ...state.layout.slots.hunter, ...tr, scale: { x: uniformScale, y: uniformScale, z: uniformScale } }
     } else {
       state.layout.slots[state.selectedSlot] = { ...state.layout.slots[state.selectedSlot], ...tr }
     }
@@ -640,6 +947,7 @@
     renderSlotTabs()
     syncTransformInputs()
     syncLightInputs()
+    syncCameraEditorInputs()
   }
 
   function applyMode(mode) {
@@ -678,7 +986,7 @@
     try {
       if (window.electronAPI && window.electronAPI.selectFileWithFilter) {
         const result = await window.electronAPI.selectFileWithFilter({
-          filters: [{ name: '3D场景', extensions: ['gltf', 'glb'] }]
+          filters: [{ name: '3D场景', extensions: ['gltf', 'glb', 'obj'] }]
         })
         if (result && result.success && result.path) {
           selectedPath = result.path
@@ -711,6 +1019,51 @@
     dom.sceneImportBtn.addEventListener('click', importSceneModel)
     dom.sceneClearBtn.addEventListener('click', clearSceneModel)
     dom.applyTransformBtn.addEventListener('click', applyInputsToSelectedTransform)
+    if (dom.cameraEventSelect) {
+      dom.cameraEventSelect.addEventListener('change', () => {
+        syncCameraEditorInputs()
+      })
+    }
+    if (dom.saveCameraKeyframeBtn) dom.saveCameraKeyframeBtn.addEventListener('click', saveCurrentCameraAsKeyframe)
+    if (dom.previewCameraKeyframeBtn) dom.previewCameraKeyframeBtn.addEventListener('click', previewSelectedCameraKeyframe)
+    if (dom.clearCameraKeyframeBtn) dom.clearCameraKeyframeBtn.addEventListener('click', clearSelectedCameraKeyframe)
+    if (dom.cameraTransitionMs) {
+      dom.cameraTransitionMs.addEventListener('change', () => {
+        state.layout.cameraTransitionMs = Math.max(50, Math.min(10000, asNumber(dom.cameraTransitionMs.value, 900)))
+        dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
+        scheduleSaveLayout()
+      })
+    }
+    if (dom.cameraMoveStep) {
+      dom.cameraMoveStep.addEventListener('change', () => {
+        const next = getCameraMoveStep()
+        dom.cameraMoveStep.value = String(next)
+      })
+    }
+    if (Array.isArray(dom.cameraMoveButtons)) {
+      dom.cameraMoveButtons.forEach((btn) => {
+        const dir = String(btn.dataset.camMove || '').trim()
+        if (!dir) return
+        btn.addEventListener('click', (e) => {
+          e.preventDefault()
+          moveCameraByDirection(dir, 1, true, true)
+        })
+        btn.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return
+          e.preventDefault()
+          if (cameraMoveState.activeBtn && cameraMoveState.activeBtn !== btn) {
+            cameraMoveState.activeBtn.classList.remove('active')
+          }
+          cameraMoveState.activeBtn = btn
+          cameraMoveState.dir = dir
+          btn.classList.add('active')
+        })
+        btn.addEventListener('pointerup', stopCameraMoveHold)
+        btn.addEventListener('pointercancel', stopCameraMoveHold)
+      })
+      window.addEventListener('pointerup', stopCameraMoveHold)
+      window.addEventListener('blur', stopCameraMoveHold)
+    }
     if (dom.applyLightBtn) {
       dom.applyLightBtn.addEventListener('click', () => {
         if (!state.layout.lights) state.layout.lights = deepClone(DEFAULT_LAYOUT.lights)
@@ -780,6 +1133,8 @@
       } else {
         return
       }
+      cancelCameraTransition()
+      stopCameraMoveHold()
       orbit.lastX = e.clientX
       orbit.lastY = e.clientY
       e.preventDefault()
@@ -799,29 +1154,29 @@
       orbit.lastX = e.clientX
       orbit.lastY = e.clientY
       if (orbit.panning) {
-        const panScale = orbit.radius * 0.0018
+        const panScale = Math.max(0.001, orbit.desiredRadius * 0.0016)
         const forward = new THREE.Vector3()
         camera.getWorldDirection(forward)
         const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize()
         const up = new THREE.Vector3().copy(camera.up).normalize()
-        orbit.target.x += (-dx * panScale * right.x) + (dy * panScale * up.x)
-        orbit.target.y += (-dx * panScale * right.y) + (dy * panScale * up.y)
-        orbit.target.z += (-dx * panScale * right.z) + (dy * panScale * up.z)
-        updateCameraFromOrbit()
+        orbit.desiredTarget.x += (-dx * panScale * right.x) + (dy * panScale * up.x)
+        orbit.desiredTarget.y += (-dx * panScale * right.y) + (dy * panScale * up.y)
+        orbit.desiredTarget.z += (-dx * panScale * right.z) + (dy * panScale * up.z)
       } else {
-        orbit.yaw -= dx * 0.0052
-        orbit.pitch -= dy * 0.0048
-        orbit.pitch = Math.max(-1.45, Math.min(1.45, orbit.pitch))
-        updateCameraFromOrbit()
+        orbit.desiredYaw -= dx * 0.0048
+        orbit.desiredPitch -= dy * 0.0044
       }
     })
 
     dom.renderRoot.addEventListener('wheel', (e) => {
       if (state.layout.mode !== 'edit') return
       e.preventDefault()
-      orbit.radius += e.deltaY * 0.008
-      orbit.radius = Math.max(1.8, Math.min(80, orbit.radius))
-      updateCameraFromOrbit()
+      cancelCameraTransition()
+      const zoomFactor = Math.exp(e.deltaY * CAMERA_ZOOM_FACTOR)
+      const baseRadius = Number.isFinite(orbit.desiredRadius) && orbit.desiredRadius > CAMERA_EPSILON_RADIUS
+        ? orbit.desiredRadius
+        : (Number.isFinite(orbit.radius) && orbit.radius > CAMERA_EPSILON_RADIUS ? orbit.radius : 1)
+      orbit.desiredRadius = Math.max(CAMERA_EPSILON_RADIUS, baseRadius * zoomFactor)
       saveCameraToLayout()
     }, { passive: false })
   }
@@ -831,6 +1186,14 @@
     const dt = clock.getDelta()
     for (const mixer of mixers.values()) {
       try { mixer.update(dt) } catch { }
+    }
+    if (cameraMoveState.dir && !cameraTransition) {
+      moveCameraByDirection(cameraMoveState.dir, dt * 5.2, false, false)
+    }
+    if (cameraTransition) {
+      updateCameraTransition()
+    } else {
+      updateCameraFromOrbit(false)
     }
     if (renderer && scene && camera) {
       renderer.render(scene, camera)
@@ -852,6 +1215,8 @@
 
   function applyIncomingBpState(nextState) {
     if (!nextState || typeof nextState !== 'object') return
+    const prevSurvivorCount = state.bpSelectionState.survivorCount || 0
+    const prevHunterSelected = !!state.bpSelectionState.hunterSelected
     const incomingSurvivors = Array.isArray(nextState.survivors)
       ? nextState.survivors
       : (Array.isArray(nextState?.currentRoundData?.selectedSurvivors) ? nextState.currentRoundData.selectedSurvivors : [null, null, null, null])
@@ -862,6 +1227,24 @@
     state.bp.survivors = Array.isArray(incomingSurvivors) ? incomingSurvivors.slice(0, 4) : [null, null, null, null]
     while (state.bp.survivors.length < 4) state.bp.survivors.push(null)
     state.bp.hunter = incomingHunter || null
+
+    const nextSurvivorCount = countSelectedSurvivors(state.bp.survivors)
+    const nextHunterSelected = isHunterSelected(state.bp.hunter)
+    state.bpSelectionState = {
+      survivorCount: nextSurvivorCount,
+      hunterSelected: nextHunterSelected
+    }
+
+    if (nextSurvivorCount === 0 && !nextHunterSelected) {
+      cancelCameraTransition()
+    } else {
+      for (let i = prevSurvivorCount + 1; i <= nextSurvivorCount && i <= 4; i++) {
+        triggerCameraEvent(`survivor${i}`)
+      }
+      if (!prevHunterSelected && nextHunterSelected) {
+        triggerCameraEvent('hunterSelected')
+      }
+    }
 
     // 注意：这里不覆盖本窗口相机/布局，避免切换视角后被回退。
     // 只做 BP 角色同步。
@@ -881,6 +1264,10 @@
         state.bp.survivors = Array.isArray(data.survivors) ? data.survivors.slice(0, 4) : [null, null, null, null]
         while (state.bp.survivors.length < 4) state.bp.survivors.push(null)
         state.bp.hunter = data.hunter || null
+        state.bpSelectionState = {
+          survivorCount: countSelectedSurvivors(state.bp.survivors),
+          hunterSelected: isHunterSelected(state.bp.hunter)
+        }
       }
     } catch (error) {
       console.error('[CharacterModel3D] 读取初始状态失败:', error)
