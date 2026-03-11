@@ -12,6 +12,7 @@
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     transparentBackground: true,
+    survivorScale: 1,
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -127,6 +128,7 @@
     const out = deepClone(DEFAULT_LAYOUT)
     out.mode = base.mode === 'render' ? 'render' : 'edit'
     out.transparentBackground = base.transparentBackground !== false
+    out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
     out.scene.modelPath = typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : ''
     out.scene.position = ensureVec3(base?.scene?.position, out.scene.position)
     out.scene.rotation = ensureVec3(base?.scene?.rotation, out.scene.rotation)
@@ -141,6 +143,10 @@
         rotation: ensureVec3(base?.slots?.[cfg.key]?.rotation, fallback.rotation),
         scale: { x: uniform, y: uniform, z: uniform }
       }
+    }
+    for (let i = 1; i <= 4; i++) {
+      const key = `survivor${i}`
+      out.slots[key].scale = { x: out.survivorScale, y: out.survivorScale, z: out.survivorScale }
     }
     out.lights = deepClone(DEFAULT_LAYOUT.lights)
     out.lights.light1.color = typeof base?.lights?.light1?.color === 'string' ? base.lights.light1.color : out.lights.light1.color
@@ -350,7 +356,9 @@
     } else if (key === 'light1') {
       runtime.group.scale.set(1, 1, 1)
     } else {
-      const uniform = Math.max(0.001, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1))))
+      const uniform = (key.startsWith('survivor'))
+        ? Math.max(0.001, asNumber(state.layout?.survivorScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
+        : Math.max(0.001, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1))))
       runtime.group.scale.set(uniform, uniform, uniform)
     }
   }
@@ -508,6 +516,15 @@
     }
     if (!state.layout.slots[key]) state.layout.slots[key] = {}
     const uniform = Math.max(0.001, asNumber(g.scale.x, 1))
+    if (key.startsWith('survivor')) {
+      state.layout.survivorScale = uniform
+      for (let i = 1; i <= 4; i++) {
+        const slotKey = `survivor${i}`
+        if (!state.layout.slots[slotKey]) state.layout.slots[slotKey] = {}
+        state.layout.slots[slotKey].scale = { x: uniform, y: uniform, z: uniform }
+        if (slotKey !== key) applyTransformToGroup(slotKey, state.layout.slots[slotKey])
+      }
+    }
     state.layout.slots[key].position = { x: g.position.x, y: g.position.y, z: g.position.z }
     state.layout.slots[key].rotation = { x: toDegrees(g.rotation.x), y: toDegrees(g.rotation.y), z: toDegrees(g.rotation.z) }
     state.layout.slots[key].scale = { x: uniform, y: uniform, z: uniform }
@@ -534,11 +551,16 @@
       dom.uniScale.disabled = true
     } else {
       dom.uniScale.disabled = false
-      dom.uniScale.value = asNumber(tr.scale?.x, 1).toFixed(3)
+      if (state.selectedSlot.startsWith('survivor')) {
+        dom.uniScale.value = asNumber(state.layout?.survivorScale, asNumber(tr.scale?.x, 1)).toFixed(3)
+      } else {
+        dom.uniScale.value = asNumber(tr.scale?.x, 1).toFixed(3)
+      }
     }
   }
 
   function applyInputsToSelectedTransform() {
+    const uniformScale = Math.max(0.001, asNumber(dom.uniScale.value, 1))
     const tr = {
       position: {
         x: asNumber(dom.posX.value, 0),
@@ -551,9 +573,9 @@
         z: asNumber(dom.rotZ.value, 0)
       },
       scale: {
-        x: Math.max(0.001, asNumber(dom.uniScale.value, 1)),
-        y: Math.max(0.001, asNumber(dom.uniScale.value, 1)),
-        z: Math.max(0.001, asNumber(dom.uniScale.value, 1))
+        x: uniformScale,
+        y: uniformScale,
+        z: uniformScale
       }
     }
     if (state.selectedSlot === 'light1') {
@@ -561,6 +583,24 @@
     }
     if (state.selectedSlot === 'scene') {
       state.layout.scene = { ...state.layout.scene, ...tr }
+    } else if (state.selectedSlot.startsWith('survivor')) {
+      state.layout.survivorScale = uniformScale
+      for (let i = 1; i <= 4; i++) {
+        const slotKey = `survivor${i}`
+        const prev = state.layout.slots[slotKey] || {}
+        const slotTr = {
+          ...prev,
+          scale: { x: uniformScale, y: uniformScale, z: uniformScale }
+        }
+        if (slotKey === state.selectedSlot) {
+          slotTr.position = tr.position
+          slotTr.rotation = tr.rotation
+        }
+        state.layout.slots[slotKey] = slotTr
+        applyTransformToGroup(slotKey, slotTr)
+      }
+      scheduleSaveLayout()
+      return
     } else {
       state.layout.slots[state.selectedSlot] = { ...state.layout.slots[state.selectedSlot], ...tr }
     }

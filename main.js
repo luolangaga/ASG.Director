@@ -5590,6 +5590,7 @@ let localBpState = {
   characterModel3DLayout: {
     mode: 'edit',
     transparentBackground: true,
+    survivorScale: 1,
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -5651,6 +5652,7 @@ function __normalizeLocalBpStateInPlace__() {
   const m3d = localBpState.characterModel3DLayout
   m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
   m3d.transparentBackground = m3d.transparentBackground !== false
+  m3d.survivorScale = Math.max(0.001, Number.isFinite(Number(m3d.survivorScale)) ? Number(m3d.survivorScale) : 1)
 
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
     const src = (v && typeof v === 'object') ? v : {}
@@ -5675,6 +5677,9 @@ function __normalizeLocalBpStateInPlace__() {
     m3d.slots[key].position = ensureVec3(m3d.slots[key].position, { x: 0, y: 0, z: 0 })
     m3d.slots[key].rotation = ensureVec3(m3d.slots[key].rotation, { x: 0, y: 0, z: 0 })
     m3d.slots[key].scale = ensureVec3(m3d.slots[key].scale, { x: 1, y: 1, z: 1 })
+    if (key.startsWith('survivor')) {
+      m3d.slots[key].scale = { x: m3d.survivorScale, y: m3d.survivorScale, z: m3d.survivorScale }
+    }
   }
 
   if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
@@ -7505,6 +7510,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
     transparentBackground: base.transparentBackground !== false,
+    survivorScale: Math.max(0.001, Number.isFinite(Number(base.survivorScale)) ? Number(base.survivorScale) : 1),
     scene: {
       modelPath: typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : '',
       position: ensureVec3(base?.scene?.position, { x: 0, y: 0, z: 0 }),
@@ -7524,6 +7530,9 @@ function normalizeCharacterModel3DLayoutInput(input) {
       position: ensureVec3(base?.slots?.[key]?.position, { x: 0, y: 0, z: 0 }),
       rotation: ensureVec3(base?.slots?.[key]?.rotation, { x: 0, y: 0, z: 0 }),
       scale: ensureVec3(base?.slots?.[key]?.scale, { x: 1, y: 1, z: 1 })
+    }
+    if (key.startsWith('survivor')) {
+      out.slots[key].scale = { x: out.survivorScale, y: out.survivorScale, z: out.survivorScale }
     }
   }
 
