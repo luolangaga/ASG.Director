@@ -5695,6 +5695,7 @@ let localBpState = {
     mode: 'edit',
     transparentBackground: true,
     environmentPreset: 'duskCinema',
+    qualityPreset: 'high',
     fogEnabled: true,
     fogStrength: 1,
     shadowStrength: 0.45,
@@ -5781,6 +5782,9 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight' || m3d.environmentPreset === 'horrorNight')
     ? m3d.environmentPreset
     : 'duskCinema'
+  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium')
+    ? m3d.qualityPreset
+    : 'high'
   m3d.fogEnabled = m3d.fogEnabled !== false
   m3d.fogStrength = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.fogStrength))
     ? Number(m3d.fogStrength)
@@ -7698,6 +7702,9 @@ function normalizeCharacterModel3DLayoutInput(input) {
     environmentPreset: (base.environmentPreset === 'cyberpunkNight' || base.environmentPreset === 'horrorNight')
       ? base.environmentPreset
       : 'duskCinema',
+    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium')
+      ? base.qualityPreset
+      : 'high',
     fogEnabled: base.fogEnabled !== false,
     fogStrength: Math.max(0, Math.min(3, Number.isFinite(Number(base.fogStrength))
       ? Number(base.fogStrength)
