@@ -80,41 +80,11 @@
       shadowOpacity: 0.45
     }
   }
-  const RENDER_QUALITY_PRESETS = {
-    low: {
-      label: '低',
-      pixelRatioCap: 1,
-      shadowMapType: 'basic',
-      shadowMapSize: 1024,
-      shadowRadius: 1,
-      textureAnisotropy: 2,
-      toneMappingExposure: 1.0
-    },
-    medium: {
-      label: '中',
-      pixelRatioCap: 1.5,
-      shadowMapType: 'pcf',
-      shadowMapSize: 2048,
-      shadowRadius: 2,
-      textureAnisotropy: 8,
-      toneMappingExposure: 1.06
-    },
-    high: {
-      label: '高',
-      pixelRatioCap: 2,
-      shadowMapType: 'pcfSoft',
-      shadowMapSize: 3072,
-      shadowRadius: 3,
-      textureAnisotropy: 16,
-      toneMappingExposure: 1.1
-    }
-  }
 
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     transparentBackground: true,
     environmentPreset: 'duskCinema',
-    qualityPreset: 'high',
     fogEnabled: true,
     fogStrength: 1,
     shadowStrength: 0.45,
@@ -251,7 +221,6 @@
     cameraTransitionMs: document.getElementById('cameraTransitionMs'),
     cameraEventInfo: document.getElementById('cameraEventInfo')
     , environmentPresetSelect: document.getElementById('environmentPresetSelect')
-    , renderQualitySelect: document.getElementById('renderQualitySelect')
     , applyEnvironmentPresetBtn: document.getElementById('applyEnvironmentPresetBtn')
     , fogEnabled: document.getElementById('fogEnabled')
     , fogStrength: document.getElementById('fogStrength')
@@ -270,6 +239,27 @@
 
   function setStatus(text) {
     if (dom.statusBar) dom.statusBar.textContent = text || ''
+  }
+
+  function showModelLoadErrorDialog(detail) {
+    try {
+      const d = (detail && typeof detail === 'object') ? detail : {}
+      const lines = [
+        '模型加载失败',
+        `槽位: ${d.slotLabel || d.slot || '-'}`,
+        `路径: ${d.modelPath || '-'}`,
+        `URL: ${d.resolvedUrl || '-'}`,
+        `扩展名: ${d.ext || '-'}`,
+        `错误: ${d.errorMessage || '-'}`
+      ]
+      if (d.errorStack) {
+        const stack = String(d.errorStack).split('\n').slice(0, 6).join('\n')
+        lines.push(`堆栈:\n${stack}`)
+      }
+      window.alert(lines.join('\n'))
+    } catch (e) {
+      console.error('[CharacterModel3D] 弹出错误对话框失败:', e)
+    }
   }
 
   function asNumber(value, fallback = 0) {
@@ -302,9 +292,6 @@
     out.environmentPreset = (typeof base.environmentPreset === 'string' && ENVIRONMENT_PRESETS[base.environmentPreset])
       ? base.environmentPreset
       : 'duskCinema'
-    out.qualityPreset = (typeof base.qualityPreset === 'string' && RENDER_QUALITY_PRESETS[base.qualityPreset])
-      ? base.qualityPreset
-      : 'high'
     out.fogEnabled = base.fogEnabled !== false
     out.fogStrength = Math.max(0, Math.min(3, asNumber(base.fogStrength, 1)))
     out.shadowStrength = Math.max(0, Math.min(1, asNumber(base.shadowStrength, 0.45)))
@@ -407,7 +394,7 @@
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.1
+    renderer.toneMappingExposure = 1.08
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     renderer.setSize(initW, initH)
     renderer.shadowMap.enabled = true
@@ -516,72 +503,6 @@
     objLoader = new THREE.OBJLoader()
     mtlLoader = new THREE.MTLLoader()
     clock = new THREE.Clock()
-    applyRenderQualityPreset(state.layout?.qualityPreset, false, false)
-  }
-
-  function getRenderQualityPreset(presetKey) {
-    const key = (typeof presetKey === 'string' && RENDER_QUALITY_PRESETS[presetKey]) ? presetKey : 'high'
-    return { key, preset: RENDER_QUALITY_PRESETS[key] }
-  }
-
-  function setTextureAnisotropy(tex, anisotropy) {
-    if (!tex) return
-    if (Number.isFinite(anisotropy) && anisotropy > 0) {
-      tex.anisotropy = anisotropy
-      tex.needsUpdate = true
-    }
-  }
-
-  function applyTextureQualityToObject(obj, preset) {
-    if (!renderer || !obj || !preset) return
-    const maxAniso = Number.isFinite(renderer?.capabilities?.getMaxAnisotropy?.())
-      ? renderer.capabilities.getMaxAnisotropy()
-      : 8
-    const targetAniso = Math.max(1, Math.min(maxAniso, asNumber(preset.textureAnisotropy, 8)))
-    obj.traverse((node) => {
-      if (!node || !node.isMesh || !node.material) return
-      const mats = Array.isArray(node.material) ? node.material : [node.material]
-      mats.forEach((mat) => {
-        if (!mat) return
-        setTextureAnisotropy(mat.map, targetAniso)
-        setTextureAnisotropy(mat.normalMap, targetAniso)
-        setTextureAnisotropy(mat.roughnessMap, targetAniso)
-        setTextureAnisotropy(mat.metalnessMap, targetAniso)
-        setTextureAnisotropy(mat.aoMap, targetAniso)
-        setTextureAnisotropy(mat.emissiveMap, targetAniso)
-        setTextureAnisotropy(mat.alphaMap, targetAniso)
-        setTextureAnisotropy(mat.specularMap, targetAniso)
-      })
-    })
-  }
-
-  function applyRenderQualityPreset(presetKey, shouldSave = true, refreshTextures = true) {
-    if (!renderer) return
-    const { key, preset } = getRenderQualityPreset(presetKey)
-    state.layout.qualityPreset = key
-
-    renderer.toneMappingExposure = asNumber(preset.toneMappingExposure, 1.08)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, asNumber(preset.pixelRatioCap, 2)))
-
-    renderer.shadowMap.enabled = true
-    if (preset.shadowMapType === 'basic' && THREE.BasicShadowMap) renderer.shadowMap.type = THREE.BasicShadowMap
-    else if (preset.shadowMapType === 'pcf' && THREE.PCFShadowMap) renderer.shadowMap.type = THREE.PCFShadowMap
-    else renderer.shadowMap.type = THREE.PCFSoftShadowMap
-
-    if (sceneLights.key) {
-      const mapSize = Math.max(256, Math.round(asNumber(preset.shadowMapSize, 2048)))
-      sceneLights.key.shadow.mapSize.set(mapSize, mapSize)
-      sceneLights.key.shadow.radius = Math.max(0, asNumber(preset.shadowRadius, 2))
-      if (sceneLights.key.shadow.map && typeof sceneLights.key.shadow.map.dispose === 'function') {
-        sceneLights.key.shadow.map.dispose()
-        sceneLights.key.shadow.map = null
-      }
-      sceneLights.key.shadow.needsUpdate = true
-    }
-
-    if (refreshTextures && root) applyTextureQualityToObject(root, preset)
-    if (dom.renderQualitySelect) dom.renderQualitySelect.value = key
-    if (shouldSave) scheduleSaveLayout()
   }
 
   function getPathExt(pathValue) {
@@ -1068,8 +989,6 @@
         node.receiveShadow = true
       }
     })
-    const { preset } = getRenderQualityPreset(state.layout?.qualityPreset)
-    applyTextureQualityToObject(obj, preset)
   }
 
   function stopEntranceEffectsForRoot(modelRoot) {
@@ -1357,7 +1276,18 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (runtime.loadSeq !== seq) return
       runtime.loadingPath = ''
       setStatus(`加载失败: ${runtime.cfg.label}`)
-      console.error('[CharacterModel3D] 模型加载失败:', key, modelPath, error)
+      const detail = {
+        slot: key,
+        slotLabel: runtime?.cfg?.label || key,
+        modelPath: modelPath || '',
+        resolvedUrl: url || '',
+        ext: ext || '',
+        errorMessage: (error && (error.message || error.type || error.target?.statusText)) || String(error),
+        errorStack: error && error.stack ? error.stack : '',
+        rawError: error
+      }
+      console.error('[CharacterModel3D] 模型加载失败(详细):', detail)
+      showModelLoadErrorDialog(detail)
     }
 
     return await new Promise((resolve) => {
@@ -1389,7 +1319,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     const clean = sanitizeRoleName(roleName)
     const cacheKey = clean || roleName
     if (Object.prototype.hasOwnProperty.call(state.roleModelPathCache, cacheKey) && state.roleModelPathCache[cacheKey]) {
-      return state.roleModelPathCache[cacheKey]
+      const cached = String(state.roleModelPathCache[cacheKey] || '').trim()
+      // 仅直接复用本地路径；旧 http 缓存会继续走本地解析以避免拉取失败
+      if (cached && !/^https?:\/\//i.test(cached)) return cached
     }
 
     // 1) 强制优先从本机 official-models 目录解析
@@ -1398,7 +1330,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         const res = await window.electronAPI.invoke('localBp:getOfficialModelLocalPath', roleName)
         const localPath = (res && res.success && typeof res.path === 'string') ? res.path.trim() : ''
         const httpUrl = (res && res.success && typeof res.httpUrl === 'string') ? res.httpUrl.trim() : ''
-        const resolved = httpUrl || localPath
+        // 始终优先本地绝对路径，避免依赖本地 HTTP 服务监听地址
+        const resolved = localPath || httpUrl
         if (resolved) {
           state.roleModelPathCache[cacheKey] = resolved
           return resolved
@@ -1598,7 +1531,6 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       applyTransformToGroup(cfg.key, state.layout.slots[cfg.key])
     }
     applyLightSettings('light1')
-    applyRenderQualityPreset(state.layout.qualityPreset, false, true)
     applyEnvironmentPreset(state.layout.environmentPreset, false)
     applyMode(state.layout.mode)
     applyOrbitFromLayout()
@@ -1701,12 +1633,6 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.environmentPresetSelect) {
       dom.environmentPresetSelect.addEventListener('change', () => {
         applyEnvironmentPreset(dom.environmentPresetSelect.value, true)
-      })
-    }
-    if (dom.renderQualitySelect) {
-      dom.renderQualitySelect.addEventListener('change', () => {
-        applyRenderQualityPreset(dom.renderQualitySelect.value, true, true)
-        setStatus(`渲染画质: ${RENDER_QUALITY_PRESETS[state.layout.qualityPreset]?.label || state.layout.qualityPreset}`)
       })
     }
     if (dom.fogEnabled) {

@@ -1,6 +1,49 @@
 
+const messages = {
+    'zh-CN': {
+        'welcome.documentTitle': '欢迎使用 Idvevent Director',
+        'welcome.title': '欢迎使用!',
+        'welcome.subtitle': '检测到您是首次使用，当前没有任何样式配置。',
+        'welcome.description': '为了获得最佳体验，我们强烈建议您安装一个初始布局包。',
+        'welcome.recommendedTitle': '🔥 精选推荐布局包',
+        'welcome.loadingRecommended': '正在获取推荐布局...',
+        'welcome.skip': '暂时跳过 (没有任何样式)',
+        'welcome.openStore': '前往完整商店',
+        'welcome.downloadingPack': '正在下载布局包...',
+        'welcome.loadFailed': '获取推荐失败，请前往完整商店查看',
+        'welcome.loadError': '加载失败: {message}',
+        'welcome.noRecommendations': '暂无推荐内容',
+        'welcome.installNow': '立即安装',
+        'welcome.installWarning': '⚠️ 警告：安装 "{name}" 将覆盖您当前的布局、背景及组件配置！\n\n如果您当前已有正在使用的布局且未导出备份，请先取消并导出，否则原有设置将被不可逆地覆盖。\n\n确定要继续安装吗？',
+        'welcome.installFailed': '安装失败: {message}',
+        'welcome.installError': '安装出错: {message}'
+    },
+    'en-US': {
+        'welcome.documentTitle': 'Welcome to Idvevent Director',
+        'welcome.title': 'Welcome!',
+        'welcome.subtitle': 'This appears to be your first run, and no style pack is configured yet.',
+        'welcome.description': 'For the best experience, we strongly recommend installing a starter layout pack.',
+        'welcome.recommendedTitle': '🔥 Recommended Starter Packs',
+        'welcome.loadingRecommended': 'Fetching recommended packs...',
+        'welcome.skip': 'Skip for now (no styles)',
+        'welcome.openStore': 'Open Full Store',
+        'welcome.downloadingPack': 'Downloading pack...',
+        'welcome.loadFailed': 'Failed to fetch recommendations. Please open the full store.',
+        'welcome.loadError': 'Load failed: {message}',
+        'welcome.noRecommendations': 'No recommended packs yet',
+        'welcome.installNow': 'Install Now',
+        'welcome.installWarning': '⚠️ Warning: Installing "{name}" will overwrite your current layout, background, and component settings.\n\nIf you have an active layout and no backup yet, cancel now and export a backup first.\n\nContinue installation?',
+        'welcome.installFailed': 'Install failed: {message}',
+        'welcome.installError': 'Install error: {message}'
+    }
+};
+
+const i18n = window.ASGI18n.init(messages);
+
 // 初始化
 window.addEventListener('DOMContentLoaded', () => {
+    i18n.bindSelector('languageSelect');
+    i18n.apply(document);
     loadRecommendedPacks();
 });
 
@@ -24,11 +67,11 @@ async function loadRecommendedPacks() {
         if (result.success && result.data && result.data.items) {
             renderPacks(result.data.items);
         } else {
-            container.innerHTML = '<div class="loading"><div class="icon">😕</div><p>获取推荐失败，请前往完整商店查看</p></div>';
+            container.innerHTML = `<div class="loading"><div class="icon">😕</div><p>${i18n.t('welcome.loadFailed')}</p></div>`;
         }
     } catch (error) {
         console.error('Failed to load packs:', error);
-        container.innerHTML = `<div class="loading"><p>加载失败: ${error.message}</p></div>`;
+        container.innerHTML = `<div class="loading"><p>${i18n.t('welcome.loadError', { message: error.message })}</p></div>`;
     }
 }
 
@@ -37,7 +80,7 @@ function renderPacks(packs) {
     const container = document.getElementById('packsGrid');
 
     if (!packs || packs.length === 0) {
-        container.innerHTML = '<div class="loading"><p>暂无推荐内容</p></div>';
+        container.innerHTML = `<div class="loading"><p>${i18n.t('welcome.noRecommendations')}</p></div>`;
         return;
     }
 
@@ -54,7 +97,7 @@ function renderPacks(packs) {
                 : '📦'}
           
           <div class="install-overlay">
-            <button class="btn-install">立即安装</button>
+            <button class="btn-install">${i18n.t('welcome.installNow')}</button>
           </div>
         </div>
         <div class="pack-info">
@@ -77,7 +120,7 @@ async function installPack(id, name) {
 
     if (btn.disabled) return;
 
-    const confirmed = confirm(`⚠️ 警告：安装 "${name}" 将覆盖您当前的布局、背景及组件配置！\n\n如果您当前已有正在使用的布局且未导出备份，请先取消并导出，否则原有设置将被不可逆地覆盖。\n\n确定要继续安装吗？`);
+    const confirmed = confirm(i18n.t('welcome.installWarning', { name }));
     if (!confirmed) return;
 
     // 显示进度条
@@ -116,13 +159,13 @@ async function installPack(id, name) {
 
         } else {
             overlay.classList.remove('show');
-            alert('安装失败: ' + (result.error || '未知错误'));
+            alert(i18n.t('welcome.installFailed', { message: result.error || 'Unknown error' }));
             btn.textContent = originalText;
             btn.disabled = false;
         }
     } catch (error) {
         overlay.classList.remove('show');
-        alert('安装出错: ' + error.message);
+        alert(i18n.t('welcome.installError', { message: error.message }));
         btn.textContent = originalText;
         btn.disabled = false;
     } finally {

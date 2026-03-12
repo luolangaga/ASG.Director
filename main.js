@@ -217,6 +217,32 @@ ipcMain.on('broadcast-animation', (event, payload) => {
   broadcastToAllWindows('broadcast-animation', payload)
 })
 
+// 渲染进程日志桥接到主进程终端
+ipcMain.on('renderer:log', (event, payload) => {
+  try {
+    const p = (payload && typeof payload === 'object') ? payload : {}
+    const lvl = String(p.level || 'log').toLowerCase()
+    const source = p.source ? `[${p.source}]` : '[renderer]'
+    const url = p.url ? ` ${p.url}` : ''
+    const msg = p.message ? ` ${p.message}` : ''
+    const prefix = `[RendererBridge]${source}${url}${msg}`
+    if (lvl === 'error') {
+      console.error(prefix)
+      if (p.stack) console.error(p.stack)
+      return
+    }
+    if (lvl === 'warn') {
+      console.warn(prefix)
+      if (p.stack) console.warn(p.stack)
+      return
+    }
+    console.log(prefix)
+    if (p.stack) console.log(p.stack)
+  } catch (e) {
+    console.error('[RendererBridge] 处理 renderer:log 失败:', e?.message || e)
+  }
+})
+
 // 存储路径
 const userDataPath = app.getPath('userData')
 const layoutPath = path.join(userDataPath, 'layout.json')
@@ -5695,7 +5721,6 @@ let localBpState = {
     mode: 'edit',
     transparentBackground: true,
     environmentPreset: 'duskCinema',
-    qualityPreset: 'high',
     fogEnabled: true,
     fogStrength: 1,
     shadowStrength: 0.45,
@@ -5782,9 +5807,6 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight' || m3d.environmentPreset === 'horrorNight')
     ? m3d.environmentPreset
     : 'duskCinema'
-  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium')
-    ? m3d.qualityPreset
-    : 'high'
   m3d.fogEnabled = m3d.fogEnabled !== false
   m3d.fogStrength = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.fogStrength))
     ? Number(m3d.fogStrength)
@@ -7702,9 +7724,6 @@ function normalizeCharacterModel3DLayoutInput(input) {
     environmentPreset: (base.environmentPreset === 'cyberpunkNight' || base.environmentPreset === 'horrorNight')
       ? base.environmentPreset
       : 'duskCinema',
-    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium')
-      ? base.qualityPreset
-      : 'high',
     fogEnabled: base.fogEnabled !== false,
     fogStrength: Math.max(0, Math.min(3, Number.isFinite(Number(base.fogStrength))
       ? Number(base.fogStrength)
