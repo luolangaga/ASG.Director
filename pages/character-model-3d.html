@@ -21,6 +21,24 @@
       <button id="sceneClearBtn" class="btn">清空场景</button>
     </div>
     <div class="toolbar-row">
+      <span class="label">天空与光影预设</span>
+      <select id="environmentPresetSelect">
+        <option value="duskCinema">电影感黄昏</option>
+        <option value="cyberpunkNight">赛博朋克夜景</option>
+        <option value="horrorNight">恐怖风夜晚</option>
+      </select>
+      <button id="applyEnvironmentPresetBtn" class="btn">应用预设</button>
+      <label><input id="fogEnabled" type="checkbox" checked> 雾化效果滤镜</label>
+      <label>雾化强度<input id="fogStrength" type="number" step="0.05" min="0" max="3" value="1"></label>
+      <label>阴影强度<input id="shadowStrength" type="number" step="0.01" min="0" max="1" value="0.45"></label>
+      <span class="label">出场动画</span>
+      <select id="entranceEffectSelect">
+        <option value="fade">淡入</option>
+        <option value="flameDissolve">火焰溶解</option>
+        <option value="none">关闭</option>
+      </select>
+    </div>
+    <div class="toolbar-row">
       <span class="label">编辑对象</span>
       <div id="slotTabs" class="slot-tabs"></div>
     </div>
@@ -74,6 +92,7 @@
   </div>
 
   <div id="renderRoot" class="render-root"></div>
+  <div id="fogOverlay" class="fog-overlay"></div>
   <div id="statusBar" class="status-bar">初始化中...</div>
 
   <script src="./js/character-model-3d-logic.js"></script>

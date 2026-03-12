@@ -15,10 +15,80 @@
     { key: 'survivor4', label: '求生者选了4个' },
     { key: 'hunterSelected', label: '监管者选了' }
   ]
+  const ENVIRONMENT_PRESETS = {
+    duskCinema: {
+      label: '电影感黄昏',
+      skyTop: '#ff9e5e',
+      skyBottom: '#2a1630',
+      fogColor: '#2a1a26',
+      fogDensity: 0.0105,
+      fogNear: 22,
+      fogFar: 210,
+      ambientColor: '#ffd9b3',
+      ambientIntensity: 0.58,
+      hemiSkyColor: '#ffbc8a',
+      hemiGroundColor: '#2a1a2f',
+      hemiIntensity: 0.32,
+      keyColor: '#ffd29e',
+      keyIntensity: 1.55,
+      keyPos: { x: 10, y: 18, z: 7 },
+      fillColor: '#7aa8ff',
+      fillIntensity: 0.42,
+      fillPos: { x: -12, y: 7, z: -9 },
+      shadowOpacity: 0.38
+    },
+    cyberpunkNight: {
+      label: '赛博朋克夜景',
+      skyTop: '#1f2d7d',
+      skyBottom: '#1a0431',
+      fogColor: '#150624',
+      fogDensity: 0.014,
+      fogNear: 16,
+      fogFar: 165,
+      ambientColor: '#7aa9ff',
+      ambientIntensity: 0.36,
+      hemiSkyColor: '#37d9ff',
+      hemiGroundColor: '#1b0031',
+      hemiIntensity: 0.44,
+      keyColor: '#ff56d8',
+      keyIntensity: 1.36,
+      keyPos: { x: 8, y: 13, z: 9 },
+      fillColor: '#45e8ff',
+      fillIntensity: 0.68,
+      fillPos: { x: -10, y: 6, z: -7 },
+      shadowOpacity: 0.32
+    },
+    horrorNight: {
+      label: '恐怖风夜晚',
+      skyTop: '#11232b',
+      skyBottom: '#000000',
+      fogColor: '#020507',
+      fogDensity: 0.018,
+      fogNear: 10,
+      fogFar: 108,
+      ambientColor: '#5f7d73',
+      ambientIntensity: 0.22,
+      hemiSkyColor: '#37555d',
+      hemiGroundColor: '#020304',
+      hemiIntensity: 0.26,
+      keyColor: '#9ed4c2',
+      keyIntensity: 0.88,
+      keyPos: { x: 4, y: 10, z: 5 },
+      fillColor: '#2f4350',
+      fillIntensity: 0.25,
+      fillPos: { x: -6, y: 4, z: -6 },
+      shadowOpacity: 0.45
+    }
+  }
 
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     transparentBackground: true,
+    environmentPreset: 'duskCinema',
+    fogEnabled: true,
+    fogStrength: 1,
+    shadowStrength: 0.45,
+    entranceEffect: 'fade',
     survivorScale: 1,
     hunterScale: 1.1,
     scene: {
@@ -81,6 +151,14 @@
   let root = null
   let grid = null
   let axes = null
+  let skyDome = null
+  let shadowGround = null
+  const sceneLights = {
+    ambient: null,
+    key: null,
+    fill: null,
+    hemi: null
+  }
   let gltfLoader = null
   let objLoader = null
   let mtlLoader = null
@@ -91,8 +169,13 @@
   let clock = null
   let saveTimer = null
   let cameraTransition = null
+  let bpRoleSyncRunning = false
+  let bpRoleSyncPending = false
+  let pendingCameraEventKey = ''
   const CAMERA_EPSILON_RADIUS = 1e-6
   const CAMERA_ZOOM_FACTOR = 0.00105
+  const activeEntranceEffects = []
+  const pendingEntranceEffects = new Set()
 
   const orbit = {
     target: { x: 0, y: 1, z: 0 },
@@ -117,6 +200,7 @@
   const dom = {
     toolbar: document.getElementById('toolbar'),
     renderRoot: document.getElementById('renderRoot'),
+    fogOverlay: document.getElementById('fogOverlay'),
     statusBar: document.getElementById('statusBar'),
     modeToggleBtn: document.getElementById('modeToggleBtn'),
     sceneImportBtn: document.getElementById('sceneImportBtn'),
@@ -136,6 +220,12 @@
     clearCameraKeyframeBtn: document.getElementById('clearCameraKeyframeBtn'),
     cameraTransitionMs: document.getElementById('cameraTransitionMs'),
     cameraEventInfo: document.getElementById('cameraEventInfo')
+    , environmentPresetSelect: document.getElementById('environmentPresetSelect')
+    , applyEnvironmentPresetBtn: document.getElementById('applyEnvironmentPresetBtn')
+    , fogEnabled: document.getElementById('fogEnabled')
+    , fogStrength: document.getElementById('fogStrength')
+    , shadowStrength: document.getElementById('shadowStrength')
+    , entranceEffectSelect: document.getElementById('entranceEffectSelect')
     , cameraMoveStep: document.getElementById('cameraMoveStep')
     , cameraMoveButtons: Array.from(document.querySelectorAll('[data-cam-move]'))
     , lightColor: document.getElementById('lightColor')
@@ -178,6 +268,15 @@
     const out = deepClone(DEFAULT_LAYOUT)
     out.mode = base.mode === 'render' ? 'render' : 'edit'
     out.transparentBackground = base.transparentBackground !== false
+    out.environmentPreset = (typeof base.environmentPreset === 'string' && ENVIRONMENT_PRESETS[base.environmentPreset])
+      ? base.environmentPreset
+      : 'duskCinema'
+    out.fogEnabled = base.fogEnabled !== false
+    out.fogStrength = Math.max(0, Math.min(3, asNumber(base.fogStrength, 1)))
+    out.shadowStrength = Math.max(0, Math.min(1, asNumber(base.shadowStrength, 0.45)))
+    out.entranceEffect = (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
+      ? base.entranceEffect
+      : 'fade'
     out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
     out.hunterScale = Math.max(0.001, asNumber(base?.hunterScale, out.slots.hunter.scale.x))
     out.scene.modelPath = typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : ''
@@ -273,22 +372,38 @@
     camera = new THREE.PerspectiveCamera(45, initW / Math.max(1, initH), 0.1, 5000)
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
     renderer.outputEncoding = THREE.sRGBEncoding
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.08
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     renderer.setSize(initW, initH)
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
     camera.updateProjectionMatrix()
     dom.renderRoot.innerHTML = ''
     dom.renderRoot.appendChild(renderer.domElement)
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.75)
-    scene.add(ambient)
+    sceneLights.ambient = new THREE.AmbientLight(0xffffff, 0.75)
+    scene.add(sceneLights.ambient)
 
-    const dir = new THREE.DirectionalLight(0xffffff, 1.15)
-    dir.position.set(6, 14, 10)
-    scene.add(dir)
+    sceneLights.hemi = new THREE.HemisphereLight(0xffc38a, 0x201020, 0.25)
+    scene.add(sceneLights.hemi)
 
-    const fill = new THREE.DirectionalLight(0x9fc5ff, 0.45)
-    fill.position.set(-10, 8, -6)
-    scene.add(fill)
+    sceneLights.key = new THREE.DirectionalLight(0xffffff, 1.15)
+    sceneLights.key.position.set(6, 14, 10)
+    sceneLights.key.castShadow = true
+    sceneLights.key.shadow.mapSize.set(2048, 2048)
+    sceneLights.key.shadow.camera.near = 0.5
+    sceneLights.key.shadow.camera.far = 160
+    sceneLights.key.shadow.camera.left = -24
+    sceneLights.key.shadow.camera.right = 24
+    sceneLights.key.shadow.camera.top = 24
+    sceneLights.key.shadow.camera.bottom = -24
+    sceneLights.key.shadow.bias = -0.00025
+    scene.add(sceneLights.key)
+
+    sceneLights.fill = new THREE.DirectionalLight(0x9fc5ff, 0.45)
+    sceneLights.fill.position.set(-10, 8, -6)
+    scene.add(sceneLights.fill)
 
     grid = new THREE.GridHelper(24, 24, 0x4caf50, 0x2d3552)
     grid.position.y = 0
@@ -299,6 +414,51 @@
 
     root = new THREE.Group()
     scene.add(root)
+
+    // 阴影接收地面：无场景地面时也能看到角色落影
+    shadowGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(280, 280),
+      new THREE.ShadowMaterial({ opacity: 0.24 })
+    )
+    shadowGround.rotation.x = -Math.PI / 2
+    shadowGround.position.y = 0
+    shadowGround.receiveShadow = true
+    scene.add(shadowGround)
+
+    // 天空穹顶：通过渐变营造天空氛围
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        uTopColor: { value: new THREE.Color('#ff9e5e') },
+        uBottomColor: { value: new THREE.Color('#2a1630') },
+        uOffset: { value: 42.0 },
+        uExponent: { value: 0.72 }
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPos = worldPos.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uTopColor;
+        uniform vec3 uBottomColor;
+        uniform float uOffset;
+        uniform float uExponent;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos + vec3(0.0, uOffset, 0.0)).y;
+          float t = pow(max(h, 0.0), uExponent);
+          vec3 col = mix(uBottomColor, uTopColor, t);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    })
+    skyDome = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 18), skyMat)
+    scene.add(skyDome)
 
     for (const cfg of SLOT_CONFIGS) {
       const group = new THREE.Group()
@@ -408,6 +568,60 @@
     if (dom.lightIntensity) dom.lightIntensity.value = String(asNumber(cfg.intensity, 2.4))
   }
 
+  function applyEnvironmentPreset(presetKey, shouldSave = true) {
+    const key = (presetKey && ENVIRONMENT_PRESETS[presetKey]) ? presetKey : 'duskCinema'
+    const preset = ENVIRONMENT_PRESETS[key]
+    state.layout.environmentPreset = key
+
+    if (sceneLights.ambient) {
+      sceneLights.ambient.color.set(preset.ambientColor)
+      sceneLights.ambient.intensity = preset.ambientIntensity
+    }
+    if (sceneLights.hemi) {
+      sceneLights.hemi.color.set(preset.hemiSkyColor)
+      sceneLights.hemi.groundColor.set(preset.hemiGroundColor)
+      sceneLights.hemi.intensity = preset.hemiIntensity
+    }
+    if (sceneLights.key) {
+      sceneLights.key.color.set(preset.keyColor)
+      sceneLights.key.intensity = preset.keyIntensity
+      sceneLights.key.position.set(preset.keyPos.x, preset.keyPos.y, preset.keyPos.z)
+    }
+    if (sceneLights.fill) {
+      sceneLights.fill.color.set(preset.fillColor)
+      sceneLights.fill.intensity = preset.fillIntensity
+      sceneLights.fill.position.set(preset.fillPos.x, preset.fillPos.y, preset.fillPos.z)
+    }
+    if (skyDome && skyDome.material && skyDome.material.uniforms) {
+      skyDome.material.uniforms.uTopColor.value.set(preset.skyTop)
+      skyDome.material.uniforms.uBottomColor.value.set(preset.skyBottom)
+    }
+    if (scene) {
+      scene.background = new THREE.Color(preset.skyBottom)
+      const fogStrength = Math.max(0, Math.min(3, asNumber(state.layout.fogStrength, 1)))
+      const strength01 = Math.max(0, Math.min(1, fogStrength / 3))
+      const near = Math.max(0.2, preset.fogNear * (1 - 0.85 * strength01))
+      const far = Math.max(near + 2, preset.fogFar * (1 - 0.88 * strength01))
+      scene.fog = state.layout.fogEnabled ? new THREE.Fog(preset.fogColor, near, far) : null
+    }
+    if (dom.fogOverlay) {
+      const fogStrength = Math.max(0, Math.min(3, asNumber(state.layout.fogStrength, 1)))
+      const strength01 = Math.max(0, Math.min(1, fogStrength / 3))
+      const alpha = state.layout.fogEnabled ? (0.03 + Math.pow(strength01, 0.82) * 0.36) : 0
+      dom.fogOverlay.style.backgroundColor = preset.fogColor
+      dom.fogOverlay.style.opacity = String(alpha.toFixed(3))
+    }
+    if (shadowGround && shadowGround.material) {
+      const strength = Math.max(0, Math.min(1, asNumber(state.layout.shadowStrength, preset.shadowOpacity)))
+      shadowGround.material.opacity = strength
+    }
+    if (dom.environmentPresetSelect) dom.environmentPresetSelect.value = key
+    if (dom.fogEnabled) dom.fogEnabled.checked = !!state.layout.fogEnabled
+    if (dom.fogStrength) dom.fogStrength.value = String(Math.max(0, Math.min(3, asNumber(state.layout.fogStrength, 1))).toFixed(2))
+    if (dom.shadowStrength) dom.shadowStrength.value = String(Math.max(0, Math.min(1, asNumber(state.layout.shadowStrength, preset.shadowOpacity))).toFixed(2))
+    if (shouldSave) scheduleSaveLayout()
+  }
+
   function applyOrbitFromLayout() {
     const cam = state.layout.camera
     orbit.target = { ...cam.target }
@@ -514,18 +728,53 @@
     cameraTransition = null
   }
 
+  function normalizeAngleRad(value) {
+    let v = value
+    while (v > Math.PI) v -= Math.PI * 2
+    while (v < -Math.PI) v += Math.PI * 2
+    return v
+  }
+
+  function lerpAngleRad(from, to, t) {
+    const delta = normalizeAngleRad(to - from)
+    return from + delta * t
+  }
+
+  function buildOrbitStateFromFrame(frame) {
+    const target = ensureVec3(frame?.target, state.layout.camera.target)
+    const position = ensureVec3(frame?.position, state.layout.camera.position)
+    const dx = position.x - target.x
+    const dy = position.y - target.y
+    const dz = position.z - target.z
+    const radius = Math.max(CAMERA_EPSILON_RADIUS, Math.sqrt(dx * dx + dy * dy + dz * dz))
+    return {
+      target,
+      radius,
+      yaw: Math.atan2(dx, dz),
+      pitch: Math.asin(Math.max(-0.99, Math.min(0.99, dy / Math.max(0.0001, radius))))
+    }
+  }
+
   function startCameraTransition(targetFrame, durationMs, reason = '') {
     if (!camera || !targetFrame) return
     const duration = Math.max(50, Math.min(10000, asNumber(durationMs, 900)))
-    const toPosition = ensureVec3(targetFrame.position, state.layout.camera.position)
-    const toTarget = ensureVec3(targetFrame.target, state.layout.camera.target)
+    const toState = buildOrbitStateFromFrame(targetFrame)
+    if (pendingEntranceEffects.size) {
+      pendingEntranceEffects.forEach((rootModel) => {
+        if (rootModel) rootModel.visible = false
+      })
+    }
     cameraTransition = {
       startAt: performance.now(),
       duration,
-      fromPosition: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
       fromTarget: { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z },
-      toPosition,
-      toTarget,
+      fromYaw: orbit.yaw,
+      fromPitch: orbit.pitch,
+      fromRadius: orbit.radius,
+      toTarget: { ...toState.target },
+      toYaw: toState.yaw,
+      toPitch: toState.pitch,
+      toRadius: toState.radius,
       reason
     }
   }
@@ -536,36 +785,46 @@
     const t = Math.max(0, Math.min(1, (now - cameraTransition.startAt) / Math.max(1, cameraTransition.duration)))
     const eased = 1 - Math.pow(1 - t, 3)
 
-    const p = {
-      x: cameraTransition.fromPosition.x + (cameraTransition.toPosition.x - cameraTransition.fromPosition.x) * eased,
-      y: cameraTransition.fromPosition.y + (cameraTransition.toPosition.y - cameraTransition.fromPosition.y) * eased,
-      z: cameraTransition.fromPosition.z + (cameraTransition.toPosition.z - cameraTransition.fromPosition.z) * eased
-    }
     orbit.target = {
       x: cameraTransition.fromTarget.x + (cameraTransition.toTarget.x - cameraTransition.fromTarget.x) * eased,
       y: cameraTransition.fromTarget.y + (cameraTransition.toTarget.y - cameraTransition.fromTarget.y) * eased,
       z: cameraTransition.fromTarget.z + (cameraTransition.toTarget.z - cameraTransition.fromTarget.z) * eased
     }
     orbit.desiredTarget = { ...orbit.target }
-    camera.position.set(p.x, p.y, p.z)
-    camera.lookAt(orbit.target.x, orbit.target.y, orbit.target.z)
-
-    const dx = p.x - orbit.target.x
-    const dy = p.y - orbit.target.y
-    const dz = p.z - orbit.target.z
-    orbit.radius = Math.max(CAMERA_EPSILON_RADIUS, Math.sqrt(dx * dx + dy * dy + dz * dz))
-    orbit.yaw = Math.atan2(dx, dz)
-    orbit.pitch = Math.asin(Math.max(-0.99, Math.min(0.99, dy / Math.max(0.0001, orbit.radius))))
+    orbit.radius = Math.max(CAMERA_EPSILON_RADIUS, cameraTransition.fromRadius + (cameraTransition.toRadius - cameraTransition.fromRadius) * eased)
+    orbit.yaw = lerpAngleRad(cameraTransition.fromYaw, cameraTransition.toYaw, eased)
+    orbit.pitch = cameraTransition.fromPitch + (cameraTransition.toPitch - cameraTransition.fromPitch) * eased
     orbit.desiredRadius = orbit.radius
     orbit.desiredYaw = orbit.yaw
     orbit.desiredPitch = orbit.pitch
+    updateCameraFromOrbit(true)
 
     if (t >= 1) {
       const reason = cameraTransition.reason
       cameraTransition = null
       saveCameraToLayout()
+      flushPendingEntranceEffects()
       if (reason) setStatus(`镜头已切换: ${reason}`)
     }
+  }
+
+  function enqueueEntranceEffect(modelRoot) {
+    if (!modelRoot) return
+    if (cameraTransition) {
+      modelRoot.visible = false
+      pendingEntranceEffects.add(modelRoot)
+      return
+    }
+    startEntranceEffect(modelRoot)
+  }
+
+  function flushPendingEntranceEffects() {
+    if (!pendingEntranceEffects.size) return
+    const roots = Array.from(pendingEntranceEffects)
+    pendingEntranceEffects.clear()
+    roots.forEach((rootModel) => {
+      if (rootModel && rootModel.parent) startEntranceEffect(rootModel)
+    })
   }
 
   function getSelectedCameraEventKey() {
@@ -576,6 +835,9 @@
   function syncCameraEditorInputs() {
     if (dom.cameraTransitionMs) {
       dom.cameraTransitionMs.value = String(Math.max(50, Math.min(10000, asNumber(state.layout.cameraTransitionMs, 900))))
+    }
+    if (dom.entranceEffectSelect) {
+      dom.entranceEffectSelect.value = state.layout?.entranceEffect || 'fade'
     }
     const eventKey = getSelectedCameraEventKey()
     const frame = state.layout?.cameraKeyframes?.[eventKey]
@@ -620,7 +882,6 @@
     const duration = Math.max(50, Math.min(10000, asNumber(dom.cameraTransitionMs ? dom.cameraTransitionMs.value : state.layout.cameraTransitionMs, state.layout.cameraTransitionMs)))
     state.layout.cameraTransitionMs = duration
     startCameraTransition(frame, duration, `预览 ${CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey}`)
-    scheduleSaveLayout()
   }
 
   function triggerCameraEvent(eventKey) {
@@ -628,6 +889,22 @@
     if (!frame) return
     const eventLabel = CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey
     startCameraTransition(frame, state.layout.cameraTransitionMs, eventLabel)
+  }
+
+  function requestCameraEvent(eventKey) {
+    if (!eventKey) return
+    if (bpRoleSyncRunning) {
+      pendingCameraEventKey = eventKey
+      return
+    }
+    triggerCameraEvent(eventKey)
+  }
+
+  function flushPendingCameraEvent() {
+    if (!pendingCameraEventKey) return
+    const key = pendingCameraEventKey
+    pendingCameraEventKey = ''
+    triggerCameraEvent(key)
   }
 
   function applyTransformToGroup(key, transform) {
@@ -656,6 +933,8 @@
   function removeModelFromSlot(key) {
     const runtime = slotRuntime.get(key)
     if (!runtime || !runtime.group) return
+    if (runtime.model) pendingEntranceEffects.delete(runtime.model)
+    stopEntranceEffectsForRoot(runtime.model)
     while (runtime.group.children.length) {
       const child = runtime.group.children.pop()
       disposeObject(child)
@@ -681,6 +960,244 @@
     if (obj.parent) obj.parent.remove(obj)
   }
 
+  function prepareModelForShadows(obj) {
+    if (!obj) return
+    obj.traverse((node) => {
+      if (node && node.isMesh) {
+        node.castShadow = true
+        node.receiveShadow = true
+      }
+    })
+  }
+
+  function stopEntranceEffectsForRoot(modelRoot) {
+    if (!modelRoot || !activeEntranceEffects.length) return
+    for (let i = activeEntranceEffects.length - 1; i >= 0; i--) {
+      const fx = activeEntranceEffects[i]
+      if (fx.modelRoot !== modelRoot) continue
+      if (Array.isArray(fx.entries)) {
+        fx.entries.forEach((entry) => {
+          entry.materials.forEach((mat) => {
+            if (!mat) return
+            if (fx.type === 'flameDissolve') {
+              if (mat.userData?.__asgDissolveUniforms) {
+                mat.userData.__asgDissolveUniforms.uProgress.value = 1
+              }
+            }
+            if (Number.isFinite(mat.userData?.__entranceOriginalOpacity)) {
+              mat.opacity = mat.userData.__entranceOriginalOpacity
+            }
+            if (typeof mat.userData?.__entranceOriginalTransparent === 'boolean') {
+              mat.transparent = mat.userData.__entranceOriginalTransparent
+            }
+            if (typeof mat.userData?.__entranceOriginalDepthWrite === 'boolean') {
+              mat.depthWrite = mat.userData.__entranceOriginalDepthWrite
+            }
+            mat.needsUpdate = true
+          })
+        })
+      }
+      activeEntranceEffects.splice(i, 1)
+    }
+  }
+
+  function attachDissolveShader(mat, minY, maxY) {
+    if (!mat) return
+    if (!mat.userData) mat.userData = {}
+    const uniforms = {
+      uProgress: { value: 0 },
+      uMinY: { value: minY },
+      uMaxY: { value: Math.max(minY + 0.0001, maxY) },
+      uNoiseAmp: { value: 0.1 },
+      uEdgeWidth: { value: 0.075 }
+    }
+    mat.userData.__asgDissolveUniforms = uniforms
+    const prevOnBeforeCompile = mat.onBeforeCompile
+    const prevCacheKey = mat.customProgramCacheKey ? mat.customProgramCacheKey.bind(mat) : null
+    mat.onBeforeCompile = (shader) => {
+      if (typeof prevOnBeforeCompile === 'function') prevOnBeforeCompile(shader)
+      shader.uniforms.uAsgProgress = uniforms.uProgress
+      shader.uniforms.uAsgMinY = uniforms.uMinY
+      shader.uniforms.uAsgMaxY = uniforms.uMaxY
+      shader.uniforms.uAsgNoiseAmp = uniforms.uNoiseAmp
+      shader.uniforms.uAsgEdgeWidth = uniforms.uEdgeWidth
+
+      if (!shader.vertexShader.includes('varying float vAsgWorldY;')) {
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <common>',
+          `#include <common>
+varying float vAsgWorldY;
+varying vec3 vAsgWorldPos;`
+        )
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+vec4 asgWorldPos = modelMatrix * vec4(transformed, 1.0);
+vAsgWorldY = asgWorldPos.y;
+vAsgWorldPos = asgWorldPos.xyz;`
+        )
+      }
+
+      if (!shader.fragmentShader.includes('uniform float uAsgProgress;')) {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <common>',
+          `#include <common>
+varying float vAsgWorldY;
+varying vec3 vAsgWorldPos;
+uniform float uAsgProgress;
+uniform float uAsgMinY;
+uniform float uAsgMaxY;
+uniform float uAsgNoiseAmp;
+uniform float uAsgEdgeWidth;
+float asgHash21(vec2 p){
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}`
+        )
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <alphatest_fragment>',
+          `float asgSpan = max(0.0001, uAsgMaxY - uAsgMinY);
+float asgH = clamp((vAsgWorldY - uAsgMinY) / asgSpan, 0.0, 1.0);
+float asgN = asgHash21(vAsgWorldPos.xz * 2.8 + vec2(asgH * 3.1, asgH * 1.7));
+float asgCut = uAsgProgress + (asgN - 0.5) * uAsgNoiseAmp;
+if (asgH > asgCut) discard;
+float asgEdge = 1.0 - smoothstep(0.0, uAsgEdgeWidth, abs(asgH - asgCut));
+diffuseColor.rgb += vec3(1.0, 0.36, 0.07) * asgEdge * 0.95;
+diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
+#include <alphatest_fragment>`
+        )
+      }
+      mat.userData.__asgDissolveShader = shader
+    }
+    mat.customProgramCacheKey = () => {
+      const base = prevCacheKey ? prevCacheKey() : ''
+      return `${base}|asg-dissolve-v3`
+    }
+    mat.needsUpdate = true
+  }
+
+  function startEntranceEffect(modelRoot) {
+    if (!modelRoot) return
+    modelRoot.visible = true
+    stopEntranceEffectsForRoot(modelRoot)
+    const effectType = state.layout?.entranceEffect || 'fade'
+    if (effectType === 'none') return
+    const materialEntries = []
+    let fx = null
+    let box = null
+
+    if (effectType === 'flameDissolve') {
+      box = new THREE.Box3().setFromObject(modelRoot)
+      if (!Number.isFinite(box.min.y) || !Number.isFinite(box.max.y)) return
+      fx = {
+        type: effectType,
+        modelRoot,
+        minY: box.min.y - 0.18,
+        maxY: box.max.y + 0.18,
+        startedAt: performance.now(),
+        durationMs: 2200
+      }
+    } else {
+      fx = {
+        type: effectType,
+        entries: materialEntries,
+        modelRoot,
+        startedAt: performance.now(),
+        durationMs: 1500
+      }
+    }
+
+    modelRoot.traverse((node) => {
+      if (!node || !node.isMesh) return
+      const originalMaterial = node.material
+      const materials = Array.isArray(originalMaterial)
+        ? originalMaterial.map((mat) => (mat && typeof mat.clone === 'function' ? mat.clone() : mat))
+        : [(originalMaterial && typeof originalMaterial.clone === 'function') ? originalMaterial.clone() : originalMaterial]
+      node.material = Array.isArray(originalMaterial) ? materials : materials[0]
+      materials.forEach((mat) => {
+        if (!mat) return
+        if (!mat.userData) mat.userData = {}
+        mat.userData.__entranceOriginalOpacity = Number.isFinite(mat.opacity) ? mat.opacity : 1
+        mat.userData.__entranceOriginalTransparent = !!mat.transparent
+        mat.userData.__entranceOriginalDepthWrite = mat.depthWrite !== false
+        if (effectType === 'flameDissolve') {
+          mat.transparent = true
+          mat.depthWrite = true
+          mat.opacity = Number.isFinite(mat.userData.__entranceOriginalOpacity) ? mat.userData.__entranceOriginalOpacity : 1
+          attachDissolveShader(mat, fx.minY, fx.maxY)
+          if ('emissiveIntensity' in mat && Number.isFinite(mat.emissiveIntensity)) {
+            mat.userData.__entranceOriginalEmissiveIntensity = mat.emissiveIntensity
+          }
+        } else {
+          mat.transparent = true
+          mat.opacity = 0.01
+          mat.depthWrite = mat.userData.__entranceOriginalDepthWrite
+        }
+        mat.needsUpdate = true
+      })
+      materialEntries.push({ node, materials })
+    })
+    if (!materialEntries.length) return
+    fx.entries = materialEntries
+    activeEntranceEffects.push(fx)
+  }
+
+  function updateEntranceEffects() {
+    if (!activeEntranceEffects.length) return
+    const now = performance.now()
+    for (let i = activeEntranceEffects.length - 1; i >= 0; i--) {
+      const fx = activeEntranceEffects[i]
+      const t = Math.max(0, Math.min(1, (now - fx.startedAt) / fx.durationMs))
+      const eased = 1 - Math.pow(1 - t, 3)
+      if (fx.type === 'flameDissolve') {
+        fx.entries.forEach((entry) => {
+          entry.materials.forEach((mat) => {
+            if (!mat) return
+            if (mat.userData?.__asgDissolveUniforms) {
+              mat.userData.__asgDissolveUniforms.uProgress.value = eased
+            }
+          })
+        })
+      } else {
+        fx.entries.forEach((entry) => {
+          entry.materials.forEach((mat) => {
+            if (!mat) return
+            const baseOpacity = Number.isFinite(mat.userData?.__entranceOriginalOpacity)
+              ? mat.userData.__entranceOriginalOpacity
+              : 1
+            mat.opacity = Math.max(0.01, eased * baseOpacity)
+          })
+        })
+      }
+      if (t >= 1) {
+        fx.entries.forEach((entry) => {
+          entry.materials.forEach((mat) => {
+            if (!mat) return
+            if (fx.type === 'flameDissolve') {
+              if (mat.userData?.__asgDissolveUniforms) {
+                mat.userData.__asgDissolveUniforms.uProgress.value = 1
+              }
+              if ('emissiveIntensity' in mat && Number.isFinite(mat.emissiveIntensity)) {
+                mat.emissiveIntensity = Number.isFinite(mat.userData?.__entranceOriginalEmissiveIntensity)
+                  ? mat.userData.__entranceOriginalEmissiveIntensity
+                  : 1
+              }
+            } else {
+              mat.opacity = Number.isFinite(mat.userData?.__entranceOriginalOpacity)
+                ? mat.userData.__entranceOriginalOpacity
+                : 1
+              mat.transparent = !!mat.userData?.__entranceOriginalTransparent
+              mat.depthWrite = mat.userData?.__entranceOriginalDepthWrite !== false
+            }
+            mat.needsUpdate = true
+          })
+        })
+        activeEntranceEffects.splice(i, 1)
+      }
+    }
+  }
+
 
   async function loadModelForSlot(key, modelPath) {
     const runtime = slotRuntime.get(key)
@@ -688,7 +1205,7 @@
     const nextPath = modelPath ? String(modelPath).trim() : ''
     if (!nextPath) {
       removeModelFromSlot(key)
-      return
+      return { success: true, cleared: true }
     }
     if (runtime.modelPath === nextPath && runtime.model) return
     if (runtime.loadingPath === nextPath) return
@@ -699,7 +1216,7 @@
     runtime.loadSeq = (runtime.loadSeq || 0) + 1
     const seq = runtime.loadSeq
     const url = normalizeFileUrl(nextPath)
-    if (!url) return
+    if (!url) return { success: false, error: 'invalid-url' }
     const ext = getPathExt(nextPath)
 
     const shortPath = String(modelPath).split(/[\\/]/).slice(-2).join('/')
@@ -707,17 +1224,18 @@
     const onLoadedObject = (obj, animations = []) => {
       if (runtime.loadSeq !== seq) {
         try { if (obj) disposeObject(obj) } catch { }
-        return
+        return { success: false, stale: true }
       }
       if (!obj) {
         runtime.loadingPath = ''
         setStatus(`模型无效: ${runtime.cfg.label}`)
-        return
+        return { success: false, error: 'invalid-object' }
       }
       // 再次清空，保证同槽位始终只保留 1 个实例
       removeModelFromSlot(key)
       runtime.modelPath = nextPath
       runtime.model = obj
+      prepareModelForShadows(obj)
       runtime.group.add(obj)
       if (Array.isArray(animations) && animations.length) {
         const mixer = new THREE.AnimationMixer(obj)
@@ -726,8 +1244,12 @@
         })
         mixers.set(key, mixer)
       }
+      if (runtime.cfg && (runtime.cfg.roleType === 'survivor' || runtime.cfg.roleType === 'hunter')) {
+        enqueueEntranceEffect(obj)
+      }
       runtime.loadingPath = ''
       setStatus(`加载完成: ${runtime.cfg.label}`)
+      return { success: true }
     }
     const onError = (error) => {
       if (runtime.loadSeq !== seq) return
@@ -736,15 +1258,23 @@
       console.error('[CharacterModel3D] 模型加载失败:', key, modelPath, error)
     }
 
-    if (ext === '.obj') {
-      loadObjModelWithOptionalMtl(url, (obj) => onLoadedObject(obj, []), onError)
-      return
-    }
+    return await new Promise((resolve) => {
+      const doneLoaded = (obj, animations = []) => resolve(onLoadedObject(obj, animations))
+      const doneError = (err) => {
+        onError(err)
+        resolve({ success: false, error: err?.message || String(err) })
+      }
 
-    gltfLoader.load(url, (gltf) => {
-      const obj = gltf && gltf.scene ? gltf.scene : null
-      onLoadedObject(obj, (gltf && Array.isArray(gltf.animations)) ? gltf.animations : [])
-    }, undefined, onError)
+      if (ext === '.obj') {
+        loadObjModelWithOptionalMtl(url, (obj) => doneLoaded(obj, []), doneError)
+        return
+      }
+
+      gltfLoader.load(url, (gltf) => {
+        const obj = gltf && gltf.scene ? gltf.scene : null
+        doneLoaded(obj, (gltf && Array.isArray(gltf.animations)) ? gltf.animations : [])
+      }, undefined, doneError)
+    })
   }
 
   function sanitizeRoleName(name) {
@@ -782,16 +1312,23 @@
 
   async function updateRoleModelsByBp() {
     const survivors = Array.isArray(state.bp.survivors) ? state.bp.survivors : [null, null, null, null]
+    const survivorModelPromises = []
+    for (let i = 0; i < 4; i++) {
+      const roleName = survivors[i] || ''
+      survivorModelPromises.push(findOfficialModel(roleName))
+    }
+    const survivorModels = await Promise.all(survivorModelPromises)
     for (let i = 0; i < 4; i++) {
       const roleName = survivors[i] || ''
       const slotKey = `survivor${i + 1}`
       state.slotDisplayNames[slotKey] = roleName || ''
-      const modelPath = await findOfficialModel(roleName)
+      const modelPath = survivorModels[i] || ''
       state.slotModelPaths[slotKey] = modelPath || ''
       if (roleName && !modelPath) {
         setStatus(`未命中本地模型: ${slotKey} -> ${roleName}`)
       }
       await loadModelForSlot(slotKey, modelPath)
+      await new Promise((r) => setTimeout(r, 0))
     }
     const hunterName = state.bp.hunter || ''
     state.slotDisplayNames.hunter = hunterName || ''
@@ -802,6 +1339,23 @@
     }
     await loadModelForSlot('hunter', hunterModel)
     renderSlotTabs()
+  }
+
+  async function runBpRoleSyncLoop() {
+    if (bpRoleSyncRunning) {
+      bpRoleSyncPending = true
+      return
+    }
+    bpRoleSyncRunning = true
+    try {
+      do {
+        bpRoleSyncPending = false
+        await updateRoleModelsByBp()
+      } while (bpRoleSyncPending)
+    } finally {
+      bpRoleSyncRunning = false
+      flushPendingCameraEvent()
+    }
   }
 
   function snapshotTransformFromGroup(key) {
@@ -942,6 +1496,7 @@
       applyTransformToGroup(cfg.key, state.layout.slots[cfg.key])
     }
     applyLightSettings('light1')
+    applyEnvironmentPreset(state.layout.environmentPreset, false)
     applyMode(state.layout.mode)
     applyOrbitFromLayout()
     renderSlotTabs()
@@ -1031,6 +1586,46 @@
       dom.cameraTransitionMs.addEventListener('change', () => {
         state.layout.cameraTransitionMs = Math.max(50, Math.min(10000, asNumber(dom.cameraTransitionMs.value, 900)))
         dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
+        scheduleSaveLayout()
+      })
+    }
+    if (dom.applyEnvironmentPresetBtn) {
+      dom.applyEnvironmentPresetBtn.addEventListener('click', () => {
+        const next = dom.environmentPresetSelect ? dom.environmentPresetSelect.value : state.layout.environmentPreset
+        applyEnvironmentPreset(next, true)
+      })
+    }
+    if (dom.environmentPresetSelect) {
+      dom.environmentPresetSelect.addEventListener('change', () => {
+        applyEnvironmentPreset(dom.environmentPresetSelect.value, true)
+      })
+    }
+    if (dom.fogEnabled) {
+      dom.fogEnabled.addEventListener('change', () => {
+        state.layout.fogEnabled = !!dom.fogEnabled.checked
+        applyEnvironmentPreset(state.layout.environmentPreset, true)
+        setStatus(`雾化效果滤镜: ${state.layout.fogEnabled ? '开启' : '关闭'}`)
+      })
+    }
+    if (dom.fogStrength) {
+      dom.fogStrength.addEventListener('change', () => {
+        state.layout.fogStrength = Math.max(0, Math.min(3, asNumber(dom.fogStrength.value, 1)))
+        dom.fogStrength.value = state.layout.fogStrength.toFixed(2)
+        applyEnvironmentPreset(state.layout.environmentPreset, true)
+        setStatus(`雾化强度: ${state.layout.fogStrength.toFixed(2)}`)
+      })
+    }
+    if (dom.shadowStrength) {
+      dom.shadowStrength.addEventListener('change', () => {
+        state.layout.shadowStrength = Math.max(0, Math.min(1, asNumber(dom.shadowStrength.value, 0.45)))
+        dom.shadowStrength.value = state.layout.shadowStrength.toFixed(2)
+        applyEnvironmentPreset(state.layout.environmentPreset, true)
+      })
+    }
+    if (dom.entranceEffectSelect) {
+      dom.entranceEffectSelect.addEventListener('change', () => {
+        const next = dom.entranceEffectSelect.value
+        state.layout.entranceEffect = (next === 'none' || next === 'flameDissolve') ? next : 'fade'
         scheduleSaveLayout()
       })
     }
@@ -1187,6 +1782,7 @@
     for (const mixer of mixers.values()) {
       try { mixer.update(dt) } catch { }
     }
+    updateEntranceEffects()
     if (cameraMoveState.dir && !cameraTransition) {
       moveCameraByDirection(cameraMoveState.dir, dt * 5.2, false, false)
     }
@@ -1238,17 +1834,19 @@
     if (nextSurvivorCount === 0 && !nextHunterSelected) {
       cancelCameraTransition()
     } else {
-      for (let i = prevSurvivorCount + 1; i <= nextSurvivorCount && i <= 4; i++) {
-        triggerCameraEvent(`survivor${i}`)
+      let cameraEventKey = ''
+      if (nextSurvivorCount > prevSurvivorCount) {
+        cameraEventKey = `survivor${Math.min(nextSurvivorCount, 4)}`
       }
       if (!prevHunterSelected && nextHunterSelected) {
-        triggerCameraEvent('hunterSelected')
+        cameraEventKey = 'hunterSelected'
       }
+      if (cameraEventKey) requestCameraEvent(cameraEventKey)
     }
 
     // 注意：这里不覆盖本窗口相机/布局，避免切换视角后被回退。
     // 只做 BP 角色同步。
-    updateRoleModelsByBp()
+    runBpRoleSyncLoop()
   }
 
   async function loadInitialState() {

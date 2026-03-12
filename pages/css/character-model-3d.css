@@ -166,6 +166,16 @@ select {
   inset: 0;
 }
 
+.fog-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  opacity: 0;
+  background: rgba(32, 24, 38, 0.0);
+  transition: opacity 160ms ease;
+}
+
 .status-bar {
   position: fixed;
   left: 12px;

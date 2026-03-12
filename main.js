@@ -237,6 +237,40 @@ function normalizeLocalPagesConfig(input) {
   return { port, host, pages }
 }
 
+function isPrivateLanAddress(ip) {
+  if (typeof ip !== 'string') return false
+  if (/^10\./.test(ip)) return true
+  if (/^192\.168\./.test(ip)) return true
+  const m = ip.match(/^172\.(\d{1,3})\./)
+  if (m) {
+    const n = Number(m[1])
+    if (Number.isFinite(n) && n >= 16 && n <= 31) return true
+  }
+  return false
+}
+
+function isExcludedLanAddress(ip) {
+  if (typeof ip !== 'string' || !ip) return true
+  if (/^127\./.test(ip)) return true
+  if (/^169\.254\./.test(ip)) return true
+  // RFC 2544 benchmarking network, often来自虚拟网卡（如 198.18.x.x）
+  if (/^198\.(18|19)\./.test(ip)) return true
+  return false
+}
+
+function getInterfacePriority(name, address) {
+  let score = 0
+  if (isPrivateLanAddress(address)) score += 100
+  const n = String(name || '').toLowerCase()
+  if (/(loopback|virtual|vmware|vbox|hyper-v|npcap|tap|tun|docker|wsl|bridge)/.test(n)) {
+    score -= 80
+  }
+  if (/(ethernet|以太网|wifi|wlan|无线|lan)/.test(n)) {
+    score += 12
+  }
+  return score
+}
+
 function getNetworkInterfaces() {
   const interfaces = os.networkInterfaces()
   const results = []
@@ -245,10 +279,16 @@ function getNetworkInterfaces() {
       if ('IPv4' !== iface.family || iface.internal) {
         continue
       }
+      if (isExcludedLanAddress(iface.address)) continue
       results.push({ name, address: iface.address })
     }
   }
-  return results
+  return results.sort((a, b) => {
+    const sa = getInterfacePriority(a.name, a.address)
+    const sb = getInterfacePriority(b.name, b.address)
+    if (sb !== sa) return sb - sa
+    return String(a.name).localeCompare(String(b.name), 'zh-CN')
+  })
 }
 
 function getLanIp() {
@@ -1976,9 +2016,15 @@ ipcMain.handle('local-pages:set-host', async (event, host) => {
     reason: prevHost === nextHost ? 'start' : 'host-change'
   })
   if (!restartResult || restartResult.success === false) {
+    // 回滚到旧 host，保证服务可用且界面状态一致
+    config.host = prevHost
+    writeJsonFileSafe(localPagesConfigPath, config)
+    try {
+      await startLocalPagesServer({ reason: 'host-change-rollback' })
+    } catch {}
     return {
       success: false,
-      host: config.host,
+      host: prevHost,
       message: (restartResult && restartResult.error) ? restartResult.error : '重启本地页面服务器失败'
     }
   }
@@ -5648,6 +5694,11 @@ let localBpState = {
   characterModel3DLayout: {
     mode: 'edit',
     transparentBackground: true,
+    environmentPreset: 'duskCinema',
+    fogEnabled: true,
+    fogStrength: 1,
+    shadowStrength: 0.45,
+    entranceEffect: 'fade',
     survivorScale: 1,
     hunterScale: 1.1,
     scene: {
@@ -5657,6 +5708,14 @@ let localBpState = {
       scale: { x: 1, y: 1, z: 1 }
     },
     slots: {},
+    lights: {
+      light1: {
+        color: '#fff1d6',
+        intensity: 2.4,
+        distance: 0,
+        decay: 2
+      }
+    },
     camera: {
       position: { x: 0, y: 2, z: 8 },
       target: { x: 0, y: 1, z: 0 }
@@ -5719,6 +5778,19 @@ function __normalizeLocalBpStateInPlace__() {
   const m3d = localBpState.characterModel3DLayout
   m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
   m3d.transparentBackground = m3d.transparentBackground !== false
+  m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight' || m3d.environmentPreset === 'horrorNight')
+    ? m3d.environmentPreset
+    : 'duskCinema'
+  m3d.fogEnabled = m3d.fogEnabled !== false
+  m3d.fogStrength = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.fogStrength))
+    ? Number(m3d.fogStrength)
+    : 1))
+  m3d.shadowStrength = Math.max(0, Math.min(1, Number.isFinite(Number(m3d.shadowStrength))
+    ? Number(m3d.shadowStrength)
+    : 0.45))
+  m3d.entranceEffect = (m3d.entranceEffect === 'none' || m3d.entranceEffect === 'flameDissolve')
+    ? m3d.entranceEffect
+    : 'fade'
   m3d.survivorScale = Math.max(0.001, Number.isFinite(Number(m3d.survivorScale)) ? Number(m3d.survivorScale) : 1)
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
@@ -5753,6 +5825,21 @@ function __normalizeLocalBpStateInPlace__() {
       m3d.slots[key].scale = { x: m3d.hunterScale, y: m3d.hunterScale, z: m3d.hunterScale }
     }
   }
+
+  if (!m3d.lights || typeof m3d.lights !== 'object') m3d.lights = {}
+  if (!m3d.lights.light1 || typeof m3d.lights.light1 !== 'object') m3d.lights.light1 = {}
+  m3d.lights.light1.color = (typeof m3d.lights.light1.color === 'string' && m3d.lights.light1.color.trim())
+    ? m3d.lights.light1.color.trim()
+    : '#fff1d6'
+  m3d.lights.light1.intensity = Math.max(0, Number.isFinite(Number(m3d.lights.light1.intensity))
+    ? Number(m3d.lights.light1.intensity)
+    : 2.4)
+  m3d.lights.light1.distance = Math.max(0, Number.isFinite(Number(m3d.lights.light1.distance))
+    ? Number(m3d.lights.light1.distance)
+    : 0)
+  m3d.lights.light1.decay = Math.max(0, Number.isFinite(Number(m3d.lights.light1.decay))
+    ? Number(m3d.lights.light1.decay)
+    : 2)
 
   if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
   m3d.camera.position = ensureVec3(m3d.camera.position, { x: 0, y: 2, z: 8 })
@@ -5882,6 +5969,10 @@ function __loadCharacterModel3DLayoutFromDiskIntoState__() {
       slots: {
         ...(existing.slots || {}),
         ...(fromDisk.slots || {})
+      },
+      lights: {
+        ...(existing.lights || {}),
+        ...(fromDisk.lights || {})
       },
       camera: {
         ...(existing.camera || {}),
@@ -7604,6 +7695,19 @@ function normalizeCharacterModel3DLayoutInput(input) {
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
     transparentBackground: base.transparentBackground !== false,
+    environmentPreset: (base.environmentPreset === 'cyberpunkNight' || base.environmentPreset === 'horrorNight')
+      ? base.environmentPreset
+      : 'duskCinema',
+    fogEnabled: base.fogEnabled !== false,
+    fogStrength: Math.max(0, Math.min(3, Number.isFinite(Number(base.fogStrength))
+      ? Number(base.fogStrength)
+      : 1)),
+    shadowStrength: Math.max(0, Math.min(1, Number.isFinite(Number(base.shadowStrength))
+      ? Number(base.shadowStrength)
+      : 0.45)),
+    entranceEffect: (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
+      ? base.entranceEffect
+      : 'fade',
     survivorScale: Math.max(0.001, Number.isFinite(Number(base.survivorScale)) ? Number(base.survivorScale) : 1),
     hunterScale: Math.max(0.001, Number.isFinite(Number(base.hunterScale))
       ? Number(base.hunterScale)
@@ -7615,6 +7719,22 @@ function normalizeCharacterModel3DLayoutInput(input) {
       scale: ensureVec3(base?.scene?.scale, { x: 1, y: 1, z: 1 })
     },
     slots: {},
+    lights: {
+      light1: {
+        color: (typeof base?.lights?.light1?.color === 'string' && base.lights.light1.color.trim())
+          ? base.lights.light1.color.trim()
+          : '#fff1d6',
+        intensity: Math.max(0, Number.isFinite(Number(base?.lights?.light1?.intensity))
+          ? Number(base.lights.light1.intensity)
+          : 2.4),
+        distance: Math.max(0, Number.isFinite(Number(base?.lights?.light1?.distance))
+          ? Number(base.lights.light1.distance)
+          : 0),
+        decay: Math.max(0, Number.isFinite(Number(base?.lights?.light1?.decay))
+          ? Number(base.lights.light1.decay)
+          : 2)
+      }
+    },
     camera: {
       position: ensureVec3(base?.camera?.position, { x: 0, y: 2, z: 8 }),
       target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 })
@@ -7776,6 +7896,7 @@ ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
       ...incoming,
       scene: { ...(prev.scene || {}), ...(incoming.scene || {}) },
       slots: { ...(prev.slots || {}), ...(incoming.slots || {}) },
+      lights: { ...(prev.lights || {}), ...(incoming.lights || {}) },
       camera: { ...(prev.camera || {}), ...(incoming.camera || {}) }
     }
     __normalizeLocalBpStateInPlace__()

@@ -309,6 +309,21 @@ async function initLocalPagesWidget() {
   await refreshLocalPagesStatus()
   await refreshLocalPagesList()
   loadLocalPageAiSettings()
+  const hostSelectEl = document.getElementById('localPagesHostSelect')
+  if (hostSelectEl && !hostSelectEl.dataset.changeBound) {
+    hostSelectEl.dataset.changeBound = 'true'
+    hostSelectEl.addEventListener('change', async () => {
+      const nextHost = hostSelectEl.value || '127.0.0.1'
+      const baseUrlEl = document.getElementById('localPagesBaseUrl')
+      if (baseUrlEl && localPagesBaseUrl) {
+        const previewHost = nextHost === '0.0.0.0' ? (hostSelectEl.dataset.lastLanIp || '127.0.0.1') : nextHost
+        baseUrlEl.textContent = localPagesBaseUrl
+          .replace('://localhost:', `://${previewHost}:`)
+          .replace('://127.0.0.1:', `://${previewHost}:`)
+      }
+      await onLocalPagesHostChange()
+    })
+  }
   const aiModal = document.getElementById('localPageAiModal')
   if (aiModal && !aiModal.dataset.clickBound) {
     aiModal.dataset.clickBound = 'true'
@@ -532,10 +547,17 @@ async function onLocalPagesHostChange() {
     if (res && res.success) {
       if (typeof showStatus === 'function') showStatus('已更新监听地址', 'success')
       await refreshLocalPagesList()
+      await refreshLocalPagesStatus()
+      return
     }
+    if (typeof showStatus === 'function') showStatus((res && res.message) ? `更新失败：${res.message}` : '更新失败', 'error')
+    await refreshLocalPagesList()
+    await refreshLocalPagesStatus()
   } catch (e) {
     console.error(e)
     if (typeof showStatus === 'function') showStatus('更新失败', 'error')
+    await refreshLocalPagesList()
+    await refreshLocalPagesStatus()
   }
 }
 
@@ -575,6 +597,7 @@ async function refreshLocalPagesList() {
   }
   
   const lanIp = res.lanIp || '未检测到'
+  if (hostSelectEl) hostSelectEl.dataset.lastLanIp = lanIp
   if (lanIpHintEl) {
     if (currentHost === '0.0.0.0') {
       lanIpHintEl.textContent = `本机 IP: ${lanIp} (其他设备可通过此 IP 访问)`
