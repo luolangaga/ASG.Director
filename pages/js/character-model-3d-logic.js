@@ -82,10 +82,10 @@
     }
   }
   const QUALITY_PRESETS = {
-    low: { label: '低', pixelRatio: 1.0, shadowMap: 1536, shadowRadius: 0.8, exposure: 1.0, contrast: 1.0, cinemaOverlay: 0.0, rim: 0.0, bounce: 0.0 },
-    medium: { label: '中', pixelRatio: 1.35, shadowMap: 2048, shadowRadius: 1.0, exposure: 1.04, contrast: 1.04, cinemaOverlay: 0.0, rim: 0.08, bounce: 0.05 },
-    high: { label: '高', pixelRatio: 1.8, shadowMap: 3072, shadowRadius: 1.2, exposure: 1.08, contrast: 1.08, cinemaOverlay: 0.0, rim: 0.16, bounce: 0.11 },
-    cinematic: { label: '电影级', pixelRatio: 2.0, shadowMap: 4096, shadowRadius: 1.65, exposure: 1.14, contrast: 1.18, cinemaOverlay: 0.62, rim: 0.32, bounce: 0.2 }
+    low: { label: '低', pixelRatio: 1.0, shadowMap: 1024, shadowRadius: 0.75, exposure: 0.98, contrast: 1.0, cinemaOverlay: 0.0, rim: 0.03, bounce: 0.02 },
+    medium: { label: '中', pixelRatio: 1.25, shadowMap: 1536, shadowRadius: 0.95, exposure: 1.0, contrast: 1.03, cinemaOverlay: 0.0, rim: 0.06, bounce: 0.04 },
+    high: { label: '高', pixelRatio: 1.6, shadowMap: 2048, shadowRadius: 1.15, exposure: 1.02, contrast: 1.06, cinemaOverlay: 0.0, rim: 0.12, bounce: 0.08 },
+    cinematic: { label: '电影级', pixelRatio: 1.9, shadowMap: 3072, shadowRadius: 1.5, exposure: 1.06, contrast: 1.12, cinemaOverlay: 0.5, rim: 0.22, bounce: 0.14 }
   }
 
   const DEFAULT_LAYOUT = {
@@ -100,6 +100,14 @@
     entranceEffect: 'fade',
     entranceParticle: {
       path: ''
+    },
+    stylizedRender: {
+      toonEnabled: false,
+      toonSteps: 3,
+      outlineEnabled: true,
+      outlineThickness: 0.004,
+      outlineColor: '#000000',
+      outlineAlpha: 1
     },
     survivorScale: 1,
     hunterScale: 1.1,
@@ -189,6 +197,7 @@
   const lightRigs = new Map()
   let rafId = 0
   let clock = null
+  let outlineEffect = null
   let saveTimer = null
   let cameraTransition = null
   let fpsAccum = 0
@@ -202,6 +211,7 @@
   const activeEntranceEffects = []
   const pendingEntranceEffects = new Set()
   const activeParticleBursts = []
+  const toonGradientMapCache = new Map()
   const entranceParticleAsset = {
     path: '',
     scene: null,
@@ -251,6 +261,7 @@
     videoHeight: document.getElementById('videoHeight'),
     applyVideoSettingsBtn: document.getElementById('applyVideoSettingsBtn'),
     slotTabs: document.getElementById('slotTabs'),
+    focusSelectedBtn: document.getElementById('focusSelectedBtn'),
     posX: document.getElementById('posX'),
     posY: document.getElementById('posY'),
     posZ: document.getElementById('posZ'),
@@ -276,6 +287,12 @@
     , particleImportBtn: document.getElementById('particleImportBtn')
     , particleClearBtn: document.getElementById('particleClearBtn')
     , particleFileInfo: document.getElementById('particleFileInfo')
+    , stylizedToonEnabled: document.getElementById('stylizedToonEnabled')
+    , stylizedToonSteps: document.getElementById('stylizedToonSteps')
+    , stylizedOutlineEnabled: document.getElementById('stylizedOutlineEnabled')
+    , stylizedOutlineThickness: document.getElementById('stylizedOutlineThickness')
+    , stylizedOutlineColor: document.getElementById('stylizedOutlineColor')
+    , stylizedOutlineAlpha: document.getElementById('stylizedOutlineAlpha')
     , cameraMoveStep: document.getElementById('cameraMoveStep')
     , cameraMoveButtons: Array.from(document.querySelectorAll('[data-cam-move]'))
     , lightColor: document.getElementById('lightColor')
@@ -355,6 +372,14 @@
     out.entranceParticle = {
       path: (typeof base?.entranceParticle?.path === 'string') ? base.entranceParticle.path : ''
     }
+    out.stylizedRender = {
+      toonEnabled: !!base?.stylizedRender?.toonEnabled,
+      toonSteps: Math.max(2, Math.min(5, Math.round(asNumber(base?.stylizedRender?.toonSteps, 3)))),
+      outlineEnabled: base?.stylizedRender?.outlineEnabled !== false,
+      outlineThickness: Math.max(0.0005, Math.min(0.03, asNumber(base?.stylizedRender?.outlineThickness, 0.004))),
+      outlineColor: (typeof base?.stylizedRender?.outlineColor === 'string' && base.stylizedRender.outlineColor) ? base.stylizedRender.outlineColor : '#000000',
+      outlineAlpha: Math.max(0, Math.min(1, asNumber(base?.stylizedRender?.outlineAlpha, 1)))
+    }
     out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
     out.hunterScale = Math.max(0.001, asNumber(base?.hunterScale, out.slots.hunter.scale.x))
     out.videoScreen.path = typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : ''
@@ -432,7 +457,7 @@
   }
 
   async function ensureThreeRuntime() {
-    if (window.THREE && window.THREE.GLTFLoader && window.THREE.OBJLoader && window.THREE.MTLLoader) {
+    if (window.THREE && window.THREE.GLTFLoader && window.THREE.OBJLoader && window.THREE.MTLLoader && window.THREE.OutlineEffect) {
       THREE = window.THREE
       return true
     }
@@ -444,8 +469,10 @@
     if (!objOk) return false
     const mtlOk = await loadScript('./js/three/MTLLoader.js')
     if (!mtlOk) return false
+    const outlineOk = await loadScript('./js/three/OutlineEffect.js')
+    if (!outlineOk) return false
     THREE = window.THREE
-    return !!(THREE && THREE.GLTFLoader && THREE.OBJLoader && THREE.MTLLoader)
+    return !!(THREE && THREE.GLTFLoader && THREE.OBJLoader && THREE.MTLLoader && THREE.OutlineEffect)
   }
 
   function createSceneGraph() {
@@ -456,22 +483,28 @@
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.08
+    renderer.toneMappingExposure = 1.02
+    renderer.physicallyCorrectLights = true
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8))
     renderer.setSize(initW, initH)
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    outlineEffect = new THREE.OutlineEffect(renderer, {
+      defaultThickness: 0.004,
+      defaultColor: [0, 0, 0],
+      defaultAlpha: 1
+    })
     camera.updateProjectionMatrix()
     dom.renderRoot.innerHTML = ''
     dom.renderRoot.appendChild(renderer.domElement)
 
-    sceneLights.ambient = new THREE.AmbientLight(0xffffff, 0.75)
+    sceneLights.ambient = new THREE.AmbientLight(0xffffff, 0.46)
     scene.add(sceneLights.ambient)
 
-    sceneLights.hemi = new THREE.HemisphereLight(0xffc38a, 0x201020, 0.25)
+    sceneLights.hemi = new THREE.HemisphereLight(0xffc38a, 0x201020, 0.2)
     scene.add(sceneLights.hemi)
 
-    sceneLights.key = new THREE.DirectionalLight(0xffffff, 1.15)
+    sceneLights.key = new THREE.DirectionalLight(0xffffff, 1.35)
     sceneLights.key.position.set(6, 14, 10)
     sceneLights.key.castShadow = true
     sceneLights.key.shadow.mapSize.set(3072, 3072)
@@ -487,7 +520,7 @@
     scene.add(sceneLights.key.target)
     scene.add(sceneLights.key)
 
-    sceneLights.fill = new THREE.DirectionalLight(0x9fc5ff, 0.45)
+    sceneLights.fill = new THREE.DirectionalLight(0x9fc5ff, 0.3)
     sceneLights.fill.position.set(-10, 8, -6)
     scene.add(sceneLights.fill)
 
@@ -690,12 +723,14 @@
     if (!rig || !state.layout?.lights?.[key]) return
     const cfg = state.layout.lights[key]
     const intensity = Math.max(0, asNumber(cfg.intensity, 2.4))
+    // physicallyCorrectLights 开启后，PointLight 需要更高量级，保持旧 UI 手感
+    const intensityScale = (renderer && renderer.physicallyCorrectLights) ? 180 : 1
     const color = (typeof cfg.color === 'string' && cfg.color) ? cfg.color : '#fff1d6'
     const distance = Math.max(0, asNumber(cfg.distance, 0))
     const decay = Math.max(0, asNumber(cfg.decay, 2))
 
     rig.light.color.set(color)
-    rig.light.intensity = intensity
+    rig.light.intensity = intensity * intensityScale
     rig.light.distance = distance
     rig.light.decay = decay
     rig.bulbMesh.material.color.set(color)
@@ -740,6 +775,143 @@
         ? `contrast(${q.contrast}) saturate(1.06)`
         : `contrast(${q.contrast})`
     }
+    if (shouldSave) scheduleSaveLayout()
+  }
+
+  function getToonGradientMap(steps = 3) {
+    const n = Math.max(2, Math.min(5, Math.round(asNumber(steps, 3))))
+    if (toonGradientMapCache.has(n)) return toonGradientMapCache.get(n)
+    const data = new Uint8Array(n)
+    for (let i = 0; i < n; i++) {
+      data[i] = Math.round((i / Math.max(1, n - 1)) * 255)
+    }
+    const tex = new THREE.DataTexture(data, n, 1, THREE.LuminanceFormat)
+    tex.magFilter = THREE.NearestFilter
+    tex.minFilter = THREE.NearestFilter
+    tex.generateMipmaps = false
+    tex.needsUpdate = true
+    toonGradientMapCache.set(n, tex)
+    return tex
+  }
+
+  function buildToonMaterialFrom(sourceMat, steps = 3) {
+    if (!sourceMat) return sourceMat
+    const toonMat = new THREE.MeshToonMaterial({
+      color: sourceMat.color ? sourceMat.color.clone() : new THREE.Color(0xffffff),
+      map: sourceMat.map || null,
+      alphaMap: sourceMat.alphaMap || null,
+      emissive: sourceMat.emissive ? sourceMat.emissive.clone() : new THREE.Color(0x000000),
+      emissiveMap: sourceMat.emissiveMap || null,
+      emissiveIntensity: Number.isFinite(sourceMat.emissiveIntensity) ? sourceMat.emissiveIntensity : 1,
+      normalMap: sourceMat.normalMap || null,
+      normalScale: sourceMat.normalScale ? sourceMat.normalScale.clone() : undefined,
+      roughnessMap: sourceMat.roughnessMap || null,
+      metalnessMap: sourceMat.metalnessMap || null,
+      aoMap: sourceMat.aoMap || null,
+      aoMapIntensity: Number.isFinite(sourceMat.aoMapIntensity) ? sourceMat.aoMapIntensity : 1,
+      transparent: !!sourceMat.transparent,
+      opacity: Number.isFinite(sourceMat.opacity) ? sourceMat.opacity : 1,
+      side: sourceMat.side,
+      depthWrite: sourceMat.depthWrite !== false,
+      depthTest: sourceMat.depthTest !== false
+    })
+    toonMat.gradientMap = getToonGradientMap(steps)
+    toonMat.skinning = !!sourceMat.skinning
+    toonMat.morphTargets = !!sourceMat.morphTargets
+    toonMat.morphNormals = !!sourceMat.morphNormals
+    return toonMat
+  }
+
+  function applyStylizedOutlineToMaterial(material, roleType) {
+    if (!material) return
+    if (!material.userData) material.userData = {}
+    if (roleType === 'scene') {
+      material.userData.outlineParameters = {
+        thickness: 0,
+        color: [0, 0, 0],
+        alpha: 0,
+        visible: false
+      }
+      return
+    }
+    const cfg = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
+    const color = new THREE.Color(cfg.outlineColor || '#000000')
+    material.userData.outlineParameters = {
+      thickness: Math.max(0.0005, Math.min(0.03, asNumber(cfg.outlineThickness, 0.004))),
+      color: [color.r, color.g, color.b],
+      alpha: Math.max(0, Math.min(1, asNumber(cfg.outlineAlpha, 1))),
+      visible: cfg.outlineEnabled !== false
+    }
+  }
+
+  function applyStylizedToObject(obj, roleType = '') {
+    if (!obj || !state.layout?.stylizedRender) return
+    const cfg = state.layout.stylizedRender
+    obj.traverse((node) => {
+      if (!node || !node.isMesh || !node.material) return
+      if (!node.userData) node.userData = {}
+      if (!node.userData.__asgBaseMaterial) {
+        node.userData.__asgBaseMaterial = node.material
+      }
+      if (!cfg.toonEnabled) {
+        node.material = node.userData.__asgBaseMaterial
+        const mats = Array.isArray(node.material) ? node.material : [node.material]
+        mats.forEach((m) => applyStylizedOutlineToMaterial(m, roleType))
+        return
+      }
+      if (roleType === 'scene') {
+        // 场景模型保持原始 PBR 材质，避免描边与三渲二导致发黑
+        node.material = node.userData.__asgBaseMaterial
+        const mats = Array.isArray(node.material) ? node.material : [node.material]
+        mats.forEach((m) => applyStylizedOutlineToMaterial(m, roleType))
+        return
+      }
+      const base = node.userData.__asgBaseMaterial
+      const mats = Array.isArray(base) ? base : [base]
+      const toonMats = mats.map((m) => buildToonMaterialFrom(m, cfg.toonSteps))
+      node.material = Array.isArray(base) ? toonMats : toonMats[0]
+      const applied = Array.isArray(node.material) ? node.material : [node.material]
+      applied.forEach((m) => applyStylizedOutlineToMaterial(m, roleType))
+    })
+  }
+
+  function applyStylizedToAllModels() {
+    for (const runtime of slotRuntime.values()) {
+      if (!runtime || !runtime.model) continue
+      if (runtime.cfg?.roleType === 'light' || runtime.cfg?.roleType === 'video') continue
+      applyStylizedToObject(runtime.model, runtime.cfg?.roleType || '')
+    }
+  }
+
+  function syncStylizedRenderInputs() {
+    const cfg = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
+    if (dom.stylizedToonEnabled) dom.stylizedToonEnabled.checked = !!cfg.toonEnabled
+    if (dom.stylizedToonSteps) dom.stylizedToonSteps.value = String(Math.max(2, Math.min(5, Math.round(asNumber(cfg.toonSteps, 3)))))
+    if (dom.stylizedOutlineEnabled) dom.stylizedOutlineEnabled.checked = cfg.outlineEnabled !== false
+    if (dom.stylizedOutlineThickness) dom.stylizedOutlineThickness.value = String(Math.max(0.0005, Math.min(0.03, asNumber(cfg.outlineThickness, 0.004))))
+    if (dom.stylizedOutlineColor) dom.stylizedOutlineColor.value = (typeof cfg.outlineColor === 'string' && cfg.outlineColor) ? cfg.outlineColor : '#000000'
+    if (dom.stylizedOutlineAlpha) dom.stylizedOutlineAlpha.value = String(Math.max(0, Math.min(1, asNumber(cfg.outlineAlpha, 1))))
+  }
+
+  function applyStylizedRenderSettings(shouldSave = true) {
+    if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+    const cfg = state.layout.stylizedRender
+    cfg.toonEnabled = !!cfg.toonEnabled
+    cfg.toonSteps = Math.max(2, Math.min(5, Math.round(asNumber(cfg.toonSteps, 3))))
+    cfg.outlineEnabled = cfg.outlineEnabled !== false
+    cfg.outlineThickness = Math.max(0.0005, Math.min(0.03, asNumber(cfg.outlineThickness, 0.004)))
+    cfg.outlineColor = (typeof cfg.outlineColor === 'string' && cfg.outlineColor) ? cfg.outlineColor : '#000000'
+    cfg.outlineAlpha = Math.max(0, Math.min(1, asNumber(cfg.outlineAlpha, 1)))
+    if (outlineEffect) {
+      try {
+        const c = new THREE.Color(cfg.outlineColor)
+        outlineEffect.defaultThickness = cfg.outlineThickness
+        outlineEffect.defaultColor = [c.r, c.g, c.b]
+        outlineEffect.defaultAlpha = cfg.outlineAlpha
+      } catch { }
+    }
+    applyStylizedToAllModels()
+    syncStylizedRenderInputs()
     if (shouldSave) scheduleSaveLayout()
   }
 
@@ -1760,6 +1932,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       runtime.modelPath = nextPath
       runtime.model = obj
       prepareModelForShadows(obj)
+      applyStylizedToObject(obj, runtime.cfg?.roleType || '')
       runtime.group.add(obj)
       if (Array.isArray(animations) && animations.length) {
         const mixer = new THREE.AnimationMixer(obj)
@@ -1931,6 +2104,54 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     return state.layout.slots[state.selectedSlot]
   }
 
+  function buildFocusFrameForSlot(slotKey) {
+    const runtime = slotRuntime.get(slotKey)
+    if (!runtime || !runtime.group) return null
+    const target = new THREE.Vector3().copy(runtime.group.position)
+    let focusRadius = Math.max(2.2, asNumber(orbit.radius, 8))
+
+    if (runtime.model) {
+      const box = new THREE.Box3().setFromObject(runtime.model)
+      if (Number.isFinite(box.min.x) && Number.isFinite(box.max.x)) {
+        const center = box.getCenter(new THREE.Vector3())
+        const size = box.getSize(new THREE.Vector3())
+        target.copy(center)
+        const maxSize = Math.max(0.8, size.x, size.y, size.z)
+        focusRadius = Math.max(2.0, Math.min(18, maxSize * 2.2))
+      }
+    }
+
+    if (runtime.cfg?.roleType === 'scene') {
+      focusRadius = Math.max(focusRadius, 9)
+    } else if (runtime.cfg?.roleType === 'light') {
+      focusRadius = Math.max(2.2, Math.min(focusRadius, 4.5))
+    } else if (runtime.cfg?.roleType === 'video') {
+      focusRadius = Math.max(2.6, Math.min(focusRadius, 6.5))
+    }
+
+    const cosPitch = Math.cos(orbit.pitch)
+    const position = {
+      x: target.x + focusRadius * Math.sin(orbit.yaw) * cosPitch,
+      y: target.y + focusRadius * Math.sin(orbit.pitch),
+      z: target.z + focusRadius * Math.cos(orbit.yaw) * cosPitch
+    }
+    return {
+      position,
+      target: { x: target.x, y: target.y, z: target.z }
+    }
+  }
+
+  function focusCameraOnSelectedSlot() {
+    const slotKey = state.selectedSlot || 'survivor1'
+    const frame = buildFocusFrameForSlot(slotKey)
+    if (!frame) {
+      setStatus('当前组件无法对焦')
+      return
+    }
+    const label = SLOT_CONFIGS.find(item => item.key === slotKey)?.label || slotKey
+    startCameraTransition(frame, 420, `对焦 ${label}`)
+  }
+
   function syncTransformInputs() {
     const tr = getSelectedTransform()
     if (!tr) return
@@ -2038,6 +2259,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     applyRenderQualityPreset(state.layout.qualityPreset || 'high', false)
     updateKeyLightShadowFrustum()
     applyMode(state.layout.mode)
+    applyStylizedRenderSettings(false)
     applyOrbitFromLayout()
     renderSlotTabs()
     syncTransformInputs()
@@ -2045,6 +2267,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncVideoInputs()
     syncCameraEditorInputs()
     syncEntranceParticleUi()
+    syncStylizedRenderInputs()
   }
 
   function applyMode(mode) {
@@ -2232,6 +2455,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.videoClearBtn) dom.videoClearBtn.addEventListener('click', clearVideoScreen)
     if (dom.applyVideoSettingsBtn) dom.applyVideoSettingsBtn.addEventListener('click', applyVideoSettingsFromInputs)
     dom.applyTransformBtn.addEventListener('click', applyInputsToSelectedTransform)
+    if (dom.focusSelectedBtn) dom.focusSelectedBtn.addEventListener('click', focusCameraOnSelectedSlot)
     if (dom.cameraEventSelect) {
       dom.cameraEventSelect.addEventListener('change', () => {
         syncCameraEditorInputs()
@@ -2298,6 +2522,48 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         const next = dom.entranceEffectSelect.value
         state.layout.entranceEffect = (next === 'none' || next === 'flameDissolve') ? next : 'fade'
         scheduleSaveLayout()
+      })
+    }
+    if (dom.stylizedToonEnabled) {
+      dom.stylizedToonEnabled.addEventListener('change', () => {
+        if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+        state.layout.stylizedRender.toonEnabled = !!dom.stylizedToonEnabled.checked
+        applyStylizedRenderSettings(true)
+      })
+    }
+    if (dom.stylizedToonSteps) {
+      dom.stylizedToonSteps.addEventListener('change', () => {
+        if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+        state.layout.stylizedRender.toonSteps = Math.max(2, Math.min(5, Math.round(asNumber(dom.stylizedToonSteps.value, 3))))
+        applyStylizedRenderSettings(true)
+      })
+    }
+    if (dom.stylizedOutlineEnabled) {
+      dom.stylizedOutlineEnabled.addEventListener('change', () => {
+        if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+        state.layout.stylizedRender.outlineEnabled = !!dom.stylizedOutlineEnabled.checked
+        applyStylizedRenderSettings(true)
+      })
+    }
+    if (dom.stylizedOutlineThickness) {
+      dom.stylizedOutlineThickness.addEventListener('change', () => {
+        if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+        state.layout.stylizedRender.outlineThickness = Math.max(0.0005, Math.min(0.03, asNumber(dom.stylizedOutlineThickness.value, 0.004)))
+        applyStylizedRenderSettings(true)
+      })
+    }
+    if (dom.stylizedOutlineColor) {
+      dom.stylizedOutlineColor.addEventListener('change', () => {
+        if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+        state.layout.stylizedRender.outlineColor = dom.stylizedOutlineColor.value || '#000000'
+        applyStylizedRenderSettings(true)
+      })
+    }
+    if (dom.stylizedOutlineAlpha) {
+      dom.stylizedOutlineAlpha.addEventListener('change', () => {
+        if (!state.layout.stylizedRender) state.layout.stylizedRender = deepClone(DEFAULT_LAYOUT.stylizedRender)
+        state.layout.stylizedRender.outlineAlpha = Math.max(0, Math.min(1, asNumber(dom.stylizedOutlineAlpha.value, 1)))
+        applyStylizedRenderSettings(true)
       })
     }
     if (dom.cameraMoveStep) {
@@ -2496,7 +2762,12 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     updateKeyLightShadowFrustum()
     if (renderer && scene && camera) {
-      renderer.render(scene, camera)
+      const sr = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
+      if (sr.outlineEnabled && outlineEffect) {
+        outlineEffect.render(scene, camera)
+      } else {
+        renderer.render(scene, camera)
+      }
     }
   }
 
