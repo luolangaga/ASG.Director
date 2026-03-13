@@ -218,6 +218,10 @@
     dir: '',
     activeBtn: null
   }
+  const cameraKeyboardState = {
+    pressed: new Set(),
+    dirty: false
+  }
 
   const dom = {
     toolbar: document.getElementById('toolbar'),
@@ -863,6 +867,65 @@
   function getCameraMoveStep() {
     const raw = asNumber(dom.cameraMoveStep ? dom.cameraMoveStep.value : 0.25, 0.25)
     return Math.max(0.001, raw)
+  }
+
+  function isCameraMoveKey(key) {
+    return key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'q' || key === 'e'
+  }
+
+  function hasActiveCameraKeyboardMove() {
+    for (const key of cameraKeyboardState.pressed) {
+      if (isCameraMoveKey(key)) return true
+    }
+    return false
+  }
+
+  function applyCameraKeyboardInput(dt) {
+    if (!camera || !THREE || cameraTransition) return
+    if (!hasActiveCameraKeyboardMove()) return
+
+    const keys = cameraKeyboardState.pressed
+    const shiftDown = keys.has('shift')
+    const moveStep = getCameraMoveStep() * Math.max(0.0001, dt * 5.2)
+    const rotateStep = Math.max(0.0001, dt * 1.9)
+    let changed = false
+
+    if (shiftDown) {
+      if (keys.has('a')) { orbit.desiredYaw += rotateStep; changed = true }
+      if (keys.has('d')) { orbit.desiredYaw -= rotateStep; changed = true }
+      if (keys.has('w')) { orbit.desiredPitch += rotateStep; changed = true }
+      if (keys.has('s')) { orbit.desiredPitch -= rotateStep; changed = true }
+      orbit.desiredPitch = Math.max(-1.4, Math.min(1.4, orbit.desiredPitch))
+      orbit.yaw = orbit.desiredYaw
+      orbit.pitch = orbit.desiredPitch
+    } else {
+      const forward = new THREE.Vector3()
+      camera.getWorldDirection(forward).normalize()
+      const up = new THREE.Vector3().copy(camera.up).normalize()
+      const right = new THREE.Vector3().crossVectors(forward, up).normalize()
+      const delta = new THREE.Vector3()
+      if (keys.has('w')) delta.add(forward)
+      if (keys.has('s')) delta.addScaledVector(forward, -1)
+      if (keys.has('a')) delta.addScaledVector(right, -1)
+      if (keys.has('d')) delta.add(right)
+      if (keys.has('q')) delta.addScaledVector(up, -1)
+      if (keys.has('e')) delta.add(up)
+      if (delta.lengthSq() > 0) {
+        delta.normalize().multiplyScalar(moveStep)
+        orbit.desiredTarget.x += delta.x
+        orbit.desiredTarget.y += delta.y
+        orbit.desiredTarget.z += delta.z
+        orbit.target.x += delta.x
+        orbit.target.y += delta.y
+        orbit.target.z += delta.z
+        changed = true
+      }
+    }
+
+    if (changed) {
+      cancelCameraTransition()
+      cameraKeyboardState.dirty = true
+    }
   }
 
   function moveCameraByDirection(dir, scale = 1, immediate = false, shouldSave = false) {
@@ -2096,11 +2159,17 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (state.layout.mode !== 'edit') return
       const tag = (document.activeElement && document.activeElement.tagName || '').toUpperCase()
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const key = String(e.key || '').toLowerCase()
+      if (key === 'shift' || isCameraMoveKey(key)) {
+        cameraKeyboardState.pressed.add(key)
+        cancelCameraTransition()
+        e.preventDefault()
+        return
+      }
 
       const runtime = slotRuntime.get(state.selectedSlot)
       if (!runtime || !runtime.group) return
       const step = e.shiftKey ? 0.2 : 0.05
-      const rotStep = e.shiftKey ? 10 : 3
       let changed = true
 
       if (e.key === 'ArrowUp') runtime.group.position.z -= step
@@ -2109,8 +2178,6 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       else if (e.key === 'ArrowRight') runtime.group.position.x += step
       else if (e.key === 'PageUp') runtime.group.position.y += step
       else if (e.key === 'PageDown') runtime.group.position.y -= step
-      else if (e.key.toLowerCase() === 'q') runtime.group.rotation.y -= toRadians(rotStep)
-      else if (e.key.toLowerCase() === 'e') runtime.group.rotation.y += toRadians(rotStep)
       else changed = false
 
       if (!changed) return
@@ -2119,6 +2186,24 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       syncTransformInputs()
       scheduleSaveLayout()
     }, true)
+
+    window.addEventListener('keyup', (e) => {
+      const key = String(e.key || '').toLowerCase()
+      if (key !== 'shift' && !isCameraMoveKey(key)) return
+      cameraKeyboardState.pressed.delete(key)
+      if (!hasActiveCameraKeyboardMove() && cameraKeyboardState.dirty) {
+        cameraKeyboardState.dirty = false
+        saveCameraToLayout()
+      }
+    }, true)
+
+    window.addEventListener('blur', () => {
+      if (cameraKeyboardState.dirty) {
+        cameraKeyboardState.dirty = false
+        saveCameraToLayout()
+      }
+      cameraKeyboardState.pressed.clear()
+    })
 
     window.addEventListener('resize', () => {
       if (!renderer || !camera) return
@@ -2211,6 +2296,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (cameraMoveState.dir && !cameraTransition) {
       moveCameraByDirection(cameraMoveState.dir, dt * 5.2, false, false)
     }
+    applyCameraKeyboardInput(dt)
     if (cameraTransition) {
       updateCameraTransition()
     } else {
