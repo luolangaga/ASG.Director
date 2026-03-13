@@ -176,6 +176,18 @@ select {
   transition: opacity 160ms ease;
 }
 
+.cinema-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 46%, rgba(0, 0, 0, 0.38) 100%),
+    linear-gradient(180deg, rgba(255, 171, 86, 0.06), rgba(38, 18, 52, 0.1));
+  transition: opacity 220ms ease;
+}
+
 .status-bar {
   position: fixed;
   left: 12px;
@@ -189,7 +201,22 @@ select {
   -webkit-app-region: no-drag;
 }
 
+.fps-badge {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 21;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgba(220, 255, 223, 0.98);
+  background: rgba(10, 14, 20, 0.72);
+  border: 1px solid rgba(120, 255, 151, 0.35);
+  -webkit-app-region: no-drag;
+}
+
 body.render-mode .toolbar,
-body.render-mode .status-bar {
+body.render-mode .status-bar,
+body.render-mode .fps-badge {
   display: none;
 }

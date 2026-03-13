@@ -59,6 +59,8 @@
           style="flex:1; justify-content:center;"><span class="update-text">更新</span></button>
         <button class="btn-ghost" id="themeToggleBtn" onclick="toggleTheme()"
           style="flex:1; justify-content:center;"><span id="themeIcon">🌙</span></button>
+        <button class="btn-ghost" id="languageToggleBtn" onclick="toggleLanguage()"
+          style="flex:1; justify-content:center;" title="切换语言（部分页面）">中</button>
         <button class="btn-ghost" id="helpBtn" onclick="ASGOnboarding.forceStart()" title="新手引导"
           style="flex:1; justify-content:center;">❓</button>
       </div>
@@ -1215,6 +1217,126 @@
       applyTheme(next, true)
     }
 
+    function normalizeDirectorLocale(raw) {
+      const text = String(raw || '').toLowerCase()
+      if (text.startsWith('en')) return 'en-US'
+      return 'zh-CN'
+    }
+
+    function getDirectorLocale() {
+      try {
+        const saved = localStorage.getItem('asg.director.locale')
+        if (saved) return normalizeDirectorLocale(saved)
+      } catch (_) { }
+      return normalizeDirectorLocale(navigator.language || 'zh-CN')
+    }
+
+    function updateLanguageToggleUI(locale) {
+      const btn = document.getElementById('languageToggleBtn')
+      if (!btn) return
+      const isEn = locale === 'en-US'
+      btn.textContent = isEn ? 'EN' : '中'
+      btn.title = isEn ? 'Switch language (partial pages)' : '切换语言（部分页面）'
+      document.documentElement.lang = locale
+    }
+
+    function applyMainLocale(locale) {
+      const isEn = locale === 'en-US'
+      const navHome = document.getElementById('nav-home')
+      const navOnline = document.getElementById('nav-online')
+      const navSettings = document.getElementById('nav-settings')
+      const navPartners = document.getElementById('nav-partners')
+      if (navHome) navHome.innerHTML = `<span class="nav-icon">📋</span> ${isEn ? 'Local BP' : '本地 BP'}`
+      if (navOnline) navOnline.innerHTML = `<span class="nav-icon">🌐</span> ${isEn ? 'Online BP' : '联网 BP'}`
+      if (navSettings) navSettings.innerHTML = `<span class="nav-icon">⚙️</span> ${isEn ? 'Settings' : '设置中心'}`
+      if (navPartners) navPartners.innerHTML = `<span class="nav-icon">🏆</span> ${isEn ? 'Events Using This App' : '使用该软件的赛事'}`
+
+      const startupTitle = document.querySelector('.startup-overlay-title')
+      const startupHint = document.getElementById('startupOverlayHint')
+      if (startupTitle) startupTitle.textContent = isEn ? 'Starting Director' : '正在启动导播端'
+      if (startupHint) startupHint.textContent = isEn ? 'Loading login state and 3D config in parallel...' : '正在并行加载登录状态与 3D 配置...'
+
+      const updateText = document.querySelector('#updateBtn .update-text')
+      if (updateText) updateText.textContent = isEn ? 'Update' : '更新'
+
+      const helpBtn = document.getElementById('helpBtn')
+      if (helpBtn) helpBtn.title = isEn ? 'Onboarding' : '新手引导'
+      const updateBtn = document.getElementById('updateBtn')
+      if (updateBtn) updateBtn.title = isEn ? 'Check updates' : '检查更新'
+      const userStatus = document.getElementById('userStatus')
+      if (userStatus && !currentUser) userStatus.textContent = isEn ? 'Not signed in' : '未登录'
+      const loginBtn = document.getElementById('loginBtn')
+      if (loginBtn && !currentUser) loginBtn.textContent = isEn ? 'Login' : '登录'
+      const logoutBtn = document.getElementById('logoutBtn')
+      if (logoutBtn) logoutBtn.textContent = isEn ? 'Logout' : '退出'
+
+      const homeTitle = document.querySelector('#view-home .section-title')
+      const homeDesc = document.querySelector('#view-home .section-desc')
+      if (homeTitle) homeTitle.textContent = isEn ? 'Local BP' : '本地 BP'
+      if (homeDesc) homeDesc.textContent = isEn ? 'Quickly start a professional event directing session' : '快速开始一场专业的赛事导播'
+
+      const homeHeroTitle = document.querySelector('#view-home .hero-card h3')
+      const homeHeroDesc = document.querySelector('#view-home .hero-card p')
+      const localBpBtn = document.getElementById('localBpBtn')
+      if (homeHeroTitle) homeHeroTitle.textContent = isEn ? 'Local BP Mode' : '本地 BP 模式'
+      if (homeHeroDesc) homeHeroDesc.textContent = isEn ? 'Single-machine directing, instant start, no internet required.' : '单机导播，快速启动，无需联网连接。'
+      if (localBpBtn) localBpBtn.textContent = isEn ? 'Start Now' : '立即开始'
+
+      const homeCards = document.querySelectorAll('#view-home .grid-2 .feature-card')
+      if (homeCards[0]) {
+        const title = homeCards[0].querySelector('h3')
+        const desc = homeCards[0].querySelector('p')
+        const btn = homeCards[0].querySelector('button')
+        if (title) title.textContent = isEn ? 'Settings Center' : '设置中心'
+        if (desc) desc.textContent = isEn ? 'Animation, fonts, component packs, plugins, MMD and more' : '动画、字体、组件包、插件、MMD 等都在这里'
+        if (btn) btn.textContent = isEn ? 'Open Settings' : '打开设置'
+      }
+
+      if (homeCards[1]) {
+        const title = homeCards[1].querySelector('h3')
+        const refreshBtn = homeCards[1].querySelector('#refreshScheduleBtn')
+        const label = homeCards[1].querySelector('label.control-label')
+        const eventIdInput = homeCards[1].querySelector('#idveventEventId')
+        const listPlaceholder = homeCards[1].querySelector('#idveventScheduleList > div')
+        if (title) title.textContent = isEn ? 'Schedule' : '赛程管理'
+        if (refreshBtn) refreshBtn.textContent = isEn ? '🔄 Refresh' : '🔄 刷新'
+        if (label) label.textContent = isEn ? 'Event ID (optional)' : '赛事ID (可选)'
+        if (eventIdInput) eventIdInput.placeholder = isEn ? 'Leave empty for all events' : '留空获取所有'
+        if (listPlaceholder && listPlaceholder.textContent.includes('刷新')) listPlaceholder.textContent = isEn ? 'Click "Refresh" to load schedules' : '点击"刷新"加载赛程'
+      }
+
+      const localPagesCard = document.getElementById('localPagesCard')
+      if (localPagesCard) {
+        const cardTitle = localPagesCard.querySelector('h3')
+        const cardDesc = localPagesCard.querySelector('p')
+        const status = document.getElementById('localPagesStatus')
+        const labels = localPagesCard.querySelectorAll('label.control-label')
+        const aiBtn = localPagesCard.querySelector('button.btn-primary')
+        if (cardTitle) cardTitle.textContent = isEn ? 'Custom Pages (OBS)' : '自定义页面（OBS）'
+        if (cardDesc) cardDesc.textContent = isEn ? 'Map local HTML files to HTTP URLs for OBS recording.' : '把本地 HTML 逐个映射为 HTTP 地址，方便 OBS 录制。'
+        if (status && status.textContent.trim() === '未启动') status.textContent = isEn ? 'Stopped' : '未启动'
+        if (labels[0]) labels[0].textContent = isEn ? 'Host Address' : '监听地址'
+        if (labels[1]) labels[1].textContent = isEn ? 'HTML Directory' : 'HTML 目录'
+        if (labels[2]) labels[2].textContent = isEn ? 'Base URL' : '访问地址'
+        if (aiBtn) aiBtn.textContent = isEn ? 'AI Generate Single HTML' : 'AI 生成单页 HTML'
+      }
+    }
+
+    function toggleLanguage() {
+      const current = getDirectorLocale()
+      const next = current === 'en-US' ? 'zh-CN' : 'en-US'
+      try {
+        localStorage.setItem('asg.director.locale', next)
+      } catch (_) { }
+      updateLanguageToggleUI(next)
+      applyMainLocale(next)
+      if (typeof showStatus === 'function') {
+        showStatus(next === 'en-US'
+          ? 'Language switched to English. Store/Welcome pages will follow this setting.'
+          : '语言已切换为中文。商店/欢迎页会使用该设置。', 'info')
+      }
+    }
+
     // Apply persisted theme at startup (no saved => follow system, but update button text)
     ; (function () {
       const saved = localStorage.getItem('asg_theme')
@@ -1225,6 +1347,9 @@
         document.documentElement.removeAttribute('data-theme')
         updateThemeToggleUI(getSystemTheme())
       }
+      const locale = getDirectorLocale()
+      updateLanguageToggleUI(locale)
+      applyMainLocale(locale)
     })()
 
     function renderPredictionSection() {

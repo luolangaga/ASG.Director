@@ -80,11 +80,19 @@
       shadowOpacity: 0.45
     }
   }
+  const QUALITY_PRESETS = {
+    low: { label: '低', pixelRatio: 1.0, shadowMap: 1536, shadowRadius: 0.8, exposure: 1.0, contrast: 1.0, cinemaOverlay: 0.0, rim: 0.0, bounce: 0.0 },
+    medium: { label: '中', pixelRatio: 1.35, shadowMap: 2048, shadowRadius: 1.0, exposure: 1.04, contrast: 1.04, cinemaOverlay: 0.0, rim: 0.08, bounce: 0.05 },
+    high: { label: '高', pixelRatio: 1.8, shadowMap: 3072, shadowRadius: 1.2, exposure: 1.08, contrast: 1.08, cinemaOverlay: 0.0, rim: 0.16, bounce: 0.11 },
+    cinematic: { label: '电影级', pixelRatio: 2.0, shadowMap: 4096, shadowRadius: 1.65, exposure: 1.14, contrast: 1.18, cinemaOverlay: 0.62, rim: 0.32, bounce: 0.2 }
+  }
 
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     transparentBackground: true,
     environmentPreset: 'duskCinema',
+    qualityPreset: 'high',
+    droneMode: false,
     fogEnabled: true,
     fogStrength: 1,
     shadowStrength: 0.45,
@@ -157,7 +165,9 @@
     ambient: null,
     key: null,
     fill: null,
-    hemi: null
+    hemi: null,
+    rim: null,
+    bounce: null
   }
   let gltfLoader = null
   let objLoader = null
@@ -169,6 +179,9 @@
   let clock = null
   let saveTimer = null
   let cameraTransition = null
+  let fpsAccum = 0
+  let fpsFrames = 0
+  let fpsLast = 0
   let bpRoleSyncRunning = false
   let bpRoleSyncPending = false
   let pendingCameraEventKey = ''
@@ -201,6 +214,8 @@
     toolbar: document.getElementById('toolbar'),
     renderRoot: document.getElementById('renderRoot'),
     fogOverlay: document.getElementById('fogOverlay'),
+    cinemaOverlay: document.getElementById('cinemaOverlay'),
+    fpsBadge: document.getElementById('fpsBadge'),
     statusBar: document.getElementById('statusBar'),
     modeToggleBtn: document.getElementById('modeToggleBtn'),
     sceneImportBtn: document.getElementById('sceneImportBtn'),
@@ -221,10 +236,12 @@
     cameraTransitionMs: document.getElementById('cameraTransitionMs'),
     cameraEventInfo: document.getElementById('cameraEventInfo')
     , environmentPresetSelect: document.getElementById('environmentPresetSelect')
+    , renderQualitySelect: document.getElementById('renderQualitySelect')
     , applyEnvironmentPresetBtn: document.getElementById('applyEnvironmentPresetBtn')
     , fogEnabled: document.getElementById('fogEnabled')
     , fogStrength: document.getElementById('fogStrength')
     , shadowStrength: document.getElementById('shadowStrength')
+    , droneModeEnabled: document.getElementById('droneModeEnabled')
     , entranceEffectSelect: document.getElementById('entranceEffectSelect')
     , cameraMoveStep: document.getElementById('cameraMoveStep')
     , cameraMoveButtons: Array.from(document.querySelectorAll('[data-cam-move]'))
@@ -292,6 +309,10 @@
     out.environmentPreset = (typeof base.environmentPreset === 'string' && ENVIRONMENT_PRESETS[base.environmentPreset])
       ? base.environmentPreset
       : 'duskCinema'
+    out.qualityPreset = (typeof base.qualityPreset === 'string' && QUALITY_PRESETS[base.qualityPreset])
+      ? base.qualityPreset
+      : 'high'
+    out.droneMode = !!base.droneMode
     out.fogEnabled = base.fogEnabled !== false
     out.fogStrength = Math.max(0, Math.min(3, asNumber(base.fogStrength, 1)))
     out.shadowStrength = Math.max(0, Math.min(1, asNumber(base.shadowStrength, 0.45)))
@@ -395,7 +416,7 @@
     renderer.outputEncoding = THREE.sRGBEncoding
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.08
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8))
     renderer.setSize(initW, initH)
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -412,19 +433,30 @@
     sceneLights.key = new THREE.DirectionalLight(0xffffff, 1.15)
     sceneLights.key.position.set(6, 14, 10)
     sceneLights.key.castShadow = true
-    sceneLights.key.shadow.mapSize.set(2048, 2048)
+    sceneLights.key.shadow.mapSize.set(3072, 3072)
     sceneLights.key.shadow.camera.near = 0.5
     sceneLights.key.shadow.camera.far = 160
-    sceneLights.key.shadow.camera.left = -24
-    sceneLights.key.shadow.camera.right = 24
-    sceneLights.key.shadow.camera.top = 24
-    sceneLights.key.shadow.camera.bottom = -24
-    sceneLights.key.shadow.bias = -0.00025
+    sceneLights.key.shadow.camera.left = -12
+    sceneLights.key.shadow.camera.right = 12
+    sceneLights.key.shadow.camera.top = 12
+    sceneLights.key.shadow.camera.bottom = -12
+    sceneLights.key.shadow.radius = 1.2
+    sceneLights.key.shadow.bias = -0.00012
+    sceneLights.key.shadow.normalBias = 0.01
+    scene.add(sceneLights.key.target)
     scene.add(sceneLights.key)
 
     sceneLights.fill = new THREE.DirectionalLight(0x9fc5ff, 0.45)
     sceneLights.fill.position.set(-10, 8, -6)
     scene.add(sceneLights.fill)
+
+    sceneLights.rim = new THREE.DirectionalLight(0xffb36a, 0.18)
+    sceneLights.rim.position.set(-6, 6, 8)
+    scene.add(sceneLights.rim)
+
+    sceneLights.bounce = new THREE.DirectionalLight(0x6f8fff, 0.12)
+    sceneLights.bounce.position.set(4, 1.5, -4)
+    scene.add(sceneLights.bounce)
 
     grid = new THREE.GridHelper(24, 24, 0x4caf50, 0x2d3552)
     grid.position.y = 0
@@ -503,6 +535,48 @@
     objLoader = new THREE.OBJLoader()
     mtlLoader = new THREE.MTLLoader()
     clock = new THREE.Clock()
+    applyRenderQualityPreset(state.layout?.qualityPreset || 'high', false)
+  }
+
+  function updateKeyLightShadowFrustum() {
+    if (!sceneLights.key || !sceneLights.key.shadow || !sceneLights.key.shadow.camera) return
+    const keys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+    let minX = Infinity
+    let maxX = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+    let found = false
+    for (const key of keys) {
+      const runtime = slotRuntime.get(key)
+      if (!runtime || !runtime.group || !runtime.model || !runtime.model.parent) continue
+      const p = runtime.group.position
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) continue
+      found = true
+      if (p.x < minX) minX = p.x
+      if (p.x > maxX) maxX = p.x
+      if (p.z < minZ) minZ = p.z
+      if (p.z > maxZ) maxZ = p.z
+    }
+    if (!found) {
+      minX = -4
+      maxX = 4
+      minZ = -4
+      maxZ = 4
+    }
+    const cx = (minX + maxX) * 0.5
+    const cz = (minZ + maxZ) * 0.5
+    const spanX = Math.max(4, maxX - minX)
+    const spanZ = Math.max(4, maxZ - minZ)
+    const half = Math.max(6, Math.min(20, Math.max(spanX, spanZ) * 0.8 + 3))
+
+    sceneLights.key.target.position.set(cx, 0.5, cz)
+    sceneLights.key.target.updateMatrixWorld()
+    const cam = sceneLights.key.shadow.camera
+    cam.left = -half
+    cam.right = half
+    cam.top = half
+    cam.bottom = -half
+    cam.updateProjectionMatrix()
   }
 
   function getPathExt(pathValue) {
@@ -589,6 +663,39 @@
     if (dom.lightIntensity) dom.lightIntensity.value = String(asNumber(cfg.intensity, 2.4))
   }
 
+  function applyRenderQualityPreset(qualityKey, shouldSave = true) {
+    const key = (typeof qualityKey === 'string' && QUALITY_PRESETS[qualityKey]) ? qualityKey : 'high'
+    const q = QUALITY_PRESETS[key]
+    state.layout.qualityPreset = key
+
+    if (renderer) {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio))
+      const w = dom.renderRoot?.clientWidth || window.innerWidth || 1920
+      const h = dom.renderRoot?.clientHeight || window.innerHeight || 1080
+      renderer.setSize(w, h)
+      renderer.toneMappingExposure = q.exposure
+      renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    }
+    if (sceneLights.key) {
+      const mapSize = Math.max(1024, Math.round(q.shadowMap))
+      sceneLights.key.shadow.mapSize.set(mapSize, mapSize)
+      sceneLights.key.shadow.radius = q.shadowRadius
+      sceneLights.key.shadow.needsUpdate = true
+    }
+    if (sceneLights.rim) sceneLights.rim.intensity = q.rim
+    if (sceneLights.bounce) sceneLights.bounce.intensity = q.bounce
+    if (dom.cinemaOverlay) dom.cinemaOverlay.style.opacity = String(q.cinemaOverlay)
+
+    if (dom.renderQualitySelect) dom.renderQualitySelect.value = key
+    if (dom.renderRoot) {
+      dom.renderRoot.style.filter = key === 'cinematic'
+        ? `contrast(${q.contrast}) saturate(1.06)`
+        : `contrast(${q.contrast})`
+    }
+    if (shouldSave) scheduleSaveLayout()
+  }
+
   function applyEnvironmentPreset(presetKey, shouldSave = true) {
     const key = (presetKey && ENVIRONMENT_PRESETS[presetKey]) ? presetKey : 'duskCinema'
     const preset = ENVIRONMENT_PRESETS[key]
@@ -612,6 +719,14 @@
       sceneLights.fill.color.set(preset.fillColor)
       sceneLights.fill.intensity = preset.fillIntensity
       sceneLights.fill.position.set(preset.fillPos.x, preset.fillPos.y, preset.fillPos.z)
+    }
+    if (sceneLights.rim) {
+      sceneLights.rim.color.set(preset.keyColor)
+      sceneLights.rim.position.set(-preset.keyPos.x * 0.55, Math.max(4, preset.keyPos.y * 0.45), preset.keyPos.z * 0.75)
+    }
+    if (sceneLights.bounce) {
+      sceneLights.bounce.color.set(preset.fillColor)
+      sceneLights.bounce.position.set(-preset.fillPos.x * 0.35, 1.5, -preset.fillPos.z * 0.35)
     }
     if (skyDome && skyDome.material && skyDome.material.uniforms) {
       skyDome.material.uniforms.uTopColor.value.set(preset.skyTop)
@@ -640,6 +755,8 @@
     if (dom.fogEnabled) dom.fogEnabled.checked = !!state.layout.fogEnabled
     if (dom.fogStrength) dom.fogStrength.value = String(Math.max(0, Math.min(3, asNumber(state.layout.fogStrength, 1))).toFixed(2))
     if (dom.shadowStrength) dom.shadowStrength.value = String(Math.max(0, Math.min(1, asNumber(state.layout.shadowStrength, preset.shadowOpacity))).toFixed(2))
+    if (dom.droneModeEnabled) dom.droneModeEnabled.checked = !!state.layout.droneMode
+    if (dom.renderQualitySelect) dom.renderQualitySelect.value = state.layout.qualityPreset || 'high'
     if (shouldSave) scheduleSaveLayout()
   }
 
@@ -669,19 +786,43 @@
     orbit.target.z += (orbit.desiredTarget.z - orbit.target.z) * lerpK
 
     const cosPitch = Math.cos(orbit.pitch)
-    const x = orbit.target.x + orbit.radius * Math.sin(orbit.yaw) * cosPitch
-    const y = orbit.target.y + orbit.radius * Math.sin(orbit.pitch)
-    const z = orbit.target.z + orbit.radius * Math.cos(orbit.yaw) * cosPitch
+    let x = orbit.target.x + orbit.radius * Math.sin(orbit.yaw) * cosPitch
+    let y = orbit.target.y + orbit.radius * Math.sin(orbit.pitch)
+    let z = orbit.target.z + orbit.radius * Math.cos(orbit.yaw) * cosPitch
+    let tx = orbit.target.x
+    let ty = orbit.target.y
+    let tz = orbit.target.z
+
+    if (state.layout?.droneMode) {
+      const t = performance.now() * 0.001
+      x += Math.sin(t * 0.37 + 1.2) * 0.03 + Math.sin(t * 1.13 + 2.7) * 0.012
+      y += Math.sin(t * 0.29 + 0.4) * 0.018 + Math.sin(t * 0.91 + 5.1) * 0.008
+      z += Math.sin(t * 0.41 + 3.3) * 0.026 + Math.sin(t * 1.27 + 0.8) * 0.010
+      tx += Math.sin(t * 0.55 + 2.1) * 0.015
+      ty += Math.sin(t * 0.47 + 4.7) * 0.010
+      tz += Math.sin(t * 0.61 + 1.9) * 0.015
+    }
+
     camera.position.set(x, y, z)
-    camera.lookAt(orbit.target.x, orbit.target.y, orbit.target.z)
+    camera.lookAt(tx, ty, tz)
+  }
+
+  function getBaseCameraPositionFromOrbit() {
+    const cosPitch = Math.cos(orbit.pitch)
+    return {
+      x: orbit.target.x + orbit.radius * Math.sin(orbit.yaw) * cosPitch,
+      y: orbit.target.y + orbit.radius * Math.sin(orbit.pitch),
+      z: orbit.target.z + orbit.radius * Math.cos(orbit.yaw) * cosPitch
+    }
   }
 
   function saveCameraToLayout() {
+    const basePos = getBaseCameraPositionFromOrbit()
     state.layout.camera = {
       position: {
-        x: camera.position.x,
-        y: camera.position.y,
-        z: camera.position.z
+        x: basePos.x,
+        y: basePos.y,
+        z: basePos.z
       },
       target: {
         x: orbit.target.x,
@@ -1532,6 +1673,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     applyLightSettings('light1')
     applyEnvironmentPreset(state.layout.environmentPreset, false)
+    applyRenderQualityPreset(state.layout.qualityPreset || 'high', false)
+    updateKeyLightShadowFrustum()
     applyMode(state.layout.mode)
     applyOrbitFromLayout()
     renderSlotTabs()
@@ -1635,6 +1778,12 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         applyEnvironmentPreset(dom.environmentPresetSelect.value, true)
       })
     }
+    if (dom.renderQualitySelect) {
+      dom.renderQualitySelect.addEventListener('change', () => {
+        applyRenderQualityPreset(dom.renderQualitySelect.value, true)
+        setStatus(`画质: ${QUALITY_PRESETS[state.layout.qualityPreset || 'high']?.label || state.layout.qualityPreset}`)
+      })
+    }
     if (dom.fogEnabled) {
       dom.fogEnabled.addEventListener('change', () => {
         state.layout.fogEnabled = !!dom.fogEnabled.checked
@@ -1655,6 +1804,13 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         state.layout.shadowStrength = Math.max(0, Math.min(1, asNumber(dom.shadowStrength.value, 0.45)))
         dom.shadowStrength.value = state.layout.shadowStrength.toFixed(2)
         applyEnvironmentPreset(state.layout.environmentPreset, true)
+      })
+    }
+    if (dom.droneModeEnabled) {
+      dom.droneModeEnabled.addEventListener('change', () => {
+        state.layout.droneMode = !!dom.droneModeEnabled.checked
+        setStatus(`无人机模式: ${state.layout.droneMode ? '开启' : '关闭'}`)
+        scheduleSaveLayout()
       })
     }
     if (dom.entranceEffectSelect) {
@@ -1814,6 +1970,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
   function renderLoop() {
     rafId = requestAnimationFrame(renderLoop)
     const dt = clock.getDelta()
+    fpsAccum += dt
+    fpsFrames += 1
+    if (fpsAccum >= 0.4) {
+      fpsLast = Math.round(fpsFrames / Math.max(0.0001, fpsAccum))
+      fpsAccum = 0
+      fpsFrames = 0
+      if (dom.fpsBadge) dom.fpsBadge.textContent = `FPS: ${fpsLast}`
+    }
     for (const mixer of mixers.values()) {
       try { mixer.update(dt) } catch { }
     }
@@ -1826,6 +1990,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     } else {
       updateCameraFromOrbit(false)
     }
+    updateKeyLightShadowFrustum()
     if (renderer && scene && camera) {
       renderer.render(scene, camera)
     }

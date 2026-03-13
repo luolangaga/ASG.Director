@@ -277,6 +277,7 @@ const defaultLayout = {
     survivor: { maxPerRow: 4, itemGap: 10, rowGap: 10, itemSize: 60 },
     hunter: { maxPerRow: 1, itemGap: 10, rowGap: 10, itemSize: 60 }
   },
+  snapEnabled: true,
   model3d: {
     enabled: false,
     useOfficialModels: false,
@@ -785,6 +786,7 @@ async function init() {
     currentLayout = { ...defaultLayout }
   }
   console.log('[Frontend] 当前布局:', currentLayout)
+  updateSnapToggleButton()
   applyLayout()
   triggerTransparentBorderBlink()
   setupTransparentDragHint()
@@ -937,7 +939,7 @@ async function init() {
       try {
         openLayoutSettings()
         setTimeout(() => {
-          const el = document.getElementById('enable3dModels') || document.getElementById('model3dTargetFPS')
+          const el = document.getElementById('gsItemGap') || document.getElementById('gsMaxPerRow')
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
           try { el?.focus() } catch { /* ignore */ }
         }, 60)
@@ -962,6 +964,7 @@ async function init() {
     const result = await window.electronAPI.loadLayout()
     if (result.success && result.layout) {
       currentLayout = { ...defaultLayout, ...result.layout }
+      updateSnapToggleButton()
       applyLayout()
       applyGlobalBanLayoutConfig()
       applyLocalBanLayoutConfig()
@@ -2262,7 +2265,7 @@ function applyLayout() {
   // 需要跳过的非DOM元素配置字段
   const skipFields = [
     'backgroundImage', 'windowBounds', 'globalBanConfig', 'localBanConfig',
-    'model3d', 'transparentBackground', 'scoreboardLayouts', 'postMatchLayout', 'renderResolution',
+    'model3d', 'snapEnabled', 'transparentBackground', 'scoreboardLayouts', 'postMatchLayout', 'renderResolution',
     // BPUI 转换相关字段
     'version', 'convertedFrom', 'convertedAt', 'settings', 'elements',
     'frontendResolution', 'frontendTextSettings',
@@ -2314,6 +2317,36 @@ function applyLayout() {
   }
 
   console.log(`[Frontend] 布局应用完成 - 成功: ${appliedCount}, 未找到: ${notFoundCount}`)
+  syncBanEditPreviewSlots()
+}
+
+function isSnapEnabled() {
+  return !(currentLayout && currentLayout.snapEnabled === false)
+}
+
+function updateSnapToggleButton() {
+  const btn = document.getElementById('snapToggleBtn')
+  if (!btn) return
+  const enabled = isSnapEnabled()
+  btn.textContent = enabled ? '吸附：开' : '吸附：关'
+  btn.classList.toggle('off', !enabled)
+}
+
+async function toggleSnapEnabled() {
+  if (!currentLayout || typeof currentLayout !== 'object') currentLayout = { ...defaultLayout }
+  currentLayout.snapEnabled = !isSnapEnabled()
+  updateSnapToggleButton()
+
+  const snapLineV = document.getElementById('snapLineV')
+  const snapLineH = document.getElementById('snapLineH')
+  if (snapLineV) snapLineV.style.display = 'none'
+  if (snapLineH) snapLineH.style.display = 'none'
+
+  try {
+    await window.electronAPI.saveLayout(currentLayout)
+  } catch (e) {
+    console.error('[Frontend] 保存吸附设置失败:', e)
+  }
 }
 
 // ========= 颜色预设点击事件 =========
@@ -2368,6 +2401,7 @@ function applyGlobalBanLayoutConfig() {
       child.style.height = '100%'
     })
   }
+  syncBanEditPreviewSlots()
 }
 
 function getLocalBanConfig() {
@@ -2412,6 +2446,33 @@ function applyLocalBanLayoutConfig() {
       child.style.height = '100%'
     })
   }
+  syncBanEditPreviewSlots()
+}
+
+function ensureBanPreviewItems(listEl, itemClassName) {
+  if (!listEl) return
+  Array.from(listEl.querySelectorAll('.ban-edit-preview')).forEach((el) => el.remove())
+  if (!editMode) return
+
+  const realCount = Array.from(listEl.children).filter((el) => !el.classList.contains('ban-edit-preview')).length
+  const needCount = Math.max(0, 2 - realCount)
+  for (let i = 0; i < needCount; i++) {
+    const item = document.createElement('div')
+    item.className = `${itemClassName} ban-edit-preview`
+    item.setAttribute('aria-hidden', 'true')
+
+    const frame = document.createElement('span')
+    frame.className = 'ban-preview-frame'
+    item.appendChild(frame)
+    listEl.appendChild(item)
+  }
+}
+
+function syncBanEditPreviewSlots() {
+  ensureBanPreviewItems(document.getElementById('survivorBanList'), 'ban-item')
+  ensureBanPreviewItems(document.getElementById('hunterBanList'), 'ban-item')
+  ensureBanPreviewItems(document.getElementById('globalBanSurvivorList'), 'global-ban-item')
+  ensureBanPreviewItems(document.getElementById('globalBanHunterList'), 'global-ban-item')
 }
 
 // 设置背景
@@ -2830,11 +2891,12 @@ function initDraggable() {
     let newWidth = startWidth
     let newHeight = startHeight
 
+    const snapEnabled = isSnapEnabled()
     // Snap Logic (仅在拖拽时启用)
     let snappedX = false
     let snappedY = false
 
-    if (isDragging) {
+    if (isDragging && snapEnabled) {
       // X Axis Snap
       let centerX = newLeft + startWidth / 2
       let rightX = newLeft + startWidth
@@ -2988,7 +3050,7 @@ function initDraggable() {
       // Calculate Snap Lines
       snapLinesX = []
       snapLinesY = []
-      if (isDragging) {
+      if (isDragging && isSnapEnabled()) {
         // Screen Center
         snapLinesX.push(window.innerWidth / 2)
         snapLinesY.push(window.innerHeight / 2)
@@ -3137,6 +3199,7 @@ function toggleEditMode() {
   console.log('切换编辑模式:', editMode)
 
   if (editMode) {
+    updateSnapToggleButton()
     toolbar.classList.add('show')
     hint.classList.add('show')
     containers.forEach(c => c.classList.add('editing'))
@@ -3150,6 +3213,7 @@ function toggleEditMode() {
 
   // 让 hidden 在退出编辑模式时立即生效
   applyLayout()
+  syncBanEditPreviewSlots()
 }
 
 function openEditMode() {
@@ -3165,6 +3229,7 @@ function exitEditMode() {
   document.getElementById('editHint').classList.remove('show')
   document.querySelectorAll('.draggable-container').forEach(c => c.classList.remove('editing'))
   document.body.classList.remove('editing')
+  syncBanEditPreviewSlots()
 }
 
 function openLayoutSettings() {
@@ -3187,76 +3252,7 @@ function openLayoutSettings() {
   document.getElementById('lhItemGap').value = l.hunter.itemGap
   document.getElementById('lhRowGap').value = l.hunter.rowGap
   document.getElementById('lhItemSize').value = l.hunter.itemSize
-    ; (function () {
-      const m = currentLayout && currentLayout.model3d ? currentLayout.model3d : { enabled: false, targetFPS: 30 }
-      const enableEl = document.getElementById('enable3dModels')
-      const fpsEl = document.getElementById('model3dTargetFPS')
-      const officialEl = document.getElementById('useOfficialModels')
-      const surDirEl = document.getElementById('survivorModelDir')
-      const hunDirEl = document.getElementById('hunterModelDir')
-      const surMotionEl = document.getElementById('survivorMotionDir')
-      const hunMotionEl = document.getElementById('hunterMotionDir')
-      const defaultVmdEl = document.getElementById('defaultMotionVmd')
-
-      // 新增渲染设置控件
-      const aaEl = document.getElementById('render3dAntialias')
-      const prEl = document.getElementById('render3dPixelRatio')
-      const shadowEl = document.getElementById('render3dEnableShadows')
-      const shadowQEl = document.getElementById('render3dShadowQuality')
-
-      const outlineEl = document.getElementById('render3dEnableOutline')
-      const outlineThEl = document.getElementById('render3dOutlineThickness')
-      const outlineColorEl = document.getElementById('render3dOutlineColor')
-      const outlineAlphaEl = document.getElementById('render3dOutlineAlpha')
-      const toonEl = document.getElementById('render3dEnableToon')
-      const toonGradEl = document.getElementById('render3dToonGradient')
-
-      const ambColorEl = document.getElementById('render3dAmbientColor')
-      const ambIntEl = document.getElementById('render3dAmbientIntensity')
-      const dirColorEl = document.getElementById('render3dDirectionalColor')
-      const dirIntEl = document.getElementById('render3dDirectionalIntensity')
-      const lpXEl = document.getElementById('render3dLightPosX')
-      const lpYEl = document.getElementById('render3dLightPosY')
-      const lpZEl = document.getElementById('render3dLightPosZ')
-
-      if (enableEl) enableEl.checked = !!m.enabled
-      if (fpsEl) fpsEl.value = Number(m.targetFPS || 30)
-      if (officialEl) officialEl.checked = !!m.useOfficialModels
-      if (surDirEl) surDirEl.value = m.survivorModelDir || ''
-      if (hunDirEl) hunDirEl.value = m.hunterModelDir || ''
-      if (surMotionEl) surMotionEl.value = m.survivorMotionDir || ''
-      if (hunMotionEl) hunMotionEl.value = m.hunterMotionDir || ''
-      if (defaultVmdEl) defaultVmdEl.value = m.defaultMotionVmd || ''
-      
-      const scaleCorrEl = document.getElementById('model3dScaleCorrection')
-      if (scaleCorrEl) scaleCorrEl.value = String(Number(m.scaleCorrection ?? 1.0))
-
-      const verticalOffsetEl = document.getElementById('model3dVerticalOffset')
-      if (verticalOffsetEl) verticalOffsetEl.value = String(Number(m.verticalOffset ?? 0))
-      
-      const rotCorrEl = document.getElementById('model3dRotationCorrection')
-      if (rotCorrEl) rotCorrEl.value = String(Number(m.rotationCorrection ?? 0))
-
-      if (aaEl) aaEl.value = String(m.antialias !== false)
-      if (prEl) prEl.value = String(Number(m.pixelRatio ?? 1))
-      if (shadowEl) shadowEl.checked = !!m.enableShadows
-      if (shadowQEl) shadowQEl.value = String(Number(m.shadowQuality || 1024))
-
-      if (outlineEl) outlineEl.checked = m.enableOutline !== false
-      if (outlineThEl) outlineThEl.value = String(Number(m.outlineThickness || 0.003))
-      if (outlineColorEl) outlineColorEl.value = m.outlineColor || '#000000'
-      if (outlineAlphaEl) outlineAlphaEl.value = String(Number(m.outlineAlpha ?? 1.0))
-      if (toonEl) toonEl.checked = !!m.enableToon
-      if (toonGradEl) toonGradEl.value = String(Number(m.toonGradient || 5))
-
-      if (ambColorEl) ambColorEl.value = m.ambientColor || '#ffffff'
-      if (ambIntEl) ambIntEl.value = String(Number(m.ambientIntensity ?? 0.5))
-      if (dirColorEl) dirColorEl.value = m.directionalColor || '#ffffff'
-      if (dirIntEl) dirIntEl.value = String(Number(m.directionalIntensity ?? 0.7))
-      if (lpXEl) lpXEl.value = String(Number(m.lightPosX ?? 10))
-      if (lpYEl) lpYEl.value = String(Number(m.lightPosY ?? 20))
-      if (lpZEl) lpZEl.value = String(Number(m.lightPosZ ?? 10))
-    })()
+  refreshLayoutGapPreview()
   panel.classList.add('show')
 }
 
@@ -3297,83 +3293,29 @@ async function syncLayoutSettingsFromUI() {
   currentLayout.globalBanConfig = g
   currentLayout.localBanConfig = l
 
-  const useOfficialEl = document.getElementById('useOfficialModels')
-  const useOfficialValue = useOfficialEl ? !!useOfficialEl.checked : !!(currentLayout && currentLayout.model3d && currentLayout.model3d.useOfficialModels)
-  const prevOfficial = !!(currentLayout && currentLayout.model3d && currentLayout.model3d.useOfficialModels)
-  if (useOfficialValue && !prevOfficial && window.electronAPI && typeof window.electronAPI.prepareOfficialModels === 'function') {
-    const status = await window.electronAPI.getOfficialModelsDownloadStatus?.()
-    if (!status || !status.complete) {
-      const ok = confirm('将开始下载官方模型资源，下载完成后才会启用。是否继续？')
-      if (!ok) {
-        if (useOfficialEl) useOfficialEl.checked = false
-        return false
-      }
-      if (useOfficialEl) useOfficialEl.disabled = true
-      try {
-        const res = await window.electronAPI.prepareOfficialModels()
-        if (!res || !res.success) {
-          throw new Error(res?.error || '下载失败')
-        }
-        _officialModelMap = null
-        _officialModelMapPromise = null
-      } catch {
-        if (useOfficialEl) useOfficialEl.checked = false
-        return false
-      } finally {
-        if (useOfficialEl) useOfficialEl.disabled = false
-      }
-    }
-  }
-  const m = {
-    enabled: !!document.getElementById('enable3dModels')?.checked,
-    useOfficialModels: useOfficialValue,
-    targetFPS: Number(document.getElementById('model3dTargetFPS')?.value) || 30,
-    survivorModelDir: document.getElementById('survivorModelDir')?.value || null,
-    hunterModelDir: document.getElementById('hunterModelDir')?.value || null,
-    survivorMotionDir: document.getElementById('survivorMotionDir')?.value || null,
-    hunterMotionDir: document.getElementById('hunterMotionDir')?.value || null,
-    defaultMotionVmd: document.getElementById('defaultMotionVmd')?.value || null,
-    scaleCorrection: Number(document.getElementById('model3dScaleCorrection')?.value ?? 1.0),
-    verticalOffset: Number(document.getElementById('model3dVerticalOffset')?.value ?? 0),
-    rotationCorrection: Number(document.getElementById('model3dRotationCorrection')?.value ?? 0),
-
-    // 渲染质量
-    antialias: document.getElementById('render3dAntialias')?.value === 'true',
-    pixelRatio: Number(document.getElementById('render3dPixelRatio')?.value) || 1,
-    enableShadows: !!document.getElementById('render3dEnableShadows')?.checked,
-    shadowQuality: Number(document.getElementById('render3dShadowQuality')?.value) || 1024,
-
-    // 风格化渲染
-    enableOutline: document.getElementById('render3dEnableOutline')?.checked !== false,
-    outlineThickness: Number(document.getElementById('render3dOutlineThickness')?.value) || 0.003,
-    outlineColor: document.getElementById('render3dOutlineColor')?.value || '#000000',
-    outlineAlpha: Number(document.getElementById('render3dOutlineAlpha')?.value ?? 1.0),
-    enableToon: !!document.getElementById('render3dEnableToon')?.checked,
-    toonGradient: Number(document.getElementById('render3dToonGradient')?.value) || 5,
-
-    // 光照
-    ambientColor: document.getElementById('render3dAmbientColor')?.value || '#ffffff',
-    ambientIntensity: Number(document.getElementById('render3dAmbientIntensity')?.value ?? 0.5),
-    directionalColor: document.getElementById('render3dDirectionalColor')?.value || '#ffffff',
-    directionalIntensity: Number(document.getElementById('render3dDirectionalIntensity')?.value ?? 0.7),
-    lightPosX: Number(document.getElementById('render3dLightPosX')?.value ?? 10),
-    lightPosY: Number(document.getElementById('render3dLightPosY')?.value ?? 20),
-    lightPosZ: Number(document.getElementById('render3dLightPosZ')?.value ?? 10),
-
-    // 保留已存在的视口设置
-    viewports: (currentLayout && currentLayout.model3d && currentLayout.model3d.viewports) ? currentLayout.model3d.viewports : {}
-  }
-  currentLayout.model3d = m
-
   // 立即应用配置到前台
   applyGlobalBanLayoutConfig()
   applyLocalBanLayoutConfig()
-
-  // 如果有 3DRenderer，则更新它
-  if (window.update3DRenderingParams) {
-    window.update3DRenderingParams(m)
-  }
   return true
+}
+
+function refreshLayoutGapPreview() {
+  const ranges = document.querySelectorAll('#layoutSettingsPanel .settings-range')
+  ranges.forEach((inputEl) => {
+    const value = Number(inputEl.value) || 0
+    const valueId = inputEl.getAttribute('data-value-id')
+    const previewId = inputEl.getAttribute('data-preview-id')
+    const axis = inputEl.getAttribute('data-preview-axis')
+    const valueEl = valueId ? document.getElementById(valueId) : null
+    const previewEl = previewId ? document.getElementById(previewId) : null
+    if (valueEl) valueEl.textContent = `${value}px`
+    if (!previewEl) return
+    if (axis === 'y') {
+      previewEl.style.setProperty('--y-gap', `${value}px`)
+    } else {
+      previewEl.style.setProperty('--x-gap', `${value}px`)
+    }
+  })
 }
 
 let liveUpdateTimeout = null;
@@ -3384,6 +3326,9 @@ function initLayoutSettingsLiveUpdate() {
   panel.addEventListener('input', async (e) => {
     // 只有在修改设置项时才触发
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+      if (e.target.classList.contains('settings-range')) {
+        refreshLayoutGapPreview()
+      }
       console.log('[Frontend] 检测到设置修改, 执行热实时更新...');
       const ok = await syncLayoutSettingsFromUI();
       if (ok === false) return
@@ -3946,6 +3891,7 @@ function updateDisplay(state) {
     const globalBanHuntersContainer = document.getElementById('globalBanHunters')
     applyImageFitToContainer(globalBanHuntersContainer)
   }
+  syncBanEditPreviewSlots()
   isFirstDisplayUpdate = false
 }
 
@@ -5375,6 +5321,7 @@ window.forceReloadLayout = async function () {
       console.log('[Frontend] 强制应用新布局，元素数量:', Object.keys(currentLayout).length)
       console.log('[Frontend] 新布局内容:', JSON.stringify(currentLayout, null, 2))
 
+      updateSnapToggleButton()
       applyLayout()
       console.log('[Frontend] applyLayout 执行完成')
 

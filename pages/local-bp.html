@@ -96,6 +96,7 @@
     <button class="menu-tab menu-action" onclick="LocalBPOnboarding.forceStart()" title="新手引导">
       <svg class="tab-icon icon-svg" aria-hidden="true"><use href="#icon-help"></use></svg>帮助
     </button>
+    <button id="localBpLangBtn" class="menu-tab menu-action" onclick="toggleLocalBpLanguage()" title="切换语言（部分文案）">中</button>
   </div>
 
   <div id="localBpLayoutEditBar" class="localbp-layout-edit-bar" style="display:none;">
@@ -1002,6 +1003,8 @@
     </div>
   </div>
 
+  <script src="./js/i18n.js"></script>
+  <script src="./js/local-bp-i18n.js"></script>
   <script src="./js/modules/match-base.js"></script>
   <script src="./js/local-bp-logic.js"></script>
   <script src="./js/localbp-onboarding.js"></script>
