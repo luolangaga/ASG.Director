@@ -98,6 +98,9 @@
     fogStrength: 1,
     shadowStrength: 0.45,
     entranceEffect: 'fade',
+    entranceParticle: {
+      path: ''
+    },
     survivorScale: 1,
     hunterScale: 1.1,
     videoScreen: {
@@ -198,6 +201,13 @@
   const CAMERA_ZOOM_FACTOR = 0.00105
   const activeEntranceEffects = []
   const pendingEntranceEffects = new Set()
+  const activeParticleBursts = []
+  const entranceParticleAsset = {
+    path: '',
+    scene: null,
+    animations: [],
+    loadingPromise: null
+  }
 
   const orbit = {
     target: { x: 0, y: 1, z: 0 },
@@ -263,6 +273,9 @@
     , shadowStrength: document.getElementById('shadowStrength')
     , droneModeEnabled: document.getElementById('droneModeEnabled')
     , entranceEffectSelect: document.getElementById('entranceEffectSelect')
+    , particleImportBtn: document.getElementById('particleImportBtn')
+    , particleClearBtn: document.getElementById('particleClearBtn')
+    , particleFileInfo: document.getElementById('particleFileInfo')
     , cameraMoveStep: document.getElementById('cameraMoveStep')
     , cameraMoveButtons: Array.from(document.querySelectorAll('[data-cam-move]'))
     , lightColor: document.getElementById('lightColor')
@@ -339,6 +352,9 @@
     out.entranceEffect = (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
       ? base.entranceEffect
       : 'fade'
+    out.entranceParticle = {
+      path: (typeof base?.entranceParticle?.path === 'string') ? base.entranceParticle.path : ''
+    }
     out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
     out.hunterScale = Math.max(0.001, asNumber(base?.hunterScale, out.slots.hunter.scale.x))
     out.videoScreen.path = typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : ''
@@ -1187,6 +1203,7 @@
     if (!runtime || !runtime.group) return
     if (runtime.model) pendingEntranceEffects.delete(runtime.model)
     stopEntranceEffectsForRoot(runtime.model)
+    stopParticleEffectsForRoot(runtime.model)
     if (runtime.videoElement) {
       try {
         runtime.videoElement.pause()
@@ -1286,6 +1303,122 @@
     }
   }
 
+  function syncEntranceParticleUi() {
+    if (!dom.particleFileInfo) return
+    const path = String(state.layout?.entranceParticle?.path || '').trim()
+    if (!path) {
+      dom.particleFileInfo.textContent = '粒子: 未配置'
+      return
+    }
+    const shortName = path.split(/[\\/]/).pop() || path
+    dom.particleFileInfo.textContent = `粒子: ${shortName}`
+  }
+
+  async function ensureEntranceParticleAsset(path) {
+    const nextPath = String(path || '').trim()
+    if (!nextPath) return { success: false, error: 'empty-path' }
+    if (entranceParticleAsset.path === nextPath && entranceParticleAsset.scene) {
+      return { success: true }
+    }
+    if (entranceParticleAsset.path === nextPath && entranceParticleAsset.loadingPromise) {
+      return entranceParticleAsset.loadingPromise
+    }
+    const resolvedUrl = normalizeFileUrl(nextPath)
+    if (!resolvedUrl) return { success: false, error: 'invalid-url' }
+
+    entranceParticleAsset.path = nextPath
+    entranceParticleAsset.scene = null
+    entranceParticleAsset.animations = []
+    entranceParticleAsset.loadingPromise = new Promise((resolve) => {
+      gltfLoader.load(resolvedUrl, (gltf) => {
+        const particleScene = gltf && gltf.scene ? gltf.scene : null
+        if (!particleScene) {
+          resolve({ success: false, error: 'particle-scene-empty' })
+          return
+        }
+        entranceParticleAsset.scene = particleScene
+        entranceParticleAsset.animations = Array.isArray(gltf.animations) ? gltf.animations : []
+        resolve({ success: true })
+      }, undefined, (error) => {
+        resolve({ success: false, error: error?.message || String(error || 'particle-load-failed') })
+      })
+    }).finally(() => {
+      entranceParticleAsset.loadingPromise = null
+    })
+
+    return entranceParticleAsset.loadingPromise
+  }
+
+  function stopParticleEffectsForRoot(modelRoot) {
+    if (!modelRoot || !activeParticleBursts.length) return
+    for (let i = activeParticleBursts.length - 1; i >= 0; i--) {
+      const burst = activeParticleBursts[i]
+      if (burst.modelRoot !== modelRoot) continue
+      if (burst.node && burst.node.parent) {
+        burst.node.parent.remove(burst.node)
+      }
+      activeParticleBursts.splice(i, 1)
+    }
+  }
+
+  async function playEntranceParticleForModel(modelRoot) {
+    const path = String(state.layout?.entranceParticle?.path || '').trim()
+    if (!modelRoot || !path || !gltfLoader) return
+    const loaded = await ensureEntranceParticleAsset(path)
+    if (!loaded || !loaded.success || !entranceParticleAsset.scene) return
+
+    const burstNode = entranceParticleAsset.scene.clone(true)
+    if (!burstNode) return
+    burstNode.position.set(0, 0, 0)
+    burstNode.rotation.set(0, 0, 0)
+    burstNode.scale.set(1, 1, 1)
+    modelRoot.add(burstNode)
+
+    let mixer = null
+    let durationMs = 2200
+    if (entranceParticleAsset.animations && entranceParticleAsset.animations.length) {
+      mixer = new THREE.AnimationMixer(burstNode)
+      let maxDuration = 0
+      entranceParticleAsset.animations.forEach((clip) => {
+        try {
+          const action = mixer.clipAction(clip)
+          action.reset()
+          action.setLoop(THREE.LoopOnce, 1)
+          action.clampWhenFinished = true
+          action.play()
+          if (Number.isFinite(clip.duration)) {
+            maxDuration = Math.max(maxDuration, clip.duration)
+          }
+        } catch { }
+      })
+      if (maxDuration > 0) durationMs = Math.max(600, maxDuration * 1000)
+    }
+
+    activeParticleBursts.push({
+      modelRoot,
+      node: burstNode,
+      mixer,
+      startedAt: performance.now(),
+      durationMs
+    })
+  }
+
+  function updateParticleBursts(dt) {
+    if (!activeParticleBursts.length) return
+    const now = performance.now()
+    for (let i = activeParticleBursts.length - 1; i >= 0; i--) {
+      const burst = activeParticleBursts[i]
+      if (burst.mixer) {
+        try { burst.mixer.update(dt) } catch { }
+      }
+      const finished = (now - burst.startedAt) >= burst.durationMs
+      const detached = !burst.node || !burst.node.parent
+      if (!finished && !detached) continue
+      if (burst.node && burst.node.parent) burst.node.parent.remove(burst.node)
+      activeParticleBursts.splice(i, 1)
+    }
+  }
+
   function attachDissolveShader(mat, minY, maxY) {
     if (!mat) return
     if (!mat.userData) mat.userData = {}
@@ -1367,6 +1500,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     modelRoot.visible = true
     stopEntranceEffectsForRoot(modelRoot)
     const effectType = state.layout?.entranceEffect || 'fade'
+    if (effectType !== 'none') {
+      void playEntranceParticleForModel(modelRoot)
+    }
     if (effectType === 'none') return
     const materialEntries = []
     let fx = null
@@ -1908,6 +2044,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncLightInputs()
     syncVideoInputs()
     syncCameraEditorInputs()
+    syncEntranceParticleUi()
   }
 
   function applyMode(mode) {
@@ -2031,12 +2168,66 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     scheduleSaveLayout()
   }
 
+  async function importEntranceParticle() {
+    let selectedPath = ''
+    try {
+      if (window.electronAPI && window.electronAPI.selectFileWithFilter) {
+        const result = await window.electronAPI.selectFileWithFilter({
+          filters: [{ name: '粒子特效(GLTF/GLB)', extensions: ['gltf', 'glb'] }]
+        })
+        if (result && result.success && result.path) selectedPath = result.path
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 选择粒子特效失败:', error)
+    }
+    if (!selectedPath) {
+      const input = window.prompt('请输入粒子特效路径(GLTF/GLB，URL 或本地路径):', state.layout?.entranceParticle?.path || '')
+      if (!input) return
+      selectedPath = input.trim()
+    }
+    if (!selectedPath) return
+    const ext = getPathExt(selectedPath)
+    if (ext !== '.gltf' && ext !== '.glb') {
+      window.alert('当前仅支持 GLTF/GLB 粒子特效文件')
+      return
+    }
+    const loadResult = await ensureEntranceParticleAsset(selectedPath)
+    if (!loadResult || !loadResult.success) {
+      window.alert(`粒子特效加载失败: ${loadResult?.error || 'unknown-error'}`)
+      return
+    }
+    if (!state.layout.entranceParticle) state.layout.entranceParticle = { path: '' }
+    state.layout.entranceParticle.path = selectedPath
+    syncEntranceParticleUi()
+    scheduleSaveLayout()
+    setStatus('已导入出场粒子特效')
+  }
+
+  function clearEntranceParticle() {
+    if (!state.layout.entranceParticle) state.layout.entranceParticle = { path: '' }
+    state.layout.entranceParticle.path = ''
+    entranceParticleAsset.path = ''
+    entranceParticleAsset.scene = null
+    entranceParticleAsset.animations = []
+    entranceParticleAsset.loadingPromise = null
+    for (let i = activeParticleBursts.length - 1; i >= 0; i--) {
+      const burst = activeParticleBursts[i]
+      if (burst.node && burst.node.parent) burst.node.parent.remove(burst.node)
+      activeParticleBursts.splice(i, 1)
+    }
+    syncEntranceParticleUi()
+    scheduleSaveLayout()
+    setStatus('已清除出场粒子特效')
+  }
+
   function bindUiEvents() {
     dom.modeToggleBtn.addEventListener('click', () => {
       applyMode(state.layout.mode === 'edit' ? 'render' : 'edit')
     })
     dom.sceneImportBtn.addEventListener('click', importSceneModel)
     dom.sceneClearBtn.addEventListener('click', clearSceneModel)
+    if (dom.particleImportBtn) dom.particleImportBtn.addEventListener('click', importEntranceParticle)
+    if (dom.particleClearBtn) dom.particleClearBtn.addEventListener('click', clearEntranceParticle)
     if (dom.videoImportBtn) dom.videoImportBtn.addEventListener('click', importVideoScreen)
     if (dom.videoClearBtn) dom.videoClearBtn.addEventListener('click', clearVideoScreen)
     if (dom.applyVideoSettingsBtn) dom.applyVideoSettingsBtn.addEventListener('click', applyVideoSettingsFromInputs)
@@ -2293,6 +2484,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       try { mixer.update(dt) } catch { }
     }
     updateEntranceEffects()
+    updateParticleBursts(dt)
     if (cameraMoveState.dir && !cameraTransition) {
       moveCameraByDirection(cameraMoveState.dir, dt * 5.2, false, false)
     }
