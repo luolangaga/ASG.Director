@@ -93,6 +93,7 @@
     transparentBackground: true,
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
+    maxFps: 60,
     droneMode: false,
     fogEnabled: true,
     fogStrength: 1,
@@ -203,6 +204,7 @@
   let fpsAccum = 0
   let fpsFrames = 0
   let fpsLast = 0
+  let frameLimiterLastAt = 0
   let bpRoleSyncRunning = false
   let bpRoleSyncPending = false
   let pendingCameraEventKey = ''
@@ -283,6 +285,7 @@
     , fogStrength: document.getElementById('fogStrength')
     , shadowStrength: document.getElementById('shadowStrength')
     , droneModeEnabled: document.getElementById('droneModeEnabled')
+    , maxFps: document.getElementById('maxFps')
     , entranceEffectSelect: document.getElementById('entranceEffectSelect')
     , particleImportBtn: document.getElementById('particleImportBtn')
     , particleClearBtn: document.getElementById('particleClearBtn')
@@ -362,6 +365,7 @@
     out.qualityPreset = (typeof base.qualityPreset === 'string' && QUALITY_PRESETS[base.qualityPreset])
       ? base.qualityPreset
       : 'high'
+    out.maxFps = Math.max(10, Math.min(240, Math.round(asNumber(base.maxFps, 60))))
     out.droneMode = !!base.droneMode
     out.fogEnabled = base.fogEnabled !== false
     out.fogStrength = Math.max(0, Math.min(3, asNumber(base.fogStrength, 1)))
@@ -2107,27 +2111,34 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
   function buildFocusFrameForSlot(slotKey) {
     const runtime = slotRuntime.get(slotKey)
     if (!runtime || !runtime.group) return null
-    const target = new THREE.Vector3().copy(runtime.group.position)
-    let focusRadius = Math.max(2.2, asNumber(orbit.radius, 8))
+    const target = new THREE.Vector3()
+    runtime.group.getWorldPosition(target)
+    let boundsRadius = 0.55
 
     if (runtime.model) {
       const box = new THREE.Box3().setFromObject(runtime.model)
       if (Number.isFinite(box.min.x) && Number.isFinite(box.max.x)) {
-        const center = box.getCenter(new THREE.Vector3())
-        const size = box.getSize(new THREE.Vector3())
-        target.copy(center)
-        const maxSize = Math.max(0.8, size.x, size.y, size.z)
-        focusRadius = Math.max(2.0, Math.min(18, maxSize * 2.2))
+        const sphere = box.getBoundingSphere(new THREE.Sphere())
+        if (sphere && Number.isFinite(sphere.radius) && sphere.radius > 0) {
+          target.copy(sphere.center)
+          boundsRadius = Math.max(0.25, sphere.radius)
+        }
       }
     }
 
-    if (runtime.cfg?.roleType === 'scene') {
-      focusRadius = Math.max(focusRadius, 9)
-    } else if (runtime.cfg?.roleType === 'light') {
-      focusRadius = Math.max(2.2, Math.min(focusRadius, 4.5))
-    } else if (runtime.cfg?.roleType === 'video') {
-      focusRadius = Math.max(2.6, Math.min(focusRadius, 6.5))
-    }
+    if (runtime.cfg?.roleType === 'scene') boundsRadius = Math.max(boundsRadius, 3.2)
+    if (runtime.cfg?.roleType === 'light') boundsRadius = Math.max(boundsRadius, 0.45)
+    if (runtime.cfg?.roleType === 'video') boundsRadius = Math.max(boundsRadius, 0.9)
+
+    const vfov = THREE.MathUtils.degToRad(Math.max(20, Math.min(120, asNumber(camera?.fov, 45))))
+    const aspect = Math.max(0.1, asNumber(camera?.aspect, 16 / 9))
+    const hfov = 2 * Math.atan(Math.tan(vfov * 0.5) * aspect)
+    const effectiveFov = Math.max(0.14, Math.min(vfov, hfov))
+    let focusRadius = (boundsRadius / Math.sin(effectiveFov * 0.5)) * 1.18
+    focusRadius = Math.max(1.8, Math.min(220, focusRadius))
+
+    if (runtime.cfg?.roleType === 'light') focusRadius = Math.max(2.2, Math.min(5.5, focusRadius))
+    if (runtime.cfg?.roleType === 'video') focusRadius = Math.max(2.8, Math.min(9.5, focusRadius))
 
     const cosPitch = Math.cos(orbit.pitch)
     const position = {
@@ -2268,6 +2279,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncCameraEditorInputs()
     syncEntranceParticleUi()
     syncStylizedRenderInputs()
+    if (dom.maxFps) dom.maxFps.value = String(Math.max(10, Math.min(240, asNumber(state.layout.maxFps, 60))))
   }
 
   function applyMode(mode) {
@@ -2517,6 +2529,13 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         scheduleSaveLayout()
       })
     }
+    if (dom.maxFps) {
+      dom.maxFps.addEventListener('change', () => {
+        state.layout.maxFps = Math.max(10, Math.min(240, Math.round(asNumber(dom.maxFps.value, 60))))
+        dom.maxFps.value = String(state.layout.maxFps)
+        scheduleSaveLayout()
+      })
+    }
     if (dom.entranceEffectSelect) {
       dom.entranceEffectSelect.addEventListener('change', () => {
         const next = dom.entranceEffectSelect.value
@@ -2737,6 +2756,13 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
 
   function renderLoop() {
     rafId = requestAnimationFrame(renderLoop)
+    const now = performance.now()
+    const maxFps = Math.max(10, Math.min(240, asNumber(state.layout?.maxFps, 60)))
+    const minFrameMs = 1000 / maxFps
+    if (frameLimiterLastAt > 0 && (now - frameLimiterLastAt) < minFrameMs) {
+      return
+    }
+    frameLimiterLastAt = now
     const dt = clock.getDelta()
     fpsAccum += dt
     fpsFrames += 1
