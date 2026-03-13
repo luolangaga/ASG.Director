@@ -5845,10 +5845,22 @@ let localBpState = {
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
     droneMode: false,
+    maxFps: 60,
     fogEnabled: true,
     fogStrength: 1,
     shadowStrength: 0.45,
     entranceEffect: 'fade',
+    entranceParticle: {
+      path: ''
+    },
+    stylizedRender: {
+      toonEnabled: false,
+      toonSteps: 3,
+      outlineEnabled: true,
+      outlineThickness: 0.004,
+      outlineColor: '#000000',
+      outlineAlpha: 1
+    },
     survivorScale: 1,
     hunterScale: 1.1,
     videoScreen: {
@@ -5941,6 +5953,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic')
     ? m3d.qualityPreset
     : 'high'
+  m3d.maxFps = Math.max(10, Math.min(240, Number.isFinite(Number(m3d.maxFps)) ? Number(m3d.maxFps) : 60))
   m3d.droneMode = !!m3d.droneMode
   m3d.fogEnabled = m3d.fogEnabled !== false
   m3d.fogStrength = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.fogStrength))
@@ -5952,6 +5965,17 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.entranceEffect = (m3d.entranceEffect === 'none' || m3d.entranceEffect === 'flameDissolve')
     ? m3d.entranceEffect
     : 'fade'
+  if (!m3d.entranceParticle || typeof m3d.entranceParticle !== 'object') m3d.entranceParticle = {}
+  m3d.entranceParticle.path = (typeof m3d.entranceParticle.path === 'string') ? m3d.entranceParticle.path : ''
+  if (!m3d.stylizedRender || typeof m3d.stylizedRender !== 'object') m3d.stylizedRender = {}
+  m3d.stylizedRender.toonEnabled = !!m3d.stylizedRender.toonEnabled
+  m3d.stylizedRender.toonSteps = Math.max(2, Math.min(5, Number.isFinite(Number(m3d.stylizedRender.toonSteps)) ? Number(m3d.stylizedRender.toonSteps) : 3))
+  m3d.stylizedRender.outlineEnabled = m3d.stylizedRender.outlineEnabled !== false
+  m3d.stylizedRender.outlineThickness = Math.max(0.0005, Math.min(0.03, Number.isFinite(Number(m3d.stylizedRender.outlineThickness)) ? Number(m3d.stylizedRender.outlineThickness) : 0.004))
+  m3d.stylizedRender.outlineColor = (typeof m3d.stylizedRender.outlineColor === 'string' && m3d.stylizedRender.outlineColor.trim())
+    ? m3d.stylizedRender.outlineColor.trim()
+    : '#000000'
+  m3d.stylizedRender.outlineAlpha = Math.max(0, Math.min(1, Number.isFinite(Number(m3d.stylizedRender.outlineAlpha)) ? Number(m3d.stylizedRender.outlineAlpha) : 1))
   m3d.survivorScale = Math.max(0.001, Number.isFinite(Number(m3d.survivorScale)) ? Number(m3d.survivorScale) : 1)
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
@@ -7868,6 +7892,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic')
       ? base.qualityPreset
       : 'high',
+    maxFps: Math.max(10, Math.min(240, Number.isFinite(Number(base.maxFps)) ? Number(base.maxFps) : 60)),
     droneMode: !!base.droneMode,
     fogEnabled: base.fogEnabled !== false,
     fogStrength: Math.max(0, Math.min(3, Number.isFinite(Number(base.fogStrength))
@@ -7879,6 +7904,23 @@ function normalizeCharacterModel3DLayoutInput(input) {
     entranceEffect: (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
       ? base.entranceEffect
       : 'fade',
+    entranceParticle: {
+      path: typeof base?.entranceParticle?.path === 'string' ? base.entranceParticle.path : ''
+    },
+    stylizedRender: {
+      toonEnabled: !!base?.stylizedRender?.toonEnabled,
+      toonSteps: Math.max(2, Math.min(5, Number.isFinite(Number(base?.stylizedRender?.toonSteps)) ? Number(base.stylizedRender.toonSteps) : 3)),
+      outlineEnabled: base?.stylizedRender?.outlineEnabled !== false,
+      outlineThickness: Math.max(0.0005, Math.min(0.03, Number.isFinite(Number(base?.stylizedRender?.outlineThickness))
+        ? Number(base.stylizedRender.outlineThickness)
+        : 0.004)),
+      outlineColor: (typeof base?.stylizedRender?.outlineColor === 'string' && base.stylizedRender.outlineColor.trim())
+        ? base.stylizedRender.outlineColor.trim()
+        : '#000000',
+      outlineAlpha: Math.max(0, Math.min(1, Number.isFinite(Number(base?.stylizedRender?.outlineAlpha))
+        ? Number(base.stylizedRender.outlineAlpha)
+        : 1))
+    },
     survivorScale: Math.max(0.001, Number.isFinite(Number(base.survivorScale)) ? Number(base.survivorScale) : 1),
     hunterScale: Math.max(0.001, Number.isFinite(Number(base.hunterScale))
       ? Number(base.hunterScale)

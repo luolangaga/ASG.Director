@@ -887,6 +887,7 @@
     }
   }
 
+
   function syncStylizedRenderInputs() {
     const cfg = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
     if (dom.stylizedToonEnabled) dom.stylizedToonEnabled.checked = !!cfg.toonEnabled
@@ -1399,6 +1400,9 @@
     runtime.model = null
     runtime.modelPath = ''
     if (mixers.has(key)) mixers.delete(key)
+    if (runtime.cfg?.roleType === 'survivor') {
+      refreshPuppeteerModelScaleFix()
+    }
   }
 
   function updateVideoScreenGeometry(runtime) {
@@ -1445,6 +1449,200 @@
         node.castShadow = true
         node.receiveShadow = true
       }
+    })
+  }
+
+  function isPuppeteerRoleName(name) {
+    const text = String(name || '').trim().toLowerCase()
+    return text === '木偶师' || text === 'puppeteer'
+  }
+
+  function isPuppeteerRuntime(runtime, roleName = '') {
+    const roleText = String(roleName || '').trim().toLowerCase()
+    const pathText = String(runtime?.modelPath || '').trim().toLowerCase()
+    if (isPuppeteerRoleName(roleText)) return true
+    return roleText.includes('木偶师')
+      || roleText.includes('puppeteer')
+      || pathText.includes('木偶师')
+      || pathText.includes('puppeteer')
+      || pathText.includes('bugoushi')
+      || pathText.includes('muou')
+  }
+
+  function getObjectWorldHeight(obj) {
+    if (!obj || !THREE) return 0
+    obj.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(obj)
+    if (!Number.isFinite(box.min.y) || !Number.isFinite(box.max.y)) return 0
+    return Math.max(0, box.max.y - box.min.y)
+  }
+
+  function getUniformScaleValue(obj) {
+    if (!obj) return 0
+    const scale = obj.scale ? obj.scale : obj
+    if (!scale) return 0
+    return Math.max(
+      Math.abs(asNumber(scale.x, 0)),
+      Math.abs(asNumber(scale.y, 0)),
+      Math.abs(asNumber(scale.z, 0))
+    )
+  }
+
+  function buildSurvivorScaleDebug(runtime, roleName, extra = {}) {
+    const model = runtime?.model || null
+    const fullHeight = getObjectWorldHeight(model)
+    const primaryBox = getPuppeteerPrimaryBox(model)
+    const primaryHeight = primaryBox ? Math.max(0, primaryBox.getSize(new THREE.Vector3()).y) : 0
+    const rootScale = getUniformScaleValue(model)
+    return {
+      slot: runtime?.key || '',
+      role: roleName || '',
+      modelPath: runtime?.modelPath || '',
+      detectedAsPuppeteer: isPuppeteerRuntime(runtime, roleName),
+      fullHeight: Number(fullHeight.toFixed(4)),
+      primaryHeight: Number(primaryHeight.toFixed(4)),
+      rootScale: Number(rootScale.toFixed(4)),
+      modelScale: model ? {
+        x: Number(model.scale.x.toFixed(4)),
+        y: Number(model.scale.y.toFixed(4)),
+        z: Number(model.scale.z.toFixed(4))
+      } : null,
+      groupScale: runtime?.group ? {
+        x: Number(runtime.group.scale.x.toFixed(4)),
+        y: Number(runtime.group.scale.y.toFixed(4)),
+        z: Number(runtime.group.scale.z.toFixed(4))
+      } : null,
+      ...extra
+    }
+  }
+
+  function getPuppeteerPrimaryBox(model) {
+    if (!model || !THREE) return null
+    const includeBox = new THREE.Box3()
+    let hasInclude = false
+    model.updateMatrixWorld(true)
+    model.traverse((node) => {
+      if (!node || !node.isMesh) return
+      const name = String(node.name || '').toLowerCase()
+      if (!name) return
+      const include = name.includes('_body') || name.includes('_head')
+      const exclude = name.includes('puppet') || name.includes('dart')
+      if (!include || exclude) return
+      const meshBox = new THREE.Box3().setFromObject(node)
+      if (!Number.isFinite(meshBox.min.x) || !Number.isFinite(meshBox.max.x)) return
+      if (!hasInclude) {
+        includeBox.copy(meshBox)
+        hasInclude = true
+      } else {
+        includeBox.union(meshBox)
+      }
+    })
+    return hasInclude ? includeBox : null
+  }
+
+  function getGenericSurvivorPrimaryHeight(model) {
+    if (!model || !THREE) return 0
+    const includeBox = new THREE.Box3()
+    let hasInclude = false
+    let fallbackHeight = 0
+    model.updateMatrixWorld(true)
+    model.traverse((node) => {
+      if (!node || !node.isMesh) return
+      const meshBox = new THREE.Box3().setFromObject(node)
+      if (!Number.isFinite(meshBox.min.x) || !Number.isFinite(meshBox.max.x)) return
+      const size = meshBox.getSize(new THREE.Vector3())
+      const h = Math.max(0, size.y)
+      if (h > fallbackHeight) fallbackHeight = h
+      const name = String(node.name || '').toLowerCase()
+      if (name.includes('weapon') || name.includes('prop') || name.includes('dart')) return
+      if (h < 0.05) return
+      if (!hasInclude) {
+        includeBox.copy(meshBox)
+        hasInclude = true
+      } else {
+        includeBox.union(meshBox)
+      }
+    })
+    if (hasInclude) {
+      return Math.max(0, includeBox.getSize(new THREE.Vector3()).y)
+    }
+    return fallbackHeight
+  }
+
+  function refreshPuppeteerModelScaleFix() {
+    if (!THREE) return
+    const survivorRuntimes = []
+    for (let i = 1; i <= 4; i++) {
+      const key = `survivor${i}`
+      const runtime = slotRuntime.get(key)
+      if (runtime && runtime.model) survivorRuntimes.push(runtime)
+    }
+    if (!survivorRuntimes.length) return
+
+    const referenceHeights = []
+    const referenceRootScales = []
+    survivorRuntimes.forEach((runtime) => {
+      const roleName = state.slotDisplayNames[runtime.key] || ''
+      if (isPuppeteerRuntime(runtime, roleName)) return
+      const h = getGenericSurvivorPrimaryHeight(runtime.model)
+      if (h > 0.15 && h < 2.5) referenceHeights.push(h)
+      const rootScale = getUniformScaleValue(runtime.model)
+      if (rootScale > 0.005 && rootScale < 1) referenceRootScales.push(rootScale)
+    })
+    const fallbackReferenceHeight = 0.72
+    const fallbackReferenceRootScale = 0.032
+    referenceHeights.sort((a, b) => a - b)
+    referenceRootScales.sort((a, b) => a - b)
+    const targetHeight = referenceHeights.length
+      ? referenceHeights[Math.floor(referenceHeights.length / 2)]
+      : fallbackReferenceHeight
+    const targetRootScale = referenceRootScales.length
+      ? referenceRootScales[Math.floor(referenceRootScales.length / 2)]
+      : fallbackReferenceRootScale
+
+    console.log('[CharacterModel3D][PuppeteerFix] reference survivor heights =', referenceHeights.map(v => Number(v.toFixed(4))))
+    console.log('[CharacterModel3D][PuppeteerFix] target reference height =', Number(targetHeight.toFixed(4)))
+    console.log('[CharacterModel3D][PuppeteerFix] reference survivor root scales =', referenceRootScales.map(v => Number(v.toFixed(4))))
+    console.log('[CharacterModel3D][PuppeteerFix] target root scale =', Number(targetRootScale.toFixed(4)))
+
+    survivorRuntimes.forEach((runtime) => {
+      const roleName = state.slotDisplayNames[runtime.key] || ''
+      const model = runtime.model
+      if (!model) return
+      if (!model.userData) model.userData = {}
+      const baseScale = model.userData.__asgBaseScale && typeof model.userData.__asgBaseScale.clone === 'function'
+        ? model.userData.__asgBaseScale
+        : model.scale.clone()
+      model.userData.__asgBaseScale = baseScale.clone()
+
+      if (!isPuppeteerRuntime(runtime, roleName)) {
+        model.scale.copy(baseScale)
+        model.updateMatrixWorld(true)
+        return
+      }
+
+      const baseRootScale = Math.max(0, getUniformScaleValue(baseScale))
+      if (!(baseRootScale > 1e-6)) {
+        console.warn('[CharacterModel3D][PuppeteerFix] invalid base root scale for', buildSurvivorScaleDebug(runtime, roleName))
+        model.scale.copy(baseScale)
+        model.updateMatrixWorld(true)
+        setStatus(`木偶师特判失败: ${runtime.key} 根缩放无效`)
+        return
+      }
+
+      const ratioRaw = targetRootScale / baseRootScale
+      const ratio = Math.max(0.35, Math.min(1.15, ratioRaw))
+      model.scale.copy(baseScale).multiplyScalar(ratio)
+      model.updateMatrixWorld(true)
+      const debugInfo = buildSurvivorScaleDebug(runtime, roleName, {
+        targetHeight: Number(targetHeight.toFixed(4)),
+        targetRootScale: Number(targetRootScale.toFixed(4)),
+        baseRootScale: Number(baseRootScale.toFixed(4)),
+        ratioRaw: Number(ratioRaw.toFixed(4)),
+        ratioApplied: Number(ratio.toFixed(4))
+      })
+      console.warn('[CharacterModel3D][PuppeteerFix] applied', debugInfo)
+      setStatus(`木偶师缩放: ${runtime.key} 根缩放 ${debugInfo.baseRootScale} -> 目标 ${debugInfo.targetRootScale} 倍率 ${debugInfo.ratioApplied}`)
     })
   }
 
@@ -1938,6 +2136,15 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       prepareModelForShadows(obj)
       applyStylizedToObject(obj, runtime.cfg?.roleType || '')
       runtime.group.add(obj)
+      if (runtime.cfg?.roleType === 'survivor') {
+        const roleName = state.slotDisplayNames[key] || ''
+        console.warn('[CharacterModel3D][ModelLoad] survivor loaded', buildSurvivorScaleDebug(runtime, roleName, {
+          phase: 'loaded'
+        }))
+      }
+      if (runtime.cfg?.roleType === 'survivor') {
+        refreshPuppeteerModelScaleFix()
+      }
       if (Array.isArray(animations) && animations.length) {
         const mixer = new THREE.AnimationMixer(obj)
         animations.forEach((clip) => {
