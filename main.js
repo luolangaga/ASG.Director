@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, screen, Notification, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { pathToFileURL } = require('url')
+const { pathToFileURL, fileURLToPath } = require('url')
 const { spawn, spawnSync } = require('child_process')
 const os = require('os')
 const https = require('https')
@@ -8571,6 +8571,49 @@ ipcMain.handle('select-file', async (event, options = {}) => {
     return { success: false, canceled: true }
   } catch (error) {
     return { success: false, error: error.message }
+  }
+})
+
+try { ipcMain.removeHandler('read-binary-file') } catch { /* ignore */ }
+ipcMain.handle('read-binary-file', async (event, inputPath) => {
+  try {
+    const raw = String(inputPath || '').trim()
+    if (!raw) return { success: false, error: 'empty-path' }
+
+    let resolvedPath = raw
+    if (/^file:/i.test(resolvedPath)) {
+      try {
+        resolvedPath = fileURLToPath(resolvedPath)
+      } catch {
+        return { success: false, error: 'invalid-file-url' }
+      }
+    }
+
+    resolvedPath = path.normalize(resolvedPath)
+    if (!path.isAbsolute(resolvedPath)) {
+      return { success: false, error: 'path-not-absolute' }
+    }
+    if (!fs.existsSync(resolvedPath)) {
+      return { success: false, error: 'file-not-found' }
+    }
+    const stat = fs.statSync(resolvedPath)
+    if (!stat.isFile()) {
+      return { success: false, error: 'not-a-file' }
+    }
+
+    const data = fs.readFileSync(resolvedPath)
+    const basePath = path.dirname(resolvedPath)
+    const basePathUrl = pathToFileURL(basePath + path.sep).toString()
+    return {
+      success: true,
+      path: resolvedPath,
+      size: stat.size,
+      basePath,
+      basePathUrl,
+      base64: data.toString('base64')
+    }
+  } catch (error) {
+    return { success: false, error: error.message || String(error) }
   }
 })
 

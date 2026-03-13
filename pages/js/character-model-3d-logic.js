@@ -314,19 +314,37 @@
   function showModelLoadErrorDialog(detail) {
     try {
       const d = (detail && typeof detail === 'object') ? detail : {}
+      const slotText = d.slotLabel || d.slot || '-'
+      const errorText = d.errorMessage || '-'
       const lines = [
         '模型加载失败',
-        `槽位: ${d.slotLabel || d.slot || '-'}`,
+        `槽位: ${slotText}`,
         `路径: ${d.modelPath || '-'}`,
         `URL: ${d.resolvedUrl || '-'}`,
         `扩展名: ${d.ext || '-'}`,
-        `错误: ${d.errorMessage || '-'}`
+        `错误: ${errorText}`
       ]
       if (d.errorStack) {
         const stack = String(d.errorStack).split('\n').slice(0, 6).join('\n')
         lines.push(`堆栈:\n${stack}`)
       }
-      window.alert(lines.join('\n'))
+
+      // 静默错误：不弹窗打断用户，仅写状态栏和控制台
+      const joined = lines.join('\n')
+      const lower = joined.toLowerCase()
+      const likelyMissingAsset = lower.includes('file-not-found')
+        || lower.includes('failed to fetch')
+        || lower.includes('not found')
+        || lower.includes('err_file_not_found')
+        || lower.includes('empty-path')
+        || lower.includes('invalid-url')
+      if (likelyMissingAsset) {
+        setStatus(`模型资源不存在: ${slotText}`)
+        console.warn('[CharacterModel3D] 模型缺失(已静默):', d)
+      } else {
+        setStatus(`模型加载失败: ${slotText}`)
+        console.error('[CharacterModel3D] 模型加载失败(已静默):', d)
+      }
     } catch (e) {
       console.error('[CharacterModel3D] 弹出错误对话框失败:', e)
     }
@@ -447,6 +465,59 @@
       return `file:${encodeURI(src.replace(/\\/g, '/'))}`
     }
     return src
+  }
+
+  function toLocalFilePath(value) {
+    const src = String(value || '').trim()
+    if (!src) return ''
+    if (/^[a-zA-Z]:[\\/]/.test(src) || src.startsWith('\\\\')) return src
+    if (!/^file:/i.test(src)) return ''
+    try {
+      const u = new URL(src)
+      if (u.protocol !== 'file:') return ''
+      let out = decodeURIComponent(u.pathname || '')
+      if (/^\/[a-zA-Z]:/.test(out)) out = out.slice(1)
+      out = out.replace(/\//g, '\\')
+      if (u.host) {
+        const p = out.startsWith('\\') ? out : `\\${out}`
+        return `\\\\${u.host}${p}`
+      }
+      return out
+    } catch {
+      return ''
+    }
+  }
+
+  function base64ToArrayBuffer(base64Value) {
+    const cleaned = String(base64Value || '').replace(/^data:[^,]*,/, '')
+    const binary = atob(cleaned)
+    const len = binary.length
+    const bytes = new Uint8Array(len)
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i)
+    return bytes.buffer
+  }
+
+  async function tryLoadGltfViaIpc(modelPath, onLoaded, onError) {
+    if (!window.electronAPI || typeof window.electronAPI.readBinaryFile !== 'function') return false
+    const localPath = toLocalFilePath(modelPath) || (/^[a-zA-Z]:[\\/]/.test(String(modelPath || '')) || String(modelPath || '').startsWith('\\\\') ? String(modelPath || '') : '')
+    if (!localPath) return false
+    try {
+      const readRes = await window.electronAPI.readBinaryFile(localPath)
+      if (!readRes || !readRes.success || !readRes.base64) {
+        onError(new Error(readRes?.error || 'read-binary-file-failed'))
+        return true
+      }
+      const arrayBuffer = base64ToArrayBuffer(readRes.base64)
+      const basePath = String(readRes.basePathUrl || '')
+      gltfLoader.parse(arrayBuffer, basePath, (gltf) => {
+        const obj = gltf && gltf.scene ? gltf.scene : null
+        onLoaded(obj, (gltf && Array.isArray(gltf.animations)) ? gltf.animations : [])
+      }, onError)
+      return true
+    } catch (error) {
+      onError(error)
+      return true
+    }
   }
 
   async function loadScript(src) {
@@ -2189,10 +2260,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         return
       }
 
-      gltfLoader.load(url, (gltf) => {
-        const obj = gltf && gltf.scene ? gltf.scene : null
-        doneLoaded(obj, (gltf && Array.isArray(gltf.animations)) ? gltf.animations : [])
-      }, undefined, doneError)
+      ; (async () => {
+        const handledByIpc = await tryLoadGltfViaIpc(nextPath, doneLoaded, doneError)
+        if (handledByIpc) return
+        gltfLoader.load(url, (gltf) => {
+          const obj = gltf && gltf.scene ? gltf.scene : null
+          doneLoaded(obj, (gltf && Array.isArray(gltf.animations)) ? gltf.animations : [])
+        }, undefined, doneError)
+      })()
     })
   }
 
