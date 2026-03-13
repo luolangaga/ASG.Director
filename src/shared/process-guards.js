@@ -10,22 +10,36 @@ function isBrokenPipeError(err) {
 }
 
 function installProcessErrorGuards(logger = console) {
-  process.on('uncaughtException', (err) => {
-    if (isBrokenPipeError(err)) return
+  const logError = (message, err, source) => {
     try {
-      logger.error('[Main] Uncaught exception:', err && err.stack ? err.stack : err)
+      if (logger && typeof logger.error === 'function') {
+        logger.error(message, {
+          source,
+          error: err && err.stack ? err.stack : err
+        })
+        return
+      }
+      if (logger && typeof logger.write === 'function') {
+        logger.write('error', message, {
+          source,
+          error: err && err.stack ? err.stack : err
+        })
+        return
+      }
+      console.error(message, err && err.stack ? err.stack : err)
     } catch {
       // ignore
     }
+  }
+
+  process.on('uncaughtException', (err) => {
+    if (isBrokenPipeError(err)) return
+    logError('[Main] Uncaught exception', err, 'process.uncaughtException')
   })
 
   process.on('unhandledRejection', (reason) => {
     if (isBrokenPipeError(reason)) return
-    try {
-      logger.error('[Main] Unhandled rejection:', reason && reason.stack ? reason.stack : reason)
-    } catch {
-      // ignore
-    }
+    logError('[Main] Unhandled rejection', reason, 'process.unhandledRejection')
   })
 }
 

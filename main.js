@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, screen, Notification } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, screen, Notification, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
@@ -8,6 +8,18 @@ const https = require('https')
 const http = require('http')
 const archiver = require('archiver')
 const { pinyin } = require('pinyin-pro')
+const { createAppLogger, normalizeLevel } = require('./src/shared/app-logger')
+const userDataPath = app.getPath('userData')
+
+const appLogger = createAppLogger({
+  userDataPath,
+  defaultLevel: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+  maxEntryCount: 1500,
+  maxBufferedEntries: 1500,
+  maxRotatedFiles: 0
+})
+appLogger.captureConsole(console)
+
 let sharp = null
 try {
   sharp = require('sharp')
@@ -20,7 +32,7 @@ const { readJsonFileSafe, writeJsonFileSafe } = require('./src/shared/json-file'
 const { registerBasicIpcHandlers } = require('./src/main/ipc/basic')
 const { createOfficialModelService } = require('./src/services/official-model-service')
 
-installProcessErrorGuards(console)
+installProcessErrorGuards(appLogger)
 
 function extractMarkedJsonOutput(stdoutText) {
   if (!stdoutText) return null
@@ -64,7 +76,7 @@ registerBasicIpcHandlers({ ipcMain, BrowserWindow })
 
 const officialModelService = createOfficialModelService({
   ipcMain,
-  userDataPath: app.getPath('userData'),
+  userDataPath,
   readJsonFileSafe,
   downloadFile,
   app,
@@ -84,6 +96,7 @@ let storeWindow = null
 let pluginStoreWindow = null
 let postMatchWindow = null
 let pluginManagerWindow = null
+let logViewerWindow = null
 let localBpWindow = null
 let localBpGuideWindow = null
 let characterDisplayWindow = null
@@ -217,34 +230,101 @@ ipcMain.on('broadcast-animation', (event, payload) => {
   broadcastToAllWindows('broadcast-animation', payload)
 })
 
-// 渲染进程日志桥接到主进程终端
+// 渲染进程日志桥接到主进程统一日志
 ipcMain.on('renderer:log', (event, payload) => {
   try {
     const p = (payload && typeof payload === 'object') ? payload : {}
-    const lvl = String(p.level || 'log').toLowerCase()
-    const source = p.source ? `[${p.source}]` : '[renderer]'
-    const url = p.url ? ` ${p.url}` : ''
-    const msg = p.message ? ` ${p.message}` : ''
-    const prefix = `[RendererBridge]${source}${url}${msg}`
-    if (lvl === 'error') {
-      console.error(prefix)
-      if (p.stack) console.error(p.stack)
-      return
-    }
-    if (lvl === 'warn') {
-      console.warn(prefix)
-      if (p.stack) console.warn(p.stack)
-      return
-    }
-    console.log(prefix)
-    if (p.stack) console.log(p.stack)
+    const lvl = normalizeLevel(p.level, 'info')
+    const source = p.source || 'renderer'
+    const url = p.url || null
+    const msg = p.message ? String(p.message) : ''
+    appLogger.write(lvl, `[RendererBridge][${source}] ${msg}`.trim(), {
+      source: 'renderer:log',
+      windowUrl: url,
+      stack: p.stack,
+      filename: p.filename,
+      lineno: p.lineno,
+      colno: p.colno
+    })
   } catch (e) {
-    console.error('[RendererBridge] 处理 renderer:log 失败:', e?.message || e)
+    appLogger.error('[RendererBridge] 处理 renderer:log 失败', {
+      source: 'renderer:log',
+      error: e?.stack || e?.message || e
+    })
   }
 })
 
+ipcMain.handle('log:get-recent', (event, limit = 300) => {
+  return { success: true, entries: appLogger.getRecent(limit) }
+})
+
+ipcMain.handle('log:get-file-info', () => {
+  return { success: true, ...appLogger.getFileInfo() }
+})
+
+ipcMain.handle('log:get-level', () => {
+  return { success: true, level: appLogger.getLevel(), levels: appLogger.levels }
+})
+
+ipcMain.handle('log:set-level', (event, level) => {
+  const next = appLogger.setLevel(level)
+  appLogger.info(`[Logger] 日志级别已更新为 ${next}`, { source: 'ipc.log:set-level' })
+  return { success: true, level: next }
+})
+
+ipcMain.handle('log:clear', () => {
+  const result = appLogger.clear()
+  if (result && result.success) {
+    appLogger.info('[Logger] 日志文件已清空', { source: 'ipc.log:clear' })
+    return { success: true }
+  }
+  return { success: false, error: result?.error || '清空日志失败' }
+})
+
+ipcMain.handle('log:open-dir', async () => {
+  try {
+    const info = appLogger.getFileInfo()
+    const openResult = await shell.openPath(info.dir)
+    if (openResult) {
+      return { success: false, error: openResult }
+    }
+    return { success: true, dir: info.dir }
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) }
+  }
+})
+
+app.on('web-contents-created', (event, contents) => {
+  contents.on('render-process-gone', (evt, details) => {
+    appLogger.error('[RendererCrash] render-process-gone', {
+      source: 'webContents.render-process-gone',
+      id: contents.id,
+      url: contents.getURL ? contents.getURL() : null,
+      details
+    })
+  })
+
+  contents.on('did-fail-load', (evt, code, description, validatedURL, isMainFrame) => {
+    appLogger.error('[RendererLoad] did-fail-load', {
+      source: 'webContents.did-fail-load',
+      id: contents.id,
+      code,
+      description,
+      validatedURL,
+      isMainFrame
+    })
+  })
+
+  contents.on('unresponsive', () => {
+    appLogger.warn('[RendererState] unresponsive', {
+      source: 'webContents.unresponsive',
+      id: contents.id,
+      url: contents.getURL ? contents.getURL() : null
+    })
+  })
+})
+
 // 存储路径
-const userDataPath = app.getPath('userData')
 const layoutPath = path.join(userDataPath, 'layout.json')
 const bgImagePath = path.join(userDataPath, 'background')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
@@ -2283,6 +2363,48 @@ function finalizeMainBootstrap(reason = 'renderer-ready') {
 ipcMain.handle('main-ui-bootstrap-ready', async () => {
   finalizeMainBootstrap('renderer-signal')
   return { success: true }
+})
+
+function openLogViewerWindow() {
+  if (logViewerWindow && !logViewerWindow.isDestroyed()) {
+    if (logViewerWindow.isMinimized()) logViewerWindow.restore()
+    logViewerWindow.show()
+    logViewerWindow.focus()
+    return { success: true }
+  }
+
+  logViewerWindow = new BrowserWindow({
+    width: 1080,
+    height: 760,
+    minWidth: 920,
+    minHeight: 620,
+    title: '日志查看器',
+    backgroundColor: '#111827',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  })
+
+  logViewerWindow.loadFile('pages/log-viewer.html')
+  logViewerWindow.setMenu(null)
+  logViewerWindow.on('closed', () => {
+    logViewerWindow = null
+  })
+  return { success: true }
+}
+
+ipcMain.handle('open-log-viewer', () => {
+  try {
+    return openLogViewerWindow()
+  } catch (e) {
+    appLogger.error('[Main] 打开日志查看器失败', {
+      source: 'ipc.open-log-viewer',
+      error: e?.stack || e?.message || e
+    })
+    return { success: false, error: e?.message || String(e) }
+  }
 })
 
 // 创建主窗口（链接展示）
@@ -5729,6 +5851,13 @@ let localBpState = {
     entranceEffect: 'fade',
     survivorScale: 1,
     hunterScale: 1.1,
+    videoScreen: {
+      path: '',
+      loop: true,
+      muted: true,
+      width: 2.2,
+      height: 1.2
+    },
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -5809,7 +5938,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight' || m3d.environmentPreset === 'horrorNight')
     ? m3d.environmentPreset
     : 'duskCinema'
-  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'cinematic')
+  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic')
     ? m3d.qualityPreset
     : 'high'
   m3d.droneMode = !!m3d.droneMode
@@ -5827,6 +5956,12 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
     : Number.isFinite(Number(m3d?.slots?.hunter?.scale?.x)) ? Number(m3d.slots.hunter.scale.x) : 1.1)
+  if (!m3d.videoScreen || typeof m3d.videoScreen !== 'object') m3d.videoScreen = {}
+  m3d.videoScreen.path = (typeof m3d.videoScreen.path === 'string') ? m3d.videoScreen.path : ''
+  m3d.videoScreen.loop = m3d.videoScreen.loop !== false
+  m3d.videoScreen.muted = m3d.videoScreen.muted !== false
+  m3d.videoScreen.width = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.width)) ? Number(m3d.videoScreen.width) : 2.2)
+  m3d.videoScreen.height = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.height)) ? Number(m3d.videoScreen.height) : 1.2)
 
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
     const src = (v && typeof v === 'object') ? v : {}
@@ -5845,7 +5980,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.scene.scale = ensureVec3(m3d.scene.scale, { x: 1, y: 1, z: 1 })
 
   if (!m3d.slots || typeof m3d.slots !== 'object') m3d.slots = {}
-  const slotKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['video1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     if (!m3d.slots[key] || typeof m3d.slots[key] !== 'object') m3d.slots[key] = {}
     m3d.slots[key].position = ensureVec3(m3d.slots[key].position, { x: 0, y: 0, z: 0 })
@@ -7730,7 +7865,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     environmentPreset: (base.environmentPreset === 'cyberpunkNight' || base.environmentPreset === 'horrorNight')
       ? base.environmentPreset
       : 'duskCinema',
-    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'cinematic')
+    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic')
       ? base.qualityPreset
       : 'high',
     droneMode: !!base.droneMode,
@@ -7748,6 +7883,13 @@ function normalizeCharacterModel3DLayoutInput(input) {
     hunterScale: Math.max(0.001, Number.isFinite(Number(base.hunterScale))
       ? Number(base.hunterScale)
       : Number.isFinite(Number(base?.slots?.hunter?.scale?.x)) ? Number(base.slots.hunter.scale.x) : 1.1),
+    videoScreen: {
+      path: typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : '',
+      loop: base?.videoScreen?.loop !== false,
+      muted: base?.videoScreen?.muted !== false,
+      width: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.width)) ? Number(base.videoScreen.width) : 2.2),
+      height: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.height)) ? Number(base.videoScreen.height) : 1.2)
+    },
     scene: {
       modelPath: typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : '',
       position: ensureVec3(base?.scene?.position, { x: 0, y: 0, z: 0 }),
@@ -7785,7 +7927,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     }
   }
 
-  const slotKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['video1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     out.slots[key] = {
       position: ensureVec3(base?.slots?.[key]?.position, { x: 0, y: 0, z: 0 }),

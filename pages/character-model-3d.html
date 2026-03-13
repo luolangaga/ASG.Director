@@ -19,6 +19,16 @@
       <button id="modeToggleBtn" class="btn">切换到渲染模式 (F2)</button>
       <button id="sceneImportBtn" class="btn">导入场景(GLTF/GLB)</button>
       <button id="sceneClearBtn" class="btn">清空场景</button>
+      <button id="videoImportBtn" class="btn">导入视频屏幕</button>
+      <button id="videoClearBtn" class="btn">清除视频屏幕</button>
+    </div>
+    <div class="toolbar-row">
+      <span class="label">视频屏幕</span>
+      <label><input id="videoLoopEnabled" type="checkbox" checked> 循环播放</label>
+      <label><input id="videoMuted" type="checkbox" checked> 静音</label>
+      <label>宽<input id="videoWidth" type="number" step="0.1" min="0.1" value="2.2"></label>
+      <label>高<input id="videoHeight" type="number" step="0.1" min="0.1" value="1.2"></label>
+      <button id="applyVideoSettingsBtn" class="btn">应用视频参数</button>
     </div>
     <div class="toolbar-row">
       <span class="label">天空与光影预设</span>

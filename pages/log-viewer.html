@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日志查看器</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121b2e;
+      --panel-soft: #17223a;
+      --border: #2f3c57;
+      --text: #dbe7ff;
+      --muted: #8ea0c6;
+      --info: #6ab7ff;
+      --warn: #ffcc66;
+      --error: #ff7b7b;
+      --debug: #9bd89b;
+      --btn: #29416e;
+      --btn-hover: #35558f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #0b1220 0%, #0f1729 100%);
+      color: var(--text);
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .wrap {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 6px;
+      padding: 8px;
+    }
+    .bar, .meta {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .meta { background: var(--panel-soft); color: var(--muted); font-size: 12px; }
+    button, select, input {
+      background: var(--btn);
+      border: 1px solid #3f5d95;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font: inherit;
+      font-size: 11px;
+    }
+    button:hover { background: var(--btn-hover); cursor: pointer; }
+    .spacer { flex: 1; }
+    .log-list {
+      overflow: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0d1628;
+      padding: 4px;
+    }
+    .entry {
+      border-bottom: 1px dashed #243451;
+      padding: 3px 2px;
+      font-size: 11px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .entry:last-child { border-bottom: none; }
+    .row {
+      display: grid;
+      grid-template-columns: 168px 58px 1fr;
+      gap: 8px;
+      align-items: center;
+      min-height: 18px;
+    }
+    .ts {
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .msg {
+      overflow-wrap: anywhere;
+    }
+    .lvl {
+      padding: 0 5px;
+      border-radius: 12px;
+      border: 1px solid currentColor;
+      font-size: 10px;
+      text-transform: uppercase;
+      justify-self: start;
+    }
+    .lvl-info { color: var(--info); }
+    .lvl-warn { color: var(--warn); }
+    .lvl-error { color: var(--error); }
+    .lvl-debug { color: var(--debug); }
+    .hint { color: var(--muted); font-size: 10px; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="bar">
+      <button onclick="refreshAll()">刷新</button>
+      <button onclick="toggleAutoRefresh()" id="autoRefreshBtn">自动刷新: 开</button>
+      <button onclick="clearLogs()">清空日志</button>
+      <button onclick="openLogDir()">打开日志目录</button>
+      <span class="spacer"></span>
+      <label for="logLevelSelect">日志级别:</label>
+      <select id="logLevelSelect" onchange="setLogLevel()">
+        <option value="debug">debug</option>
+        <option value="info">info</option>
+        <option value="warn">warn</option>
+        <option value="error">error</option>
+      </select>
+      <input id="filterInput" type="text" placeholder="关键字过滤..." oninput="renderLogs()">
+    </div>
+    <div class="meta" id="metaText">加载中...</div>
+    <div class="log-list" id="logList"></div>
+  </div>
+
+  <script>
+    let logs = []
+    let autoRefresh = true
+    let timer = null
+
+    function levelClass(level) {
+      const key = String(level || 'info').toLowerCase()
+      if (key === 'error') return 'lvl lvl-error'
+      if (key === 'warn') return 'lvl lvl-warn'
+      if (key === 'debug') return 'lvl lvl-debug'
+      return 'lvl lvl-info'
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    function renderLogs() {
+      const list = document.getElementById('logList')
+      const filter = (document.getElementById('filterInput')?.value || '').trim().toLowerCase()
+      const rows = logs.filter((item) => {
+        if (!filter) return true
+        const text = `${item.ts || ''} ${item.level || ''} ${item.message || ''} ${JSON.stringify(item.meta || {})}`.toLowerCase()
+        return text.includes(filter)
+      })
+
+      if (!rows.length) {
+        list.innerHTML = '<div class="hint">暂无日志</div>'
+        return
+      }
+
+      list.innerHTML = rows.map((item) => {
+        const level = String(item.level || 'info').toLowerCase()
+        const msg = escapeHtml(item.message || '')
+        const meta = item.meta ? `<div class="hint">${escapeHtml(JSON.stringify(item.meta))}</div>` : ''
+        return `
+          <div class="entry">
+            <div class="row">
+              <span class="ts">${escapeHtml(item.ts || '')}</span>
+              <span class="${levelClass(level)}">${level}</span>
+              <span class="msg">${msg}</span>
+            </div>
+            ${meta}
+          </div>
+        `
+      }).join('')
+    }
+
+    async function loadMeta() {
+      if (!window.electronAPI) return
+      const [infoRes, levelRes] = await Promise.all([
+        window.electronAPI.logGetFileInfo(),
+        window.electronAPI.logGetLevel()
+      ])
+      const info = infoRes && infoRes.success ? infoRes : {}
+      const level = levelRes && levelRes.success ? levelRes.level : 'info'
+      const el = document.getElementById('metaText')
+      el.textContent = `日志文件: ${info.path || '-'} | 大小: ${info.size || 0} bytes | 更新时间: ${info.updatedAt || '-'}`
+      const select = document.getElementById('logLevelSelect')
+      if (select) select.value = level
+    }
+
+    async function loadLogs() {
+      if (!window.electronAPI) return
+      const res = await window.electronAPI.logGetRecent(1500)
+      logs = (res && res.success && Array.isArray(res.entries)) ? res.entries : []
+      renderLogs()
+    }
+
+    async function refreshAll() {
+      await Promise.all([loadMeta(), loadLogs()])
+    }
+
+    async function setLogLevel() {
+      const level = document.getElementById('logLevelSelect')?.value || 'info'
+      if (!window.electronAPI) return
+      await window.electronAPI.logSetLevel(level)
+      await refreshAll()
+    }
+
+    async function clearLogs() {
+      if (!window.electronAPI) return
+      if (!confirm('确定清空日志文件吗？')) return
+      await window.electronAPI.logClear()
+      await refreshAll()
+    }
+
+    async function openLogDir() {
+      if (!window.electronAPI) return
+      await window.electronAPI.logOpenDir()
+    }
+
+    function toggleAutoRefresh() {
+      autoRefresh = !autoRefresh
+      const btn = document.getElementById('autoRefreshBtn')
+      if (btn) btn.textContent = `自动刷新: ${autoRefresh ? '开' : '关'}`
+    }
+
+    function startLoop() {
+      timer = setInterval(async () => {
+        if (!autoRefresh) return
+        await refreshAll()
+      }, 1500)
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (timer) clearInterval(timer)
+    })
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await refreshAll()
+      startLoop()
+    })
+  </script>
+</body>
+</html>

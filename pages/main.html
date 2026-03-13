@@ -494,6 +494,14 @@
                     oninput="onLocalBpConsoleBackgroundInput()" onchange="onLocalBpConsoleBackgroundInput(true)">
                 </div>
               </div>
+
+              <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
+                <h4>日志管理</h4>
+                <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 12px;">查看本地日志文件，调整日志级别，便于排查问题。</p>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn btn-primary" onclick="openLogViewer()">打开日志查看器</button>
+                </div>
+              </div>
             </div>
 
             <div class="feature-card" id="settings-auto-open-card" style="margin-top:20px;">
@@ -1471,6 +1479,21 @@
         await window.electronAPI.openPluginStore()
       } catch (e) {
         showStatus('打开插件商店失败: ' + e.message, 'error')
+      }
+    }
+
+    async function openLogViewer() {
+      try {
+        if (!window.electronAPI || typeof window.electronAPI.openLogViewer !== 'function') {
+          showStatus('当前版本不支持日志查看器', 'error')
+          return
+        }
+        const result = await window.electronAPI.openLogViewer()
+        if (result && result.success === false) {
+          showStatus('打开日志查看器失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('打开日志查看器失败: ' + (e?.message || '未知错误'), 'error')
       }
     }
 

@@ -176,8 +176,15 @@ const electronAPI = {
   openComponentEditor: () => ipcRenderer.invoke('open-component-editor'),
   openComponentDesignerTutorial: () => ipcRenderer.invoke('open-component-designer-tutorial'),
   openAnimationEditor: () => ipcRenderer.invoke('open-animation-editor'),
+  openLogViewer: () => ipcRenderer.invoke('open-log-viewer'),
   openObsAutomationEditor: () => ipcRenderer.invoke('obs-automation:open-editor'),
   openObsAutomationTutorial: () => ipcRenderer.invoke('obs-automation:open-tutorial'),
+  logGetRecent: (limit) => ipcRenderer.invoke('log:get-recent', limit),
+  logGetFileInfo: () => ipcRenderer.invoke('log:get-file-info'),
+  logGetLevel: () => ipcRenderer.invoke('log:get-level'),
+  logSetLevel: (level) => ipcRenderer.invoke('log:set-level', level),
+  logClear: () => ipcRenderer.invoke('log:clear'),
+  logOpenDir: () => ipcRenderer.invoke('log:open-dir'),
 
   // 插件系统
   openPluginManager: () => ipcRenderer.invoke('open-plugin-manager'),
@@ -354,19 +361,29 @@ try {
       })
     })
 
-    // 额外：把 console.error 也转发到主进程（便于捕捉 loader/three 报错）
-    const origConsoleError = console.error.bind(console)
-    console.error = (...args) => {
-      try {
-        sendRendererLog({
-          level: 'error',
-          source: 'console.error',
-          message: args.map(safeToString).join(' ')
-        })
-      } catch {
-        // ignore
+    // 统一转发 console.* 到主进程日志，便于追踪渲染流程与报错。
+    const consoleBridgeMap = {
+      debug: 'debug',
+      log: 'info',
+      info: 'info',
+      warn: 'warn',
+      error: 'error'
+    }
+    for (const [method, level] of Object.entries(consoleBridgeMap)) {
+      const original = typeof console[method] === 'function' ? console[method].bind(console) : null
+      if (!original) continue
+      console[method] = (...args) => {
+        try {
+          sendRendererLog({
+            level,
+            source: `console.${method}`,
+            message: args.map(safeToString).join(' ')
+          })
+        } catch {
+          // ignore
+        }
+        original(...args)
       }
-      origConsoleError(...args)
     }
   }
 } catch {

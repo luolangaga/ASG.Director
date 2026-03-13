@@ -2,6 +2,7 @@
   const SLOT_CONFIGS = [
     { key: 'scene', label: '场景', roleType: 'scene', index: -1 },
     { key: 'light1', label: '光源1', roleType: 'light', index: 0 },
+    { key: 'video1', label: '视频屏幕', roleType: 'video', index: 0 },
     { key: 'survivor1', label: '求生者1', roleType: 'survivor', index: 0 },
     { key: 'survivor2', label: '求生者2', roleType: 'survivor', index: 1 },
     { key: 'survivor3', label: '求生者3', roleType: 'survivor', index: 2 },
@@ -99,6 +100,13 @@
     entranceEffect: 'fade',
     survivorScale: 1,
     hunterScale: 1.1,
+    videoScreen: {
+      path: '',
+      loop: true,
+      muted: true,
+      width: 2.2,
+      height: 1.2
+    },
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -107,6 +115,7 @@
     },
     slots: {
       light1: { position: { x: 0, y: 4.2, z: 3.2 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      video1: { position: { x: 0, y: 1.4, z: -1.8 }, rotation: { x: 0, y: 180, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor1: { position: { x: -2.4, y: 0, z: 0.8 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor2: { position: { x: -0.8, y: 0, z: 1.0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor3: { position: { x: 0.8, y: 0, z: 1.0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
@@ -220,6 +229,13 @@
     modeToggleBtn: document.getElementById('modeToggleBtn'),
     sceneImportBtn: document.getElementById('sceneImportBtn'),
     sceneClearBtn: document.getElementById('sceneClearBtn'),
+    videoImportBtn: document.getElementById('videoImportBtn'),
+    videoClearBtn: document.getElementById('videoClearBtn'),
+    videoLoopEnabled: document.getElementById('videoLoopEnabled'),
+    videoMuted: document.getElementById('videoMuted'),
+    videoWidth: document.getElementById('videoWidth'),
+    videoHeight: document.getElementById('videoHeight'),
+    applyVideoSettingsBtn: document.getElementById('applyVideoSettingsBtn'),
     slotTabs: document.getElementById('slotTabs'),
     posX: document.getElementById('posX'),
     posY: document.getElementById('posY'),
@@ -321,6 +337,11 @@
       : 'fade'
     out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
     out.hunterScale = Math.max(0.001, asNumber(base?.hunterScale, out.slots.hunter.scale.x))
+    out.videoScreen.path = typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : ''
+    out.videoScreen.loop = base?.videoScreen?.loop !== false
+    out.videoScreen.muted = base?.videoScreen?.muted !== false
+    out.videoScreen.width = Math.max(0.1, asNumber(base?.videoScreen?.width, out.videoScreen.width))
+    out.videoScreen.height = Math.max(0.1, asNumber(base?.videoScreen?.height, out.videoScreen.height))
     out.scene.modelPath = typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : ''
     out.scene.position = ensureVec3(base?.scene?.position, out.scene.position)
     out.scene.rotation = ensureVec3(base?.scene?.rotation, out.scene.rotation)
@@ -524,7 +545,9 @@
         model: null,
         modelPath: '',
         loadingPath: '',
-        loadSeq: 0
+        loadSeq: 0,
+        videoElement: null,
+        videoTexture: null
       })
       if (cfg.roleType === 'light') {
         attachLightRig(cfg.key, group)
@@ -587,6 +610,10 @@
     } catch {
       return ''
     }
+  }
+
+  function isVideoExt(ext) {
+    return ext === '.mp4' || ext === '.webm' || ext === '.ogg' || ext === '.mov' || ext === '.m4v'
   }
 
   function replacePathExt(pathValue, newExtWithDot) {
@@ -1097,6 +1124,18 @@
     if (!runtime || !runtime.group) return
     if (runtime.model) pendingEntranceEffects.delete(runtime.model)
     stopEntranceEffectsForRoot(runtime.model)
+    if (runtime.videoElement) {
+      try {
+        runtime.videoElement.pause()
+        runtime.videoElement.removeAttribute('src')
+        runtime.videoElement.load()
+      } catch { }
+    }
+    if (runtime.videoTexture && typeof runtime.videoTexture.dispose === 'function') {
+      try { runtime.videoTexture.dispose() } catch { }
+    }
+    runtime.videoElement = null
+    runtime.videoTexture = null
     while (runtime.group.children.length) {
       const child = runtime.group.children.pop()
       disposeObject(child)
@@ -1104,6 +1143,27 @@
     runtime.model = null
     runtime.modelPath = ''
     if (mixers.has(key)) mixers.delete(key)
+  }
+
+  function updateVideoScreenGeometry(runtime) {
+    if (!runtime || !runtime.model || !runtime.model.isMesh) return
+    const w = Math.max(0.1, asNumber(state.layout?.videoScreen?.width, 2.2))
+    const h = Math.max(0.1, asNumber(state.layout?.videoScreen?.height, 1.2))
+    const oldGeo = runtime.model.geometry
+    runtime.model.geometry = new THREE.PlaneGeometry(w, h, 1, 1)
+    if (oldGeo && typeof oldGeo.dispose === 'function') {
+      try { oldGeo.dispose() } catch { }
+    }
+  }
+
+  function applyVideoScreenSettingsToRuntime(runtime) {
+    if (!runtime || !runtime.videoElement) return
+    const cfg = state.layout?.videoScreen || DEFAULT_LAYOUT.videoScreen
+    runtime.videoElement.loop = cfg.loop !== false
+    runtime.videoElement.muted = cfg.muted !== false
+    runtime.videoElement.defaultMuted = runtime.videoElement.muted
+    runtime.videoElement.volume = runtime.videoElement.muted ? 0 : 1
+    updateVideoScreenGeometry(runtime)
   }
 
   function disposeObject(obj) {
@@ -1360,6 +1420,91 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
   }
 
+  async function loadVideoScreenForSlot(key, videoPath, resolvedUrl) {
+    const runtime = slotRuntime.get(key)
+    if (!runtime) return { success: false, error: 'slot-not-found' }
+    removeModelFromSlot(key)
+    runtime.modelPath = videoPath
+    const video = document.createElement('video')
+    video.src = resolvedUrl
+    video.crossOrigin = 'anonymous'
+    video.preload = 'auto'
+    video.playsInline = true
+    video.autoplay = true
+    video.loop = state.layout?.videoScreen?.loop !== false
+    video.muted = state.layout?.videoScreen?.muted !== false
+    video.defaultMuted = video.muted
+    video.volume = video.muted ? 0 : 1
+    video.load()
+
+    const ready = await new Promise((resolve) => {
+      let done = false
+      const finish = (ok, err) => {
+        if (done) return
+        done = true
+        try { video.removeEventListener('loadeddata', onLoaded) } catch { }
+        try { video.removeEventListener('error', onError) } catch { }
+        clearTimeout(timer)
+        resolve({ ok, err })
+      }
+      const onLoaded = () => finish(true, null)
+      const onError = () => {
+        const mediaErr = video.error
+        const msg = mediaErr ? `视频解码失败(code=${mediaErr.code})` : '视频加载失败'
+        finish(false, new Error(msg))
+      }
+      const timer = setTimeout(() => finish(false, new Error('视频加载超时')), 10000)
+      video.addEventListener('loadeddata', onLoaded, { once: true })
+      video.addEventListener('error', onError, { once: true })
+    })
+    if (!ready.ok) {
+      try {
+        video.pause()
+        video.removeAttribute('src')
+        video.load()
+      } catch { }
+      return { success: false, error: ready.err?.message || 'video-load-failed' }
+    }
+
+    const texture = new THREE.VideoTexture(video)
+    if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace
+    else if ('encoding' in texture && THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding
+    texture.minFilter = THREE.LinearFilter
+    texture.magFilter = THREE.LinearFilter
+    texture.generateMipmaps = false
+
+    const w = Math.max(0.1, asNumber(state.layout?.videoScreen?.width, 2.2))
+    const h = Math.max(0.1, asNumber(state.layout?.videoScreen?.height, 1.2))
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h, 1, 1),
+      new THREE.MeshStandardMaterial({
+        map: texture,
+        emissiveMap: texture,
+        emissive: new THREE.Color(0xffffff),
+        emissiveIntensity: 0.45,
+        side: THREE.DoubleSide,
+        roughness: 0.92,
+        metalness: 0.0
+      })
+    )
+    mesh.castShadow = false
+    mesh.receiveShadow = true
+
+    runtime.videoElement = video
+    runtime.videoTexture = texture
+    runtime.model = mesh
+    runtime.group.add(mesh)
+    applyVideoScreenSettingsToRuntime(runtime)
+
+    try {
+      const playPromise = video.play()
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => { })
+      }
+    } catch { }
+    return { success: true }
+  }
+
 
   async function loadModelForSlot(key, modelPath) {
     const runtime = slotRuntime.get(key)
@@ -1380,6 +1525,24 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     const url = normalizeFileUrl(nextPath)
     if (!url) return { success: false, error: 'invalid-url' }
     const ext = getPathExt(nextPath)
+    if (runtime.cfg?.roleType === 'video' || isVideoExt(ext)) {
+      const result = await loadVideoScreenForSlot(key, nextPath, url)
+      runtime.loadingPath = ''
+      if (result && result.success) {
+        setStatus(`加载完成: ${runtime.cfg.label}`)
+      } else {
+        setStatus(`加载失败: ${runtime.cfg.label}`)
+        showModelLoadErrorDialog({
+          slot: key,
+          slotLabel: runtime?.cfg?.label || key,
+          modelPath: modelPath || '',
+          resolvedUrl: url || '',
+          ext: ext || '',
+          errorMessage: result?.error || '视频加载失败'
+        })
+      }
+      return result
+    }
 
     const shortPath = String(modelPath).split(/[\\/]/).slice(-2).join('/')
     setStatus(`加载模型: ${runtime.cfg.label} (${shortPath})`)
@@ -1680,6 +1843,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     renderSlotTabs()
     syncTransformInputs()
     syncLightInputs()
+    syncVideoInputs()
     syncCameraEditorInputs()
   }
 
@@ -1739,6 +1903,65 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     scheduleSaveLayout()
   }
 
+  function syncVideoInputs() {
+    const cfg = state.layout?.videoScreen || DEFAULT_LAYOUT.videoScreen
+    if (dom.videoLoopEnabled) dom.videoLoopEnabled.checked = cfg.loop !== false
+    if (dom.videoMuted) dom.videoMuted.checked = cfg.muted !== false
+    if (dom.videoWidth) dom.videoWidth.value = String(Math.max(0.1, asNumber(cfg.width, 2.2)).toFixed(2))
+    if (dom.videoHeight) dom.videoHeight.value = String(Math.max(0.1, asNumber(cfg.height, 1.2)).toFixed(2))
+  }
+
+  function applyVideoSettingsFromInputs() {
+    if (!state.layout.videoScreen) state.layout.videoScreen = deepClone(DEFAULT_LAYOUT.videoScreen)
+    state.layout.videoScreen.loop = dom.videoLoopEnabled ? !!dom.videoLoopEnabled.checked : true
+    state.layout.videoScreen.muted = dom.videoMuted ? !!dom.videoMuted.checked : true
+    state.layout.videoScreen.width = Math.max(0.1, asNumber(dom.videoWidth ? dom.videoWidth.value : 2.2, 2.2))
+    state.layout.videoScreen.height = Math.max(0.1, asNumber(dom.videoHeight ? dom.videoHeight.value : 1.2, 1.2))
+    const runtime = slotRuntime.get('video1')
+    if (runtime && runtime.model) applyVideoScreenSettingsToRuntime(runtime)
+    syncVideoInputs()
+    scheduleSaveLayout()
+  }
+
+  async function importVideoScreen() {
+    let selectedPath = ''
+    try {
+      if (window.electronAPI && window.electronAPI.selectFileWithFilter) {
+        const result = await window.electronAPI.selectFileWithFilter({
+          filters: [{ name: '视频文件', extensions: ['mp4', 'webm', 'ogg', 'mov', 'm4v'] }]
+        })
+        if (result && result.success && result.path) {
+          selectedPath = result.path
+        }
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 选择视频文件失败:', error)
+    }
+    if (!selectedPath) {
+      const input = window.prompt('请输入视频路径(URL 或本地路径):', state.layout?.videoScreen?.path || '')
+      if (!input) return
+      selectedPath = input.trim()
+    }
+    if (!selectedPath) return
+    if (!state.layout.videoScreen) state.layout.videoScreen = deepClone(DEFAULT_LAYOUT.videoScreen)
+    state.layout.videoScreen.path = selectedPath
+    const result = await loadModelForSlot('video1', selectedPath)
+    if (result && result.success) {
+      state.selectedSlot = 'video1'
+      renderSlotTabs()
+      syncTransformInputs()
+    }
+    syncVideoInputs()
+    scheduleSaveLayout()
+  }
+
+  function clearVideoScreen() {
+    if (!state.layout.videoScreen) state.layout.videoScreen = deepClone(DEFAULT_LAYOUT.videoScreen)
+    state.layout.videoScreen.path = ''
+    removeModelFromSlot('video1')
+    scheduleSaveLayout()
+  }
+
   async function clearSceneModel() {
     state.layout.scene.modelPath = ''
     removeModelFromSlot('scene')
@@ -1751,6 +1974,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     })
     dom.sceneImportBtn.addEventListener('click', importSceneModel)
     dom.sceneClearBtn.addEventListener('click', clearSceneModel)
+    if (dom.videoImportBtn) dom.videoImportBtn.addEventListener('click', importVideoScreen)
+    if (dom.videoClearBtn) dom.videoClearBtn.addEventListener('click', clearVideoScreen)
+    if (dom.applyVideoSettingsBtn) dom.applyVideoSettingsBtn.addEventListener('click', applyVideoSettingsFromInputs)
     dom.applyTransformBtn.addEventListener('click', applyInputsToSelectedTransform)
     if (dom.cameraEventSelect) {
       dom.cameraEventSelect.addEventListener('change', () => {
@@ -2073,6 +2299,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     applyLayoutToScene()
     if (state.layout.scene.modelPath) {
       await loadModelForSlot('scene', state.layout.scene.modelPath)
+    }
+    if (state.layout?.videoScreen?.path) {
+      await loadModelForSlot('video1', state.layout.videoScreen.path)
     }
     await updateRoleModelsByBp()
   }
