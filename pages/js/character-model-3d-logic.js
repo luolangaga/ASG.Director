@@ -3,6 +3,7 @@
     { key: 'scene', label: '场景', roleType: 'scene', index: -1 },
     { key: 'light1', label: '光源1', roleType: 'light', index: 0 },
     { key: 'video1', label: '视频屏幕', roleType: 'video', index: 0 },
+    { key: 'custom1', label: '自定义模型', roleType: 'custom', index: 0 },
     { key: 'survivor1', label: '求生者1', roleType: 'survivor', index: 0 },
     { key: 'survivor2', label: '求生者2', roleType: 'survivor', index: 1 },
     { key: 'survivor3', label: '求生者3', roleType: 'survivor', index: 2 },
@@ -79,6 +80,69 @@
       fillIntensity: 0.25,
       fillPos: { x: -6, y: 4, z: -6 },
       shadowOpacity: 0.45
+    },
+    sunnyDaylight: {
+      label: '晴空日光',
+      skyTop: '#7ec8ff',
+      skyBottom: '#e6f4ff',
+      fogColor: '#d7ebff',
+      fogDensity: 0.004,
+      fogNear: 38,
+      fogFar: 320,
+      ambientColor: '#ffffff',
+      ambientIntensity: 0.9,
+      hemiSkyColor: '#a6d9ff',
+      hemiGroundColor: '#d7d0c4',
+      hemiIntensity: 0.58,
+      keyColor: '#fff2d9',
+      keyIntensity: 2.05,
+      keyPos: { x: 12, y: 22, z: 10 },
+      fillColor: '#cfe4ff',
+      fillIntensity: 0.9,
+      fillPos: { x: -13, y: 9, z: -8 },
+      shadowOpacity: 0.26
+    },
+    studioHighKey: {
+      label: '棚拍高调光',
+      skyTop: '#f5f8ff',
+      skyBottom: '#fcfdff',
+      fogColor: '#f1f5ff',
+      fogDensity: 0.0035,
+      fogNear: 44,
+      fogFar: 360,
+      ambientColor: '#ffffff',
+      ambientIntensity: 1.08,
+      hemiSkyColor: '#ffffff',
+      hemiGroundColor: '#eceff7',
+      hemiIntensity: 0.72,
+      keyColor: '#fff8ed',
+      keyIntensity: 2.35,
+      keyPos: { x: 11, y: 19, z: 8 },
+      fillColor: '#edf4ff',
+      fillIntensity: 1.16,
+      fillPos: { x: -11, y: 8, z: -8 },
+      shadowOpacity: 0.2
+    },
+    goldenNoon: {
+      label: '暖阳正午',
+      skyTop: '#9dd4ff',
+      skyBottom: '#fff0c7',
+      fogColor: '#ffecb5',
+      fogDensity: 0.0048,
+      fogNear: 34,
+      fogFar: 300,
+      ambientColor: '#ffe9b0',
+      ambientIntensity: 0.96,
+      hemiSkyColor: '#a9d9ff',
+      hemiGroundColor: '#f3db9f',
+      hemiIntensity: 0.62,
+      keyColor: '#ffe4a3',
+      keyIntensity: 2.2,
+      keyPos: { x: 10, y: 21, z: 9 },
+      fillColor: '#ffd7a0',
+      fillIntensity: 0.98,
+      fillPos: { x: -12, y: 8, z: -7 },
+      shadowOpacity: 0.24
     }
   }
   const QUALITY_PRESETS = {
@@ -119,6 +183,7 @@
       width: 2.2,
       height: 1.2
     },
+    customModelPath: '',
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -128,6 +193,7 @@
     slots: {
       light1: { position: { x: 0, y: 4.2, z: 3.2 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       video1: { position: { x: 0, y: 1.4, z: -1.8 }, rotation: { x: 0, y: 180, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      custom1: { position: { x: 0, y: 0, z: 2.0 }, rotation: { x: 0, y: 180, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor1: { position: { x: -2.4, y: 0, z: 0.8 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor2: { position: { x: -0.8, y: 0, z: 1.0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor3: { position: { x: 0.8, y: 0, z: 1.0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
@@ -263,6 +329,8 @@
     videoHeight: document.getElementById('videoHeight'),
     applyVideoSettingsBtn: document.getElementById('applyVideoSettingsBtn'),
     slotTabs: document.getElementById('slotTabs'),
+    customModelImportBtn: document.getElementById('customModelImportBtn'),
+    customModelClearBtn: document.getElementById('customModelClearBtn'),
     focusSelectedBtn: document.getElementById('focusSelectedBtn'),
     posX: document.getElementById('posX'),
     posY: document.getElementById('posY'),
@@ -409,6 +477,7 @@
     out.videoScreen.muted = base?.videoScreen?.muted !== false
     out.videoScreen.width = Math.max(0.1, asNumber(base?.videoScreen?.width, out.videoScreen.width))
     out.videoScreen.height = Math.max(0.1, asNumber(base?.videoScreen?.height, out.videoScreen.height))
+    out.customModelPath = typeof base?.customModelPath === 'string' ? base.customModelPath : ''
     out.scene.modelPath = typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : ''
     out.scene.position = ensureVec3(base?.scene?.position, out.scene.position)
     out.scene.rotation = ensureVec3(base?.scene?.rotation, out.scene.rotation)
@@ -902,7 +971,6 @@
     if (!material.userData) material.userData = {}
     if (roleType === 'scene') {
       material.userData.outlineParameters = {
-        thickness: 0,
         color: [0, 0, 0],
         alpha: 0,
         visible: false
@@ -912,11 +980,28 @@
     const cfg = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
     const color = new THREE.Color(cfg.outlineColor || '#000000')
     material.userData.outlineParameters = {
-      thickness: Math.max(0.0005, Math.min(0.03, asNumber(cfg.outlineThickness, 0.004))),
       color: [color.r, color.g, color.b],
       alpha: Math.max(0, Math.min(1, asNumber(cfg.outlineAlpha, 1))),
       visible: cfg.outlineEnabled !== false
     }
+  }
+
+  function getOutlineDistanceScale() {
+    if (!camera || !orbit || !orbit.target) return 1
+    const dx = asNumber(camera.position.x, 0) - asNumber(orbit.target.x, 0)
+    const dy = asNumber(camera.position.y, 0) - asNumber(orbit.target.y, 0)
+    const dz = asNumber(camera.position.z, 0) - asNumber(orbit.target.z, 0)
+    const dist = Math.max(0.001, Math.sqrt(dx * dx + dy * dy + dz * dz))
+    const reference = 8
+    // 距离越远，适当减小厚度，保持视觉宽度稳定
+    return Math.max(0.3, Math.min(2.2, reference / dist))
+  }
+
+  function updateOutlineEffectThickness() {
+    if (!outlineEffect) return
+    const cfg = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
+    const base = Math.max(0.0005, Math.min(0.03, asNumber(cfg.outlineThickness, 0.004)))
+    outlineEffect.defaultThickness = base * getOutlineDistanceScale()
   }
 
   function applyStylizedToObject(obj, roleType = '') {
@@ -981,9 +1066,9 @@
     if (outlineEffect) {
       try {
         const c = new THREE.Color(cfg.outlineColor)
-        outlineEffect.defaultThickness = cfg.outlineThickness
         outlineEffect.defaultColor = [c.r, c.g, c.b]
         outlineEffect.defaultAlpha = cfg.outlineAlpha
+        updateOutlineEffectThickness()
       } catch { }
     }
     applyStylizedToAllModels()
@@ -2595,6 +2680,25 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }, 160)
   }
 
+  async function importAssetForPack(sourcePath, copyMode = 'auto') {
+    const raw = String(sourcePath || '').trim()
+    if (!raw) return ''
+    if (!window.electronAPI || typeof window.electronAPI.importBundledAsset !== 'function') return raw
+    try {
+      const res = await window.electronAPI.importBundledAsset(raw, { copyMode })
+      if (res && res.success && typeof res.path === 'string' && res.path.trim()) {
+        if (res.copied) {
+          const modeText = res.mode === 'folder' ? '文件夹模式' : '单文件模式'
+          setStatus(`已归档模型资源 (${modeText})`)
+        }
+        return res.path.trim()
+      }
+    } catch (error) {
+      console.warn('[CharacterModel3D] 归档模型资源失败，继续使用原路径:', error)
+    }
+    return raw
+  }
+
   async function importSceneModel() {
     let selectedPath = ''
     try {
@@ -2615,6 +2719,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       selectedPath = input.trim()
     }
     if (!selectedPath) return
+    selectedPath = await importAssetForPack(selectedPath, 'auto')
     state.layout.scene.modelPath = selectedPath
     await loadModelForSlot('scene', selectedPath)
     scheduleSaveLayout()
@@ -2660,6 +2765,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       selectedPath = input.trim()
     }
     if (!selectedPath) return
+    selectedPath = await importAssetForPack(selectedPath, 'single')
     if (!state.layout.videoScreen) state.layout.videoScreen = deepClone(DEFAULT_LAYOUT.videoScreen)
     state.layout.videoScreen.path = selectedPath
     const result = await loadModelForSlot('video1', selectedPath)
@@ -2685,6 +2791,43 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     scheduleSaveLayout()
   }
 
+  async function importCustomModel() {
+    let selectedPath = ''
+    try {
+      if (window.electronAPI && window.electronAPI.selectFileWithFilter) {
+        const result = await window.electronAPI.selectFileWithFilter({
+          filters: [{ name: '3D模型', extensions: ['gltf', 'glb', 'obj'] }]
+        })
+        if (result && result.success && result.path) selectedPath = result.path
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 选择所选槽位模型失败:', error)
+    }
+    if (!selectedPath) {
+      const input = window.prompt('请输入模型路径(URL 或本地路径):', '')
+      if (!input) return
+      selectedPath = input.trim()
+    }
+    if (!selectedPath) return
+    selectedPath = await importAssetForPack(selectedPath, 'auto')
+    state.layout.customModelPath = selectedPath
+    state.slotModelPaths.custom1 = selectedPath
+    await loadModelForSlot('custom1', selectedPath)
+    state.selectedSlot = 'custom1'
+    renderSlotTabs()
+    syncTransformInputs()
+    scheduleSaveLayout()
+    setStatus('已导入自定义模型')
+  }
+
+  async function clearCustomModel() {
+    state.layout.customModelPath = ''
+    state.slotModelPaths.custom1 = ''
+    await loadModelForSlot('custom1', '')
+    scheduleSaveLayout()
+    setStatus('已清除自定义模型')
+  }
+
   async function importEntranceParticle() {
     let selectedPath = ''
     try {
@@ -2708,6 +2851,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       window.alert('当前仅支持 GLTF/GLB 粒子特效文件')
       return
     }
+    selectedPath = await importAssetForPack(selectedPath, 'auto')
     const loadResult = await ensureEntranceParticleAsset(selectedPath)
     if (!loadResult || !loadResult.success) {
       window.alert(`粒子特效加载失败: ${loadResult?.error || 'unknown-error'}`)
@@ -2743,6 +2887,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     })
     dom.sceneImportBtn.addEventListener('click', importSceneModel)
     dom.sceneClearBtn.addEventListener('click', clearSceneModel)
+    if (dom.customModelImportBtn) dom.customModelImportBtn.addEventListener('click', importCustomModel)
+    if (dom.customModelClearBtn) dom.customModelClearBtn.addEventListener('click', clearCustomModel)
     if (dom.particleImportBtn) dom.particleImportBtn.addEventListener('click', importEntranceParticle)
     if (dom.particleClearBtn) dom.particleClearBtn.addEventListener('click', clearEntranceParticle)
     if (dom.videoImportBtn) dom.videoImportBtn.addEventListener('click', importVideoScreen)
@@ -3072,6 +3218,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (renderer && scene && camera) {
       const sr = state.layout?.stylizedRender || DEFAULT_LAYOUT.stylizedRender
       if (sr.outlineEnabled && outlineEffect) {
+        updateOutlineEffectThickness()
         outlineEffect.render(scene, camera)
       } else {
         renderer.render(scene, camera)
@@ -3159,6 +3306,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     if (state.layout?.videoScreen?.path) {
       await loadModelForSlot('video1', state.layout.videoScreen.path)
+    }
+    if (state.layout?.customModelPath) {
+      await loadModelForSlot('custom1', state.layout.customModelPath)
     }
     await updateRoleModelsByBp()
   }

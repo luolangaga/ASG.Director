@@ -276,6 +276,7 @@ const electronAPI = {
   // 3D模型设置
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   selectFileWithFilter: (options) => ipcRenderer.invoke('select-file', options),
+  importBundledAsset: (filePath, options) => ipcRenderer.invoke('localBp:importBundledAsset', filePath, options),
   readBinaryFile: (filePath) => ipcRenderer.invoke('read-binary-file', filePath),
   saveModelConfig: (config) => ipcRenderer.invoke('save-model-config', config),
   getModelConfig: () => ipcRenderer.invoke('get-model-config'),

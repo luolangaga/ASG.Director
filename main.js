@@ -109,6 +109,8 @@ let secondInstanceNoticeCooldownUntil = 0
 let obsAutomationService = null
 const SUPPORTS_NATIVE_RESIZE_WITH_TRANSPARENT = process.platform !== 'win32'
 const FRONTEND_MAIN_WINDOW_ID = 'frontend-main'
+const FIXED_FRONTEND_WIDTH = 1686
+const FIXED_FRONTEND_HEIGHT = 934
 const customFrontendWindows = new Map()
 
 function getCustomFrontendWindowList() {
@@ -128,6 +130,35 @@ function getAllFrontendWindows() {
   if (frontendWindow && !frontendWindow.isDestroyed()) windows.push(frontendWindow)
   windows.push(...getCustomFrontendWindowList())
   return windows
+}
+
+function enforceFixedFrontendWindowSize(win) {
+  if (!win || win.isDestroyed()) return
+  try {
+    win.setResizable(false)
+    win.setMinimumSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+    win.setMaximumSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+    win.setContentSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+  } catch {
+    // ignore
+  }
+
+  if (win.__asgFixedFrontendSizeBound) return
+  win.__asgFixedFrontendSizeBound = true
+
+  win.on('will-resize', (event) => {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault()
+  })
+  win.on('resize', () => {
+    try {
+      const [cw, ch] = win.getContentSize()
+      if (cw !== FIXED_FRONTEND_WIDTH || ch !== FIXED_FRONTEND_HEIGHT) {
+        win.setContentSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+      }
+    } catch {
+      // ignore
+    }
+  })
 }
 
 function broadcastToFrontendWindows(channel, ...args) {
@@ -327,6 +358,7 @@ app.on('web-contents-created', (event, contents) => {
 // 存储路径
 const layoutPath = path.join(userDataPath, 'layout.json')
 const bgImagePath = path.join(userDataPath, 'background')
+const userModelsPath = path.join(userDataPath, 'user-models')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
 const configPath = path.join(userDataPath, 'config.json')
 const localPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
@@ -2100,8 +2132,100 @@ function ensureDirectories() {
   if (!fs.existsSync(bgImagePath)) {
     fs.mkdirSync(bgImagePath, { recursive: true })
   }
+  if (!fs.existsSync(userModelsPath)) {
+    fs.mkdirSync(userModelsPath, { recursive: true })
+  }
   ensureCharacterDirectories()
   ensureLocalPagesStorage()
+}
+
+function sanitizeModelBundleName(value) {
+  const cleaned = String(value || '')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return cleaned || 'asset'
+}
+
+function copyDirRecursive(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) return
+  fs.mkdirSync(destDir, { recursive: true })
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true })
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name)
+    const destPath = path.join(destDir, entry.name)
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath)
+      continue
+    }
+    if (entry.isFile()) {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true })
+      fs.copyFileSync(srcPath, destPath)
+    }
+  }
+}
+
+function importBundledAssetToUserModels(inputPath, options = {}) {
+  const raw = String(inputPath || '').trim()
+  if (!raw) return { success: false, error: 'empty-path' }
+  if (/^(https?:|data:)/i.test(raw)) return { success: true, path: raw, copied: false, skipped: true }
+
+  let resolvedPath = raw
+  if (/^file:/i.test(resolvedPath)) {
+    try {
+      resolvedPath = fileURLToPath(resolvedPath)
+    } catch {
+      return { success: false, error: 'invalid-file-url' }
+    }
+  }
+  resolvedPath = path.normalize(resolvedPath)
+  if (!path.isAbsolute(resolvedPath)) return { success: true, path: raw, copied: false, skipped: true }
+  if (!fs.existsSync(resolvedPath)) return { success: false, error: 'file-not-found' }
+  const stat = fs.statSync(resolvedPath)
+  if (!stat.isFile()) return { success: false, error: 'not-a-file' }
+
+  ensureDirectories()
+  const normalizedUserModels = path.resolve(userModelsPath) + path.sep
+  const normalizedSrc = path.resolve(resolvedPath)
+  if (normalizedSrc.startsWith(normalizedUserModels)) {
+    return { success: true, path: normalizedSrc, copied: false, skipped: true }
+  }
+
+  const ext = path.extname(resolvedPath).toLowerCase()
+  const sourceDir = path.dirname(resolvedPath)
+  const fileName = path.basename(resolvedPath)
+  const baseName = path.basename(resolvedPath, ext)
+  const timestamp = Date.now()
+  const modeInput = String(options.copyMode || 'auto').toLowerCase()
+  const copyMode = (modeInput === 'single' || modeInput === 'folder') ? modeInput : 'auto'
+  const resolvedMode = copyMode === 'auto'
+    ? ((ext === '.gltf' || ext === '.obj' || ext === '.mtl') ? 'folder' : 'single')
+    : copyMode
+
+  const bundleDirName = `${sanitizeModelBundleName(baseName)}_${timestamp}`
+  const bundleRoot = path.join(userModelsPath, bundleDirName)
+  fs.mkdirSync(bundleRoot, { recursive: true })
+
+  if (resolvedMode === 'folder') {
+    const destDir = path.join(bundleRoot, sanitizeModelBundleName(path.basename(sourceDir)))
+    copyDirRecursive(sourceDir, destDir)
+    return {
+      success: true,
+      path: path.join(destDir, fileName),
+      copied: true,
+      mode: 'folder'
+    }
+  }
+
+  const destPath = path.join(bundleRoot, fileName)
+  fs.copyFileSync(resolvedPath, destPath)
+  return {
+    success: true,
+    path: destPath,
+    copied: true,
+    mode: 'single'
+  }
 }
 
 ipcMain.handle('local-pages:get-pages', () => {
@@ -2193,14 +2317,12 @@ ipcMain.handle('local-bp:auto-open:set', (event, settings) => {
 })
 
 ipcMain.handle('frontend-resize-lock:get', () => {
-  const config = readJsonFileSafe(configPath, {})
-  const locked = normalizeFrontendResizeLockSetting(config.frontendResizeLock)
-  return { success: true, locked }
+  return { success: true, locked: true }
 })
 
 ipcMain.handle('frontend-resize-lock:set', (event, locked) => {
   const config = readJsonFileSafe(configPath, {})
-  const next = normalizeFrontendResizeLockSetting(locked)
+  const next = true
   config.frontendResizeLock = next
   writeJsonFileSafe(configPath, config)
   if (frontendWindow && !frontendWindow.isDestroyed()) {
@@ -2612,8 +2734,12 @@ function persistFrontendWindowBounds(windowId, win) {
     if (!layout.windowBounds || typeof layout.windowBounds !== 'object') layout.windowBounds = {}
 
     if (windowId === FRONTEND_MAIN_WINDOW_ID) {
-      layout.windowBounds.frontendBounds = bounds
-      layout.windowBounds.frontendContentSize = { width: cw, height: ch }
+      layout.windowBounds.frontendBounds = {
+        ...bounds,
+        width: FIXED_FRONTEND_WIDTH,
+        height: FIXED_FRONTEND_HEIGHT
+      }
+      layout.windowBounds.frontendContentSize = { width: FIXED_FRONTEND_WIDTH, height: FIXED_FRONTEND_HEIGHT }
     } else {
       if (!layout.windowBounds.frontendCustomBounds || typeof layout.windowBounds.frontendCustomBounds !== 'object') {
         layout.windowBounds.frontendCustomBounds = {}
@@ -2651,6 +2777,9 @@ function createManagedFrontendWindow(roomData, options = {}) {
   const isPrimary = windowId === FRONTEND_MAIN_WINDOW_ID
   const existing = isPrimary ? frontendWindow : customFrontendWindows.get(windowId)
   if (existing && !existing.isDestroyed()) {
+    if (isPrimary) {
+      enforceFixedFrontendWindowSize(existing)
+    }
     try {
       existing.show()
       existing.focus()
@@ -2664,7 +2793,6 @@ function createManagedFrontendWindow(roomData, options = {}) {
   const profile = normalizeFrontendWindowProfile(options.profile || {}, 0) || options.profile || {}
   const layout = readJsonFileSafe(layoutPath, {})
   const windowBounds = (layout.windowBounds && typeof layout.windowBounds === 'object') ? layout.windowBounds : {}
-  const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
 
   const savedBounds = isPrimary
     ? (windowBounds.frontendBounds || null)
@@ -2673,11 +2801,15 @@ function createManagedFrontendWindow(roomData, options = {}) {
     ? normalizeResolution(windowBounds.frontendContentSize)
     : normalizeResolution(windowBounds.frontendCustomContentSize && windowBounds.frontendCustomContentSize[windowId])
 
-  const defaultWidth = Number.isFinite(Number(profile.width)) ? Math.max(320, Math.round(Number(profile.width))) : 1280
-  const defaultHeight = Number.isFinite(Number(profile.height)) ? Math.max(180, Math.round(Number(profile.height))) : 720
+  const defaultWidth = isPrimary
+    ? FIXED_FRONTEND_WIDTH
+    : (Number.isFinite(Number(profile.width)) ? Math.max(320, Math.round(Number(profile.width))) : 1280)
+  const defaultHeight = isPrimary
+    ? FIXED_FRONTEND_HEIGHT
+    : (Number.isFinite(Number(profile.height)) ? Math.max(180, Math.round(Number(profile.height))) : 720)
   const content = savedContentSize || { width: defaultWidth, height: defaultHeight }
-  const finalWidth = Number(content.width) || defaultWidth
-  const finalHeight = Number(content.height) || defaultHeight
+  const finalWidth = isPrimary ? FIXED_FRONTEND_WIDTH : (Number(content.width) || defaultWidth)
+  const finalHeight = isPrimary ? FIXED_FRONTEND_HEIGHT : (Number(content.height) || defaultHeight)
   const finalX = (savedBounds && Number.isFinite(savedBounds.x))
     ? savedBounds.x
     : (Number.isFinite(Number(profile.x)) ? Math.round(Number(profile.x)) : undefined)
@@ -2699,7 +2831,7 @@ function createManagedFrontendWindow(roomData, options = {}) {
     frame: false,
     transparent: true,
     titleBarStyle: 'hidden',
-    resizable: isPrimary ? !resizeLocked : profile.resizable !== false,
+    resizable: isPrimary ? false : profile.resizable !== false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -2711,6 +2843,7 @@ function createManagedFrontendWindow(roomData, options = {}) {
   })
 
   win.setContentSize(finalWidth, finalHeight)
+  if (isPrimary) enforceFixedFrontendWindowSize(win)
   if (!isPrimary && profile.alwaysOnTop) {
     try { win.setAlwaysOnTop(true) } catch {}
   }
@@ -2742,13 +2875,19 @@ function createManagedFrontendWindow(roomData, options = {}) {
 
   let resizeTimer = null
   const schedulePersist = () => {
+    if (isPrimary) {
+      try {
+        const [cw, ch] = win.getContentSize()
+        if (cw !== FIXED_FRONTEND_WIDTH || ch !== FIXED_FRONTEND_HEIGHT) {
+          win.setContentSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+        }
+      } catch {
+        // ignore
+      }
+    }
     if (resizeTimer) clearTimeout(resizeTimer)
     resizeTimer = setTimeout(() => {
       if (!win || win.isDestroyed()) return
-      if (isPrimary) {
-        const resizeLockedNow = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
-        if (resizeLockedNow) return
-      }
       persistFrontendWindowBounds(windowId, win)
     }, 500)
   }
@@ -3209,11 +3348,14 @@ ipcMain.handle('save-layout', async (event, layout) => {
 
     // 保存窗口大小配置（合并旧值，避免窗口未打开时丢失上次尺寸）
     const windowBounds = { ...(existingLayout.windowBounds || {}) }
-    const resizeLocked = normalizeFrontendResizeLockSetting(readJsonFileSafe(configPath, {}).frontendResizeLock)
-    if (!resizeLocked && frontendWindow && !frontendWindow.isDestroyed()) {
-      windowBounds.frontendBounds = frontendWindow.getBounds()
-      const [cw, ch] = frontendWindow.getContentSize()
-      windowBounds.frontendContentSize = { width: cw, height: ch }
+    if (frontendWindow && !frontendWindow.isDestroyed()) {
+      const currentBounds = frontendWindow.getBounds()
+      windowBounds.frontendBounds = {
+        ...currentBounds,
+        width: FIXED_FRONTEND_WIDTH,
+        height: FIXED_FRONTEND_HEIGHT
+      }
+      windowBounds.frontendContentSize = { width: FIXED_FRONTEND_WIDTH, height: FIXED_FRONTEND_HEIGHT }
       console.log('[Main] 保存前台窗口 - Bounds:', windowBounds.frontendBounds, 'ContentSize:', windowBounds.frontendContentSize)
     }
     if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
@@ -4295,28 +4437,17 @@ ipcMain.handle('set-frontend-fullscreen', async (event, fullscreen) => {
 
 // 获取/设置前台渲染分辨率（内容尺寸）
 ipcMain.handle('get-frontend-render-resolution', async () => {
-  const layout = readJsonFileSafe(layoutPath, {})
-  const saved = normalizeResolution(layout?.windowBounds?.frontendContentSize)
-  const fallback = normalizeResolution(layout?.windowBounds?.frontendBounds) || { width: 1280, height: 720 }
-  const current = (frontendWindow && !frontendWindow.isDestroyed())
-    ? (() => {
-      const [cw, ch] = frontendWindow.getContentSize()
-      return { width: cw, height: ch }
-    })()
-    : null
+  const fixed = { width: FIXED_FRONTEND_WIDTH, height: FIXED_FRONTEND_HEIGHT }
 
   return {
     success: true,
-    saved: saved || fallback,
-    current
+    saved: fixed,
+    current: fixed
   }
 })
 
 ipcMain.handle('set-frontend-render-resolution', async (event, input) => {
-  const resolution = normalizeResolution(input)
-  if (!resolution) {
-    return { success: false, error: '分辨率不合法（范围 320×240 ~ 7680×4320）' }
-  }
+  const resolution = { width: FIXED_FRONTEND_WIDTH, height: FIXED_FRONTEND_HEIGHT }
 
   const root = readJsonFileSafe(layoutPath, {})
   const windowBounds = { ...(root.windowBounds || {}) }
@@ -4354,14 +4485,9 @@ ipcMain.handle('set-frontend-render-resolution', async (event, input) => {
     }
   }
 
-  const current = (frontendWindow && !frontendWindow.isDestroyed())
-    ? (() => {
-      const [cw, ch] = frontendWindow.getContentSize()
-      return { width: cw, height: ch }
-    })()
-    : null
+  const current = { width: FIXED_FRONTEND_WIDTH, height: FIXED_FRONTEND_HEIGHT }
 
-  return { success: true, saved: resolution, current }
+  return { success: false, saved: resolution, current, error: '前台分辨率已固定为 1686x934，不允许修改' }
 })
 
 // 打开比分窗口
@@ -5139,6 +5265,16 @@ ipcMain.handle('store-upload-pack', async (event, metadata) => {
         console.warn('[Store] 背景图片目录不存在:', bgImagePath)
       }
 
+      // 复制用户自定义模型目录（用于角色模型3D页）
+      if (fs.existsSync(userModelsPath)) {
+        const modelEntries = fs.readdirSync(userModelsPath)
+        if (modelEntries.length > 0) {
+          const destUserModels = path.join(tempDir, 'user-models')
+          copyDirRecursive(userModelsPath, destUserModels)
+          console.log('[Store] 已复制 user-models 目录，条目数:', modelEntries.length)
+        }
+      }
+
       // 列出临时目录中的所有文件
       const tempFiles = fs.readdirSync(tempDir)
       console.log('[Store] 临时目录文件列表:', tempFiles)
@@ -5870,6 +6006,7 @@ let localBpState = {
       width: 2.2,
       height: 1.2
     },
+    customModelPath: '',
     scene: {
       modelPath: '',
       position: { x: 0, y: 0, z: 0 },
@@ -5947,7 +6084,11 @@ function __normalizeLocalBpStateInPlace__() {
   const m3d = localBpState.characterModel3DLayout
   m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
   m3d.transparentBackground = m3d.transparentBackground !== false
-  m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight' || m3d.environmentPreset === 'horrorNight')
+  m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight'
+    || m3d.environmentPreset === 'horrorNight'
+    || m3d.environmentPreset === 'sunnyDaylight'
+    || m3d.environmentPreset === 'studioHighKey'
+    || m3d.environmentPreset === 'goldenNoon')
     ? m3d.environmentPreset
     : 'duskCinema'
   m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic')
@@ -5986,6 +6127,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.videoScreen.muted = m3d.videoScreen.muted !== false
   m3d.videoScreen.width = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.width)) ? Number(m3d.videoScreen.width) : 2.2)
   m3d.videoScreen.height = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.height)) ? Number(m3d.videoScreen.height) : 1.2)
+  m3d.customModelPath = (typeof m3d.customModelPath === 'string') ? m3d.customModelPath : ''
 
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
     const src = (v && typeof v === 'object') ? v : {}
@@ -6004,7 +6146,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.scene.scale = ensureVec3(m3d.scene.scale, { x: 1, y: 1, z: 1 })
 
   if (!m3d.slots || typeof m3d.slots !== 'object') m3d.slots = {}
-  const slotKeys = ['video1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     if (!m3d.slots[key] || typeof m3d.slots[key] !== 'object') m3d.slots[key] = {}
     m3d.slots[key].position = ensureVec3(m3d.slots[key].position, { x: 0, y: 0, z: 0 })
@@ -7886,7 +8028,11 @@ function normalizeCharacterModel3DLayoutInput(input) {
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
     transparentBackground: base.transparentBackground !== false,
-    environmentPreset: (base.environmentPreset === 'cyberpunkNight' || base.environmentPreset === 'horrorNight')
+    environmentPreset: (base.environmentPreset === 'cyberpunkNight'
+      || base.environmentPreset === 'horrorNight'
+      || base.environmentPreset === 'sunnyDaylight'
+      || base.environmentPreset === 'studioHighKey'
+      || base.environmentPreset === 'goldenNoon')
       ? base.environmentPreset
       : 'duskCinema',
     qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic')
@@ -7932,6 +8078,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
       width: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.width)) ? Number(base.videoScreen.width) : 2.2),
       height: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.height)) ? Number(base.videoScreen.height) : 1.2)
     },
+    customModelPath: typeof base?.customModelPath === 'string' ? base.customModelPath : '',
     scene: {
       modelPath: typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : '',
       position: ensureVec3(base?.scene?.position, { x: 0, y: 0, z: 0 }),
@@ -7969,7 +8116,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     }
   }
 
-  const slotKeys = ['video1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     out.slots[key] = {
       position: ensureVec3(base?.slots?.[key]?.position, { x: 0, y: 0, z: 0 }),
@@ -8571,6 +8718,15 @@ ipcMain.handle('select-file', async (event, options = {}) => {
     return { success: false, canceled: true }
   } catch (error) {
     return { success: false, error: error.message }
+  }
+})
+
+try { ipcMain.removeHandler('localBp:importBundledAsset') } catch { /* ignore */ }
+ipcMain.handle('localBp:importBundledAsset', async (event, inputPath, options = {}) => {
+  try {
+    return importBundledAssetToUserModels(inputPath, options)
+  } catch (error) {
+    return { success: false, error: error.message || String(error) }
   }
 })
 

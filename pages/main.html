@@ -386,30 +386,26 @@
               <h3>OBS 前台输出</h3>
               <div class="control-group">
                 <label class="control-label">输出分辨率</label>
-                <select id="frontendResolutionPreset" class="form-select" onchange="onFrontendResPresetChange()">
-                  <option value="1920x1080">1080p</option>
-                  <option value="2560x1440">1440p</option>
-                  <option value="3840x2160">4K</option>
-                  <option value="custom">自定义</option>
+                <select id="frontendResolutionPreset" class="form-select" onchange="onFrontendResPresetChange()" disabled>
+                  <option value="1686x934">固定 1686×934</option>
                 </select>
               </div>
               <div class="grid-2">
-                <input type="number" id="frontendResWidth" class="form-input" placeholder="W">
-                <input type="number" id="frontendResHeight" class="form-input" placeholder="H">
+                <input type="number" id="frontendResWidth" class="form-input" placeholder="W" disabled>
+                <input type="number" id="frontendResHeight" class="form-input" placeholder="H" disabled>
               </div>
               <p id="frontendResHint" style="font-size:12px; color:var(--text-secondary); margin:10px 0;">...</p>
-              <!-- ⚠️ 重要提示：不懂不要乱改哦 (๑•̀ㅂ•́)و✧ -->
-              <p style="font-size:12px; color:#ff4d4f; margin-bottom:10px;">如果你不懂修改这个会造成什么后果的情况下请不要修改</p>
-              <button class="btn btn-primary" onclick="applyFrontendResolution()">应用分辨率</button>
+              <p style="font-size:12px; color:#ff4d4f; margin-bottom:10px;">前台分辨率已固定为 1686×934，不允许修改</p>
+              <button class="btn btn-primary" onclick="applyFrontendResolution()" disabled>应用分辨率</button>
 
               <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                   <div>
                     <h4>锁定前台窗口大小</h4>
-                    <p style="font-size:12px; color:var(--text-secondary);">防止误触调整，尺寸跟随布局包或分辨率设置</p>
+                    <p style="font-size:12px; color:var(--text-secondary);">已强制锁定，Windows 层面不可调整大小</p>
                   </div>
                   <label class="switch">
-                    <input type="checkbox" id="frontendResizeLockToggle" onchange="toggleFrontendResizeLock()">
+                    <input type="checkbox" id="frontendResizeLockToggle" onchange="toggleFrontendResizeLock()" checked disabled>
                     <span class="slider"></span>
                   </label>
                 </div>
@@ -1651,68 +1647,35 @@
     }
 
     function onFrontendResPresetChange() {
-      const preset = document.getElementById('frontendResolutionPreset').value
-      const r = parsePresetResolution(preset)
-      if (r) {
-        setFrontendResInputs(r.width, r.height)
-      }
+      setFrontendResInputs(1686, 934)
     }
 
     async function loadFrontendResolution() {
       try {
         const result = await window.electronAPI.getFrontendRenderResolution()
         if (!result || !result.success) return
-
-        const saved = result.saved
-        if (saved && saved.width && saved.height) {
-          setFrontendResInputs(saved.width, saved.height)
-          const presetValue = `${saved.width}x${saved.height}`
-          const presetSelect = document.getElementById('frontendResolutionPreset')
-          const hasPreset = Array.from(presetSelect.options).some(o => o.value === presetValue)
-          presetSelect.value = hasPreset ? presetValue : 'custom'
-        }
+        setFrontendResInputs(1686, 934)
+        const presetSelect = document.getElementById('frontendResolutionPreset')
+        if (presetSelect) presetSelect.value = '1686x934'
 
         const hint = document.getElementById('frontendResHint')
-        if (result.current) {
-          hint.textContent = `当前前台窗口：${result.current.width}×${result.current.height}。点击“应用分辨率”可立即调整并保存。`
-        }
+        if (hint) hint.textContent = '当前前台窗口：1686×934（固定，不可修改）'
       } catch (e) {
         console.warn('加载前台渲染分辨率失败:', e)
       }
     }
 
     async function applyFrontendResolution() {
-      const w = parseInt(document.getElementById('frontendResWidth').value, 10)
-      const h = parseInt(document.getElementById('frontendResHeight').value, 10)
-      if (!Number.isFinite(w) || !Number.isFinite(h)) {
-        showStatus('请输入合法的宽高', 'error')
-        return
-      }
-
-      try {
-        const result = await window.electronAPI.setFrontendRenderResolution({ width: w, height: h })
-        if (result && result.success) {
-          showStatus(`✅ 前台渲染分辨率已设置为 ${w}×${h}`, 'success')
-          const hint = document.getElementById('frontendResHint')
-          if (result.current) {
-            hint.textContent = `当前前台窗口：${result.current.width}×${result.current.height}（已应用并保存）`
-          }
-        } else {
-          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
-        }
-      } catch (e) {
-        showStatus('设置失败: ' + e.message, 'error')
-      }
+      setFrontendResInputs(1686, 934)
+      showStatus('前台分辨率已固定为 1686×934，不允许修改', 'error')
     }
 
     async function loadFrontendResizeLockSetting() {
       try {
-        const result = await window.electronAPI.getFrontendResizeLock()
-        if (result && result.success) {
-          const toggle = document.getElementById('frontendResizeLockToggle')
-          if (toggle) {
-            toggle.checked = !!result.locked
-          }
+        const toggle = document.getElementById('frontendResizeLockToggle')
+        if (toggle) {
+          toggle.checked = true
+          toggle.disabled = true
         }
       } catch (e) {
         console.warn('加载前台窗口锁定设置失败:', e)
@@ -1721,20 +1684,8 @@
 
     async function toggleFrontendResizeLock() {
       const toggle = document.getElementById('frontendResizeLockToggle')
-      const locked = toggle ? toggle.checked : false
-
-      try {
-        const result = await window.electronAPI.setFrontendResizeLock(locked)
-        if (result && result.success) {
-          showStatus(locked ? '✅ 已锁定前台窗口大小' : '✅ 已允许调整前台窗口大小', 'success')
-        } else {
-          showStatus('设置失败: ' + (result?.error || '未知错误'), 'error')
-          if (toggle) toggle.checked = !locked
-        }
-      } catch (e) {
-        showStatus('设置失败: ' + e.message, 'error')
-        if (toggle) toggle.checked = !locked
-      }
+      if (toggle) toggle.checked = true
+      showStatus('前台窗口大小已强制锁定，不允许修改', 'error')
     }
 
     // ==================== 透明背景设置 ====================

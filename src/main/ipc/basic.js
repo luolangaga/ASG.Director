@@ -1,6 +1,14 @@
 const fs = require('fs')
 const path = require('path')
 
+const FIXED_FRONTEND_WIDTH = 1686
+const FIXED_FRONTEND_HEIGHT = 934
+
+function isFrontendPageUrl(url) {
+  const text = String(url || '').toLowerCase()
+  return text.includes('/frontend') || text.includes('frontend.html') || text.includes('custom-frontend.html')
+}
+
 function registerBasicIpcHandlers({ ipcMain, BrowserWindow }) {
   ipcMain.on('preload:loaded', (event, info) => {
     try {
@@ -81,6 +89,15 @@ function registerBasicIpcHandlers({ ipcMain, BrowserWindow }) {
     try {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (!win) return { success: false, error: 'Window not found' }
+      if (isFrontendPageUrl(event?.sender?.getURL?.())) {
+        win.setContentSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+        return {
+          success: false,
+          width: FIXED_FRONTEND_WIDTH,
+          height: FIXED_FRONTEND_HEIGHT,
+          error: '前台窗口尺寸已固定为 1686x934，不允许修改'
+        }
+      }
       const w = Number.isFinite(width) ? Math.max(100, Math.floor(width)) : null
       const h = Number.isFinite(height) ? Math.max(100, Math.floor(height)) : null
       if (!w || !h) return { success: false, error: 'Invalid size' }

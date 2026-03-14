@@ -15,7 +15,10 @@ const layoutPath = path.join(userDataPath, 'layout.json')
 const layoutV2Path = path.join(userDataPath, 'layout-v2.json')
 const bgImagePath = path.join(userDataPath, 'background')
 const fontsPath = path.join(userDataPath, 'fonts')
+const userModelsPath = path.join(userDataPath, 'user-models')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
+const FIXED_FRONTEND_WIDTH = 1686
+const FIXED_FRONTEND_HEIGHT = 934
 
 // 支持的图片扩展名
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
@@ -47,6 +50,27 @@ function ensureDirectories() {
   }
   if (!fs.existsSync(fontsPath)) {
     fs.mkdirSync(fontsPath, { recursive: true })
+  }
+  if (!fs.existsSync(userModelsPath)) {
+    fs.mkdirSync(userModelsPath, { recursive: true })
+  }
+}
+
+function copyDirectoryRecursive(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) return
+  fs.mkdirSync(destDir, { recursive: true })
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true })
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name)
+    const destPath = path.join(destDir, entry.name)
+    if (entry.isDirectory()) {
+      copyDirectoryRecursive(srcPath, destPath)
+      continue
+    }
+    if (entry.isFile()) {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true })
+      fs.copyFileSync(srcPath, destPath)
+    }
   }
 }
 
@@ -159,6 +183,43 @@ function remapLayoutAssetPaths(layout) {
         }
       }
     }
+  }
+
+  const remapUserModelPath = (assetPath) => {
+    if (!assetPath || typeof assetPath !== 'string') return assetPath
+    const raw = assetPath.trim()
+    if (!raw) return raw
+    if (/^(https?:|data:)/i.test(raw)) return raw
+    const normalized = raw.replace(/\\/g, '/')
+    const marker = '/user-models/'
+    const idx = normalized.toLowerCase().indexOf(marker)
+    if (idx < 0) return raw
+    const rel = normalized.slice(idx + marker.length).replace(/^\/+/, '')
+    if (!rel) return raw
+    const safeSegments = rel.split('/').filter(seg => seg && seg !== '.' && seg !== '..')
+    if (!safeSegments.length) return raw
+    return path.join(userModelsPath, ...safeSegments)
+  }
+
+  const remapCharacterModelLayoutPaths = (host) => {
+    if (!host || typeof host !== 'object') return
+    if (host.scene && typeof host.scene === 'object') {
+      host.scene.modelPath = remapUserModelPath(host.scene.modelPath)
+    }
+    if (host.videoScreen && typeof host.videoScreen === 'object') {
+      host.videoScreen.path = remapUserModelPath(host.videoScreen.path)
+    }
+    if (host.entranceParticle && typeof host.entranceParticle === 'object') {
+      host.entranceParticle.path = remapUserModelPath(host.entranceParticle.path)
+    }
+    host.customModelPath = remapUserModelPath(host.customModelPath)
+  }
+
+  if (layout.characterModel3DLayout && typeof layout.characterModel3DLayout === 'object') {
+    remapCharacterModelLayoutPaths(layout.characterModel3DLayout)
+  }
+  if (layout.localBpCharacterModel3DLayout && typeof layout.localBpCharacterModel3DLayout === 'object') {
+    remapCharacterModelLayoutPaths(layout.localBpCharacterModel3DLayout)
   }
 
   return layout
@@ -346,6 +407,17 @@ async function prepareExportDir(options = {}) {
     }
   }
 
+  // 复制用户自定义 3D 模型目录到 user-models 子目录
+  if (fs.existsSync(userModelsPath)) {
+    const modelEntries = fs.readdirSync(userModelsPath)
+    if (modelEntries.length > 0) {
+      const modelsTempDir = path.join(tempDir, 'user-models')
+      copyDirectoryRecursive(userModelsPath, modelsTempDir)
+      files.push('user-models/')
+      console.log('[PackManager] 已打包 user-models 目录，条目数:', modelEntries.length)
+    }
+  }
+
   console.log('[PackManager] 准备导出文件:', files.length, '个')
   return { tempDir, files }
 }
@@ -483,6 +555,13 @@ async function importPack(options = {}) {
     // 确保背景目录存在
     ensureDirectories()
 
+    // 复制 user-models 目录（如果包内存在）
+    const modelsTempDir = path.join(tempDir, 'user-models')
+    if (fs.existsSync(modelsTempDir)) {
+      copyDirectoryRecursive(modelsTempDir, userModelsPath)
+      console.log('[PackManager] 导入 user-models 目录完成')
+    }
+
     // 复制布局文件 - 优先使用 V2 格式
     const layoutV2File = path.join(tempDir, 'layout-v2.json')
     const layoutFile = path.join(tempDir, 'layout.json')
@@ -577,7 +656,7 @@ async function importPack(options = {}) {
     // 复制所有图片文件
     const extractedFiles = fs.readdirSync(tempDir)
     for (const file of extractedFiles) {
-      if (file === 'layout.json' || file === 'layout-v2.json' || file === 'pack-config.json' || file === 'fonts') continue
+      if (file === 'layout.json' || file === 'layout-v2.json' || file === 'pack-config.json' || file === 'fonts' || file === 'user-models') continue
 
       const srcPath = path.join(tempDir, file)
       if (fs.statSync(srcPath).isFile()) {
@@ -665,19 +744,22 @@ async function applyPackData(packData, windowRefs) {
 
   // 应用前台窗口大小
   if (packData.frontendBounds && frontendWindow && !frontendWindow.isDestroyed()) {
-    frontendWindow.setBounds(packData.frontendBounds)
+    const x = Number.isFinite(packData.frontendBounds.x) ? Math.round(packData.frontendBounds.x) : undefined
+    const y = Number.isFinite(packData.frontendBounds.y) ? Math.round(packData.frontendBounds.y) : undefined
+    frontendWindow.setBounds({
+      ...(typeof x === 'number' ? { x } : {}),
+      ...(typeof y === 'number' ? { y } : {}),
+      width: FIXED_FRONTEND_WIDTH,
+      height: FIXED_FRONTEND_HEIGHT
+    })
   }
 
   // 应用前台渲染分辨率（内容尺寸）
-  if (packData.frontendContentSize && frontendWindow && !frontendWindow.isDestroyed()) {
-    const w = Number(packData.frontendContentSize.width)
-    const h = Number(packData.frontendContentSize.height)
-    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-      try {
-        frontendWindow.setContentSize(Math.round(w), Math.round(h))
-      } catch (e) {
-        // ignore
-      }
+  if (frontendWindow && !frontendWindow.isDestroyed()) {
+    try {
+      frontendWindow.setContentSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -829,7 +911,12 @@ async function resetLayout(windowRefs = {}) {
 
     // 恢复前台窗口默认大小
     if (frontendWindow && !frontendWindow.isDestroyed()) {
-      frontendWindow.setBounds({ x: 100, y: 100, width: 1280, height: 720 })
+      frontendWindow.setBounds({ x: 100, y: 100, width: FIXED_FRONTEND_WIDTH, height: FIXED_FRONTEND_HEIGHT })
+      try {
+        frontendWindow.setContentSize(FIXED_FRONTEND_WIDTH, FIXED_FRONTEND_HEIGHT)
+      } catch (e) {
+        // ignore
+      }
 
       // 通知前台窗口重新加载
       console.log('[PackManager] 通知前台窗口重置布局')
