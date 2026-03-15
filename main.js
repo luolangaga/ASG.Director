@@ -5977,6 +5977,24 @@ let localBpState = {
   // 角色模型3D展示窗口布局
   characterModel3DLayout: {
     mode: 'edit',
+    advancedRender: {
+      antialiasEnabled: true,
+      lightTextureEnabled: true,
+      exposure: 1,
+      contrast: 1,
+      saturation: 1,
+      renderScale: 1,
+      shadowMapBoost: 1,
+      shadowRadiusBoost: 1,
+      shadowBias: -0.00012,
+      shadowNormalBias: 0.01,
+      ambientBoost: 1,
+      hemiBoost: 1,
+      keyBoost: 1,
+      fillBoost: 1,
+      rimBoost: 1,
+      bounceBoost: 1
+    },
     transparentBackground: true,
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
@@ -6006,6 +6024,14 @@ let localBpState = {
       width: 2.2,
       height: 1.2
     },
+    cameraScreen: {
+      enabled: false,
+      deviceId: '',
+      muted: true,
+      mirrored: true,
+      width: 2.2,
+      height: 1.2
+    },
     customModelPath: '',
     scene: {
       modelPath: '',
@@ -6024,7 +6050,8 @@ let localBpState = {
     },
     camera: {
       position: { x: 0, y: 2, z: 8 },
-      target: { x: 0, y: 1, z: 0 }
+      target: { x: 0, y: 1, z: 0 },
+      fov: 45
     },
     cameraTransitionMs: 900,
     cameraKeyframes: {
@@ -6083,6 +6110,23 @@ function __normalizeLocalBpStateInPlace__() {
   }
   const m3d = localBpState.characterModel3DLayout
   m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
+  if (!m3d.advancedRender || typeof m3d.advancedRender !== 'object') m3d.advancedRender = {}
+  m3d.advancedRender.antialiasEnabled = m3d.advancedRender.antialiasEnabled !== false
+  m3d.advancedRender.lightTextureEnabled = m3d.advancedRender.lightTextureEnabled !== false
+  m3d.advancedRender.exposure = Math.max(0.6, Math.min(2.2, Number.isFinite(Number(m3d.advancedRender.exposure)) ? Number(m3d.advancedRender.exposure) : 1))
+  m3d.advancedRender.contrast = Math.max(0.8, Math.min(1.6, Number.isFinite(Number(m3d.advancedRender.contrast)) ? Number(m3d.advancedRender.contrast) : 1))
+  m3d.advancedRender.saturation = Math.max(0.7, Math.min(1.8, Number.isFinite(Number(m3d.advancedRender.saturation)) ? Number(m3d.advancedRender.saturation) : 1))
+  m3d.advancedRender.renderScale = Math.max(0.7, Math.min(2, Number.isFinite(Number(m3d.advancedRender.renderScale)) ? Number(m3d.advancedRender.renderScale) : 1))
+  m3d.advancedRender.shadowMapBoost = Math.max(0.5, Math.min(2, Number.isFinite(Number(m3d.advancedRender.shadowMapBoost)) ? Number(m3d.advancedRender.shadowMapBoost) : 1))
+  m3d.advancedRender.shadowRadiusBoost = Math.max(0.5, Math.min(2.5, Number.isFinite(Number(m3d.advancedRender.shadowRadiusBoost)) ? Number(m3d.advancedRender.shadowRadiusBoost) : 1))
+  m3d.advancedRender.shadowBias = Math.max(-0.001, Math.min(0.001, Number.isFinite(Number(m3d.advancedRender.shadowBias)) ? Number(m3d.advancedRender.shadowBias) : -0.00012))
+  m3d.advancedRender.shadowNormalBias = Math.max(0, Math.min(0.1, Number.isFinite(Number(m3d.advancedRender.shadowNormalBias)) ? Number(m3d.advancedRender.shadowNormalBias) : 0.01))
+  m3d.advancedRender.ambientBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.ambientBoost)) ? Number(m3d.advancedRender.ambientBoost) : 1))
+  m3d.advancedRender.hemiBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.hemiBoost)) ? Number(m3d.advancedRender.hemiBoost) : 1))
+  m3d.advancedRender.keyBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.keyBoost)) ? Number(m3d.advancedRender.keyBoost) : 1))
+  m3d.advancedRender.fillBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.fillBoost)) ? Number(m3d.advancedRender.fillBoost) : 1))
+  m3d.advancedRender.rimBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.rimBoost)) ? Number(m3d.advancedRender.rimBoost) : 1))
+  m3d.advancedRender.bounceBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.bounceBoost)) ? Number(m3d.advancedRender.bounceBoost) : 1))
   m3d.transparentBackground = m3d.transparentBackground !== false
   m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight'
     || m3d.environmentPreset === 'horrorNight'
@@ -6091,7 +6135,7 @@ function __normalizeLocalBpStateInPlace__() {
     || m3d.environmentPreset === 'goldenNoon')
     ? m3d.environmentPreset
     : 'duskCinema'
-  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic')
+  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic' || m3d.qualityPreset === 'ultra')
     ? m3d.qualityPreset
     : 'high'
   m3d.maxFps = Math.max(10, Math.min(240, Number.isFinite(Number(m3d.maxFps)) ? Number(m3d.maxFps) : 60))
@@ -6127,6 +6171,13 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.videoScreen.muted = m3d.videoScreen.muted !== false
   m3d.videoScreen.width = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.width)) ? Number(m3d.videoScreen.width) : 2.2)
   m3d.videoScreen.height = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.height)) ? Number(m3d.videoScreen.height) : 1.2)
+  if (!m3d.cameraScreen || typeof m3d.cameraScreen !== 'object') m3d.cameraScreen = {}
+  m3d.cameraScreen.enabled = !!m3d.cameraScreen.enabled
+  m3d.cameraScreen.deviceId = (typeof m3d.cameraScreen.deviceId === 'string') ? m3d.cameraScreen.deviceId : ''
+  m3d.cameraScreen.muted = m3d.cameraScreen.muted !== false
+  m3d.cameraScreen.mirrored = m3d.cameraScreen.mirrored !== false
+  m3d.cameraScreen.width = Math.max(0.1, Number.isFinite(Number(m3d.cameraScreen.width)) ? Number(m3d.cameraScreen.width) : 2.2)
+  m3d.cameraScreen.height = Math.max(0.1, Number.isFinite(Number(m3d.cameraScreen.height)) ? Number(m3d.cameraScreen.height) : 1.2)
   m3d.customModelPath = (typeof m3d.customModelPath === 'string') ? m3d.customModelPath : ''
 
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
@@ -6146,7 +6197,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.scene.scale = ensureVec3(m3d.scene.scale, { x: 1, y: 1, z: 1 })
 
   if (!m3d.slots || typeof m3d.slots !== 'object') m3d.slots = {}
-  const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['light1', 'video1', 'camera1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     if (!m3d.slots[key] || typeof m3d.slots[key] !== 'object') m3d.slots[key] = {}
     m3d.slots[key].position = ensureVec3(m3d.slots[key].position, { x: 0, y: 0, z: 0 })
@@ -6177,6 +6228,7 @@ function __normalizeLocalBpStateInPlace__() {
   if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
   m3d.camera.position = ensureVec3(m3d.camera.position, { x: 0, y: 2, z: 8 })
   m3d.camera.target = ensureVec3(m3d.camera.target, { x: 0, y: 1, z: 0 })
+  m3d.camera.fov = Math.max(12, Math.min(80, Number.isFinite(Number(m3d.camera.fov)) ? Number(m3d.camera.fov) : 45))
   m3d.cameraTransitionMs = Math.max(50, Math.min(10000, Number.isFinite(Number(m3d.cameraTransitionMs)) ? Number(m3d.cameraTransitionMs) : 900))
   if (!m3d.cameraKeyframes || typeof m3d.cameraKeyframes !== 'object') m3d.cameraKeyframes = {}
   const cameraEventKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunterSelected']
@@ -6188,7 +6240,8 @@ function __normalizeLocalBpStateInPlace__() {
     }
     m3d.cameraKeyframes[key] = {
       position: ensureVec3(frame.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 })
+      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 }),
+      fov: Math.max(12, Math.min(80, Number.isFinite(Number(frame.fov)) ? Number(frame.fov) : 45))
     }
   }
 }
@@ -8021,12 +8074,31 @@ function normalizeCharacterModel3DLayoutInput(input) {
     if (!v || typeof v !== 'object') return null
     return {
       position: ensureVec3(v.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 })
+      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 }),
+      fov: Math.max(12, Math.min(80, Number.isFinite(Number(v.fov)) ? Number(v.fov) : 45))
     }
   }
 
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
+    advancedRender: {
+      antialiasEnabled: base?.advancedRender?.antialiasEnabled !== false,
+      lightTextureEnabled: base?.advancedRender?.lightTextureEnabled !== false,
+      exposure: Math.max(0.6, Math.min(2.2, Number.isFinite(Number(base?.advancedRender?.exposure)) ? Number(base.advancedRender.exposure) : 1)),
+      contrast: Math.max(0.8, Math.min(1.6, Number.isFinite(Number(base?.advancedRender?.contrast)) ? Number(base.advancedRender.contrast) : 1)),
+      saturation: Math.max(0.7, Math.min(1.8, Number.isFinite(Number(base?.advancedRender?.saturation)) ? Number(base.advancedRender.saturation) : 1)),
+      renderScale: Math.max(0.7, Math.min(2, Number.isFinite(Number(base?.advancedRender?.renderScale)) ? Number(base.advancedRender.renderScale) : 1)),
+      shadowMapBoost: Math.max(0.5, Math.min(2, Number.isFinite(Number(base?.advancedRender?.shadowMapBoost)) ? Number(base.advancedRender.shadowMapBoost) : 1)),
+      shadowRadiusBoost: Math.max(0.5, Math.min(2.5, Number.isFinite(Number(base?.advancedRender?.shadowRadiusBoost)) ? Number(base.advancedRender.shadowRadiusBoost) : 1)),
+      shadowBias: Math.max(-0.001, Math.min(0.001, Number.isFinite(Number(base?.advancedRender?.shadowBias)) ? Number(base.advancedRender.shadowBias) : -0.00012)),
+      shadowNormalBias: Math.max(0, Math.min(0.1, Number.isFinite(Number(base?.advancedRender?.shadowNormalBias)) ? Number(base.advancedRender.shadowNormalBias) : 0.01)),
+      ambientBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.ambientBoost)) ? Number(base.advancedRender.ambientBoost) : 1)),
+      hemiBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.hemiBoost)) ? Number(base.advancedRender.hemiBoost) : 1)),
+      keyBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.keyBoost)) ? Number(base.advancedRender.keyBoost) : 1)),
+      fillBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.fillBoost)) ? Number(base.advancedRender.fillBoost) : 1)),
+      rimBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.rimBoost)) ? Number(base.advancedRender.rimBoost) : 1)),
+      bounceBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.bounceBoost)) ? Number(base.advancedRender.bounceBoost) : 1))
+    },
     transparentBackground: base.transparentBackground !== false,
     environmentPreset: (base.environmentPreset === 'cyberpunkNight'
       || base.environmentPreset === 'horrorNight'
@@ -8035,7 +8107,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
       || base.environmentPreset === 'goldenNoon')
       ? base.environmentPreset
       : 'duskCinema',
-    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic')
+    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic' || base.qualityPreset === 'ultra')
       ? base.qualityPreset
       : 'high',
     maxFps: Math.max(10, Math.min(240, Number.isFinite(Number(base.maxFps)) ? Number(base.maxFps) : 60)),
@@ -8078,6 +8150,14 @@ function normalizeCharacterModel3DLayoutInput(input) {
       width: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.width)) ? Number(base.videoScreen.width) : 2.2),
       height: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.height)) ? Number(base.videoScreen.height) : 1.2)
     },
+    cameraScreen: {
+      enabled: !!base?.cameraScreen?.enabled,
+      deviceId: typeof base?.cameraScreen?.deviceId === 'string' ? base.cameraScreen.deviceId : '',
+      muted: base?.cameraScreen?.muted !== false,
+      mirrored: base?.cameraScreen?.mirrored !== false,
+      width: Math.max(0.1, Number.isFinite(Number(base?.cameraScreen?.width)) ? Number(base.cameraScreen.width) : 2.2),
+      height: Math.max(0.1, Number.isFinite(Number(base?.cameraScreen?.height)) ? Number(base.cameraScreen.height) : 1.2)
+    },
     customModelPath: typeof base?.customModelPath === 'string' ? base.customModelPath : '',
     scene: {
       modelPath: typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : '',
@@ -8104,7 +8184,8 @@ function normalizeCharacterModel3DLayoutInput(input) {
     },
     camera: {
       position: ensureVec3(base?.camera?.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 })
+      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 }),
+      fov: Math.max(12, Math.min(80, Number.isFinite(Number(base?.camera?.fov)) ? Number(base.camera.fov) : 45))
     },
     cameraTransitionMs: Math.max(50, Math.min(10000, Number.isFinite(Number(base.cameraTransitionMs)) ? Number(base.cameraTransitionMs) : 900)),
     cameraKeyframes: {
@@ -8116,7 +8197,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     }
   }
 
-  const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['light1', 'video1', 'camera1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     out.slots[key] = {
       position: ensureVec3(base?.slots?.[key]?.position, { x: 0, y: 0, z: 0 }),

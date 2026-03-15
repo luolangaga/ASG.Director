@@ -155,6 +155,7 @@
   }
 
   const ADVANCED_RENDER_DEFAULT = {
+    antialiasEnabled: true,
     lightTextureEnabled: true,
     exposure: 1,
     contrast: 1,
@@ -209,6 +210,7 @@
       enabled: false,
       deviceId: '',
       muted: true,
+      mirrored: true,
       width: 2.2,
       height: 1.2
     },
@@ -240,7 +242,8 @@
     },
     camera: {
       position: { x: 0, y: 2, z: 8 },
-      target: { x: 0, y: 1, z: 0 }
+      target: { x: 0, y: 1, z: 0 },
+      fov: 45
     },
     cameraTransitionMs: 900,
     cameraKeyframes: {
@@ -271,13 +274,13 @@
     virtualCameraMode: {
       enabled: false,
       savedFrame: null,
-      savedTransitionMs: null,
-      savedFov: null
+      savedTransitionMs: null
     }
   }
 
   let THREE = null
   let renderer = null
+  let rendererAntialiasEnabled = true
   let scene = null
   let camera = null
   let root = null
@@ -312,6 +315,10 @@
   let bpRoleSyncPending = false
   let pendingCameraEventKey = ''
   const CAMERA_EPSILON_RADIUS = 1e-6
+  const CAMERA_MIN_FOV = 12
+  const CAMERA_MAX_FOV = 80
+  const DEFAULT_CAMERA_FOV = 45
+  const VIRTUAL_CAMERA_STAGE_FOV = 14
   const CAMERA_ZOOM_FACTOR = 0.00105
   const activeEntranceEffects = []
   const pendingEntranceEffects = new Set()
@@ -373,6 +380,7 @@
     cameraStopBtn: document.getElementById('cameraStopBtn'),
     virtualCameraModeToggleBtn: document.getElementById('virtualCameraModeToggleBtn'),
     cameraMuted: document.getElementById('cameraMuted'),
+    cameraMirrored: document.getElementById('cameraMirrored'),
     cameraWidth: document.getElementById('cameraWidth'),
     cameraHeight: document.getElementById('cameraHeight'),
     applyCameraSettingsBtn: document.getElementById('applyCameraSettingsBtn'),
@@ -420,6 +428,7 @@
     , lightIntensity: document.getElementById('lightIntensity')
     , applyLightBtn: document.getElementById('applyLightBtn')
     , advExposure: document.getElementById('advExposure')
+    , advAntialiasEnabled: document.getElementById('advAntialiasEnabled')
     , advContrast: document.getElementById('advContrast')
     , advSaturation: document.getElementById('advSaturation')
     , advRenderScale: document.getElementById('advRenderScale')
@@ -490,6 +499,22 @@
     return Number.isFinite(n) ? n : fallback
   }
 
+  function clampCameraFov(value, fallback = DEFAULT_CAMERA_FOV) {
+    const safeFallback = Math.max(CAMERA_MIN_FOV, Math.min(CAMERA_MAX_FOV, asNumber(fallback, DEFAULT_CAMERA_FOV)))
+    return Math.max(CAMERA_MIN_FOV, Math.min(CAMERA_MAX_FOV, asNumber(value, safeFallback)))
+  }
+
+  function getViewportAspect() {
+    const w = dom.renderRoot?.clientWidth || window.innerWidth || 1920
+    const h = dom.renderRoot?.clientHeight || window.innerHeight || 1080
+    return Math.max(0.1, w / Math.max(1, h))
+  }
+
+  function clampCameraAspect(value, fallback = null) {
+    const safeFallback = Math.max(0.1, asNumber(fallback, getViewportAspect()))
+    return Math.max(0.1, asNumber(value, safeFallback))
+  }
+
   function ensureVec3(input, fallback = { x: 0, y: 0, z: 0 }) {
     const src = (input && typeof input === 'object') ? input : {}
     return {
@@ -501,9 +526,13 @@
 
   function normalizeCameraKeyframe(input, fallback = null) {
     if (!input || typeof input !== 'object') return fallback
+    const baseFallback = fallback && typeof fallback === 'object'
+      ? fallback
+      : { position: { x: 0, y: 2, z: 8 }, target: { x: 0, y: 1, z: 0 }, fov: DEFAULT_CAMERA_FOV }
     return {
-      position: ensureVec3(input.position, fallback?.position || { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(input.target, fallback?.target || { x: 0, y: 1, z: 0 })
+      position: ensureVec3(input.position, baseFallback.position),
+      target: ensureVec3(input.target, baseFallback.target),
+      fov: clampCameraFov(input.fov, baseFallback.fov)
     }
   }
 
@@ -514,6 +543,7 @@
     out.toolbarCollapsed = !!base.toolbarCollapsed
     out.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
     const adv = (base?.advancedRender && typeof base.advancedRender === 'object') ? base.advancedRender : {}
+    out.advancedRender.antialiasEnabled = adv.antialiasEnabled !== false
     out.advancedRender.lightTextureEnabled = adv.lightTextureEnabled !== false
     out.advancedRender.exposure = Math.max(0.6, Math.min(2.2, asNumber(adv.exposure, ADVANCED_RENDER_DEFAULT.exposure)))
     out.advancedRender.contrast = Math.max(0.8, Math.min(1.6, asNumber(adv.contrast, ADVANCED_RENDER_DEFAULT.contrast)))
@@ -565,6 +595,7 @@
     out.cameraScreen.enabled = !!base?.cameraScreen?.enabled
     out.cameraScreen.deviceId = typeof base?.cameraScreen?.deviceId === 'string' ? base.cameraScreen.deviceId : ''
     out.cameraScreen.muted = base?.cameraScreen?.muted !== false
+    out.cameraScreen.mirrored = base?.cameraScreen?.mirrored !== false
     out.cameraScreen.width = Math.max(0.1, asNumber(base?.cameraScreen?.width, out.cameraScreen.width))
     out.cameraScreen.height = Math.max(0.1, asNumber(base?.cameraScreen?.height, out.cameraScreen.height))
     out.customModelPath = typeof base?.customModelPath === 'string' ? base.customModelPath : ''
@@ -595,6 +626,7 @@
     out.lights.light1.decay = Math.max(0, asNumber(base?.lights?.light1?.decay, out.lights.light1.decay))
     out.camera.position = ensureVec3(base?.camera?.position, out.camera.position)
     out.camera.target = ensureVec3(base?.camera?.target, out.camera.target)
+    out.camera.fov = clampCameraFov(base?.camera?.fov, out.camera.fov)
     out.cameraTransitionMs = Math.max(50, Math.min(10000, asNumber(base?.cameraTransitionMs, out.cameraTransitionMs)))
     out.cameraKeyframes = deepClone(DEFAULT_LAYOUT.cameraKeyframes)
     for (const eventCfg of CAMERA_EVENT_OPTIONS) {
@@ -709,28 +741,47 @@
     return !!(THREE && THREE.GLTFLoader && THREE.OBJLoader && THREE.MTLLoader && THREE.OutlineEffect)
   }
 
-  function createSceneGraph() {
-    scene = new THREE.Scene()
-    const initW = dom.renderRoot.clientWidth || window.innerWidth || 1920
-    const initH = dom.renderRoot.clientHeight || window.innerHeight || 1080
-    camera = new THREE.PerspectiveCamera(45, initW / Math.max(1, initH), 0.1, 5000)
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
-    renderer.outputEncoding = THREE.sRGBEncoding
-    renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.02
-    renderer.physicallyCorrectLights = true
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8))
-    renderer.setSize(initW, initH)
-    renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  function buildRendererRuntime() {
+    if (!THREE || !camera || !dom.renderRoot) return
+    const width = dom.renderRoot.clientWidth || window.innerWidth || 1920
+    const height = dom.renderRoot.clientHeight || window.innerHeight || 1080
+    const antialiasEnabled = state.layout?.advancedRender?.antialiasEnabled !== false
+    const nextRenderer = new THREE.WebGLRenderer({
+      antialias: antialiasEnabled,
+      alpha: true,
+      powerPreference: 'high-performance'
+    })
+    nextRenderer.outputEncoding = THREE.sRGBEncoding
+    nextRenderer.toneMapping = THREE.ACESFilmicToneMapping
+    nextRenderer.toneMappingExposure = 1.02
+    nextRenderer.physicallyCorrectLights = true
+    nextRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8))
+    nextRenderer.setSize(width, height)
+    nextRenderer.shadowMap.enabled = true
+    nextRenderer.shadowMap.type = THREE.PCFSoftShadowMap
+
+    const prevRenderer = renderer
+    renderer = nextRenderer
+    rendererAntialiasEnabled = antialiasEnabled
     outlineEffect = new THREE.OutlineEffect(renderer, {
       defaultThickness: 0.004,
       defaultColor: [0, 0, 0],
       defaultAlpha: 1
     })
-    camera.updateProjectionMatrix()
     dom.renderRoot.innerHTML = ''
     dom.renderRoot.appendChild(renderer.domElement)
+    if (prevRenderer && typeof prevRenderer.dispose === 'function') {
+      try { prevRenderer.dispose() } catch { }
+    }
+  }
+
+  function createSceneGraph() {
+    scene = new THREE.Scene()
+    const initW = dom.renderRoot.clientWidth || window.innerWidth || 1920
+    const initH = dom.renderRoot.clientHeight || window.innerHeight || 1080
+    camera = new THREE.PerspectiveCamera(45, initW / Math.max(1, initH), 0.1, 5000)
+    buildRendererRuntime()
+    camera.updateProjectionMatrix()
 
     sceneLights.ambient = new THREE.AmbientLight(0xffffff, 0.46)
     scene.add(sceneLights.ambient)
@@ -995,11 +1046,12 @@
 
   function syncAdvancedRenderInputs() {
     const adv = state.layout?.advancedRender || ADVANCED_RENDER_DEFAULT
+    if (dom.advAntialiasEnabled) dom.advAntialiasEnabled.checked = adv.antialiasEnabled !== false
     if (dom.advLightTextureEnabled) dom.advLightTextureEnabled.checked = adv.lightTextureEnabled !== false
     if (dom.advExposure) dom.advExposure.value = String(adv.exposure.toFixed(2))
     if (dom.advContrast) dom.advContrast.value = String(adv.contrast.toFixed(2))
     if (dom.advSaturation) dom.advSaturation.value = String(adv.saturation.toFixed(2))
-    if (dom.advRenderScale) dom.advRenderScale.value = String(adv.renderScale.toFixed(2))
+    if (dom.advRenderScale) dom.advRenderScale.value = String(Math.max(0.7, Math.min(2, asNumber(adv.renderScale, 1))))
     if (dom.advShadowMapBoost) dom.advShadowMapBoost.value = String(adv.shadowMapBoost.toFixed(2))
     if (dom.advShadowRadius) dom.advShadowRadius.value = String(adv.shadowRadiusBoost.toFixed(2))
     if (dom.advShadowBias) dom.advShadowBias.value = String(adv.shadowBias.toFixed(5))
@@ -1015,6 +1067,7 @@
   function readAdvancedRenderFromInputs() {
     if (!state.layout.advancedRender) state.layout.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
     const adv = state.layout.advancedRender
+    adv.antialiasEnabled = dom.advAntialiasEnabled ? !!dom.advAntialiasEnabled.checked : true
     adv.lightTextureEnabled = dom.advLightTextureEnabled ? !!dom.advLightTextureEnabled.checked : true
     adv.exposure = Math.max(0.6, Math.min(2.2, asNumber(dom.advExposure?.value, adv.exposure)))
     adv.contrast = Math.max(0.8, Math.min(1.6, asNumber(dom.advContrast?.value, adv.contrast)))
@@ -1038,6 +1091,9 @@
     const q = QUALITY_PRESETS[state.layout.qualityPreset || 'high'] || QUALITY_PRESETS.high
     const useStylizedLightTexture = adv.lightTextureEnabled !== false
 
+    if (!renderer || rendererAntialiasEnabled !== (adv.antialiasEnabled !== false)) {
+      buildRendererRuntime()
+    }
     if (renderer) {
       const scaledRatio = Math.min((window.devicePixelRatio || 1) * adv.renderScale, q.pixelRatio * adv.renderScale)
       renderer.setPixelRatio(Math.max(0.7, Math.min(3, scaledRatio)))
@@ -1097,6 +1153,7 @@
     }
 
     syncAdvancedRenderInputs()
+    applyStylizedRenderSettings(false)
     if (shouldSave) scheduleSaveLayout()
   }
 
@@ -1336,6 +1393,11 @@
     orbit.desiredRadius = orbit.radius
     orbit.desiredYaw = orbit.yaw
     orbit.desiredPitch = orbit.pitch
+    if (camera) {
+      camera.fov = clampCameraFov(cam.fov, DEFAULT_CAMERA_FOV)
+      camera.aspect = clampCameraAspect(camera.aspect, getViewportAspect())
+      camera.updateProjectionMatrix()
+    }
     updateCameraFromOrbit(true)
   }
 
@@ -1391,7 +1453,8 @@
         x: orbit.target.x,
         y: orbit.target.y,
         z: orbit.target.z
-      }
+      },
+      fov: clampCameraFov(camera?.fov, state.layout?.camera?.fov || DEFAULT_CAMERA_FOV)
     }
     scheduleSaveLayout()
   }
@@ -1524,6 +1587,22 @@
     return from + delta * t
   }
 
+  function easeInOutSmootherStep(t) {
+    const x = Math.max(0, Math.min(1, asNumber(t, 0)))
+    return x * x * x * (x * (x * 6 - 15) + 10)
+  }
+
+  function captureCurrentCameraFrame() {
+    const fallbackCamera = state.layout?.camera || DEFAULT_LAYOUT.camera
+    return {
+      position: camera
+        ? { x: camera.position.x, y: camera.position.y, z: camera.position.z }
+        : ensureVec3(fallbackCamera.position, DEFAULT_LAYOUT.camera.position),
+      target: ensureVec3(orbit?.target, fallbackCamera.target || DEFAULT_LAYOUT.camera.target),
+      fov: clampCameraFov(camera?.fov, fallbackCamera.fov || DEFAULT_CAMERA_FOV)
+    }
+  }
+
   function buildOrbitStateFromFrame(frame) {
     const target = ensureVec3(frame?.target, state.layout.camera.target)
     const position = ensureVec3(frame?.position, state.layout.camera.position)
@@ -1542,7 +1621,16 @@
   function startCameraTransition(targetFrame, durationMs, reason = '') {
     if (!camera || !targetFrame) return
     const duration = Math.max(50, Math.min(10000, asNumber(durationMs, 900)))
-    const toState = buildOrbitStateFromFrame(targetFrame)
+    camera.aspect = clampCameraAspect(getViewportAspect(), getViewportAspect())
+    camera.updateProjectionMatrix()
+    const fromFrame = captureCurrentCameraFrame()
+    const toFrame = normalizeCameraKeyframe(targetFrame, {
+      position: state.layout?.camera?.position || DEFAULT_LAYOUT.camera.position,
+      target: state.layout?.camera?.target || DEFAULT_LAYOUT.camera.target,
+      fov: state.layout?.camera?.fov || DEFAULT_LAYOUT.camera.fov
+    })
+    const fromState = buildOrbitStateFromFrame(fromFrame)
+    const toState = buildOrbitStateFromFrame(toFrame)
     if (pendingEntranceEffects.size) {
       pendingEntranceEffects.forEach((rootModel) => {
         if (rootModel) rootModel.visible = false
@@ -1551,14 +1639,16 @@
     cameraTransition = {
       startAt: performance.now(),
       duration,
-      fromTarget: { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z },
-      fromYaw: orbit.yaw,
-      fromPitch: orbit.pitch,
-      fromRadius: orbit.radius,
+      fromTarget: { ...fromState.target },
+      fromYaw: fromState.yaw,
+      fromPitch: fromState.pitch,
+      fromRadius: fromState.radius,
+      fromFov: fromFrame.fov,
       toTarget: { ...toState.target },
       toYaw: toState.yaw,
       toPitch: toState.pitch,
       toRadius: toState.radius,
+      toFov: toFrame.fov,
       reason
     }
   }
@@ -1567,7 +1657,7 @@
     if (!cameraTransition || !camera) return
     const now = performance.now()
     const t = Math.max(0, Math.min(1, (now - cameraTransition.startAt) / Math.max(1, cameraTransition.duration)))
-    const eased = 1 - Math.pow(1 - t, 3)
+    const eased = easeInOutSmootherStep(t)
 
     orbit.target = {
       x: cameraTransition.fromTarget.x + (cameraTransition.toTarget.x - cameraTransition.fromTarget.x) * eased,
@@ -1581,6 +1671,12 @@
     orbit.desiredRadius = orbit.radius
     orbit.desiredYaw = orbit.yaw
     orbit.desiredPitch = orbit.pitch
+    camera.fov = clampCameraFov(
+      cameraTransition.fromFov + (cameraTransition.toFov - cameraTransition.fromFov) * eased,
+      DEFAULT_CAMERA_FOV
+    )
+    camera.aspect = clampCameraAspect(getViewportAspect(), getViewportAspect())
+    camera.updateProjectionMatrix()
     updateCameraFromOrbit(true)
 
     if (t >= 1) {
@@ -1638,7 +1734,8 @@
     if (!state.layout.cameraKeyframes) state.layout.cameraKeyframes = deepClone(DEFAULT_LAYOUT.cameraKeyframes)
     state.layout.cameraKeyframes[eventKey] = {
       position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
-      target: { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z }
+      target: { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z },
+      fov: clampCameraFov(camera?.fov, state.layout?.camera?.fov || DEFAULT_CAMERA_FOV)
     }
     syncCameraEditorInputs()
     scheduleSaveLayout()
@@ -1674,14 +1771,7 @@
     const eventLabel = CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey
     let duration = state.layout.cameraTransitionMs
     if (state.virtualCameraMode?.enabled) {
-      duration = Math.max(780, Math.min(2800, Math.round(duration * 1.35)))
-      const vm = state.virtualCameraMode
-      if (Number.isFinite(vm.savedFov) && camera) {
-        const from = camera.fov
-        const to = Math.max(18, Math.min(80, vm.savedFov))
-        camera.fov = from + (to - from) * 0.72
-        camera.updateProjectionMatrix()
-      }
+      duration = Math.max(820, Math.min(2400, Math.round(duration * 1.22)))
     }
     startCameraTransition(frame, duration, eventLabel)
   }
@@ -2805,6 +2895,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       state.layout.slots[state.selectedSlot] = { ...state.layout.slots[state.selectedSlot], ...tr }
     }
     applyTransformToGroup(state.selectedSlot, tr)
+    if (state.selectedSlot === 'camera1' && state.virtualCameraMode?.enabled) {
+      refreshVirtualCameraStageFrame(220, '更新虚拟摄像机位置')
+    }
     scheduleSaveLayout()
   }
 
@@ -2846,6 +2939,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncTransformInputs()
     syncLightInputs()
     syncVideoInputs()
+    syncCameraInputs()
     syncCameraEditorInputs()
     syncEntranceParticleUi()
     syncStylizedRenderInputs()
@@ -2972,15 +3066,24 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     const worldQuat = new THREE.Quaternion()
     anchor.getWorldQuaternion(worldQuat)
 
+    const worldScale = new THREE.Vector3(1, 1, 1)
+    anchor.getWorldScale(worldScale)
+
     const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(worldQuat).normalize()
     if (!Number.isFinite(normal.x) || !Number.isFinite(normal.y) || !Number.isFinite(normal.z) || normal.lengthSq() < 1e-6) {
       normal.copy(camera.position).sub(target).normalize()
     }
 
     const cfg = state.layout?.cameraScreen || DEFAULT_LAYOUT.cameraScreen
-    const screenMax = Math.max(0.1, asNumber(cfg.width, 2.2), asNumber(cfg.height, 1.2))
-    const currentDistance = Math.max(1.05, camera.position.distanceTo(target))
-    const distance = Math.max(1.05, Math.min(5.8, screenMax * 1.18, currentDistance * 0.92))
+    const screenWidth = Math.max(0.1, asNumber(cfg.width, 2.2) * Math.max(0.001, Math.abs(worldScale.x)))
+    const screenHeight = Math.max(0.1, asNumber(cfg.height, 1.2) * Math.max(0.001, Math.abs(worldScale.y)))
+    const fov = VIRTUAL_CAMERA_STAGE_FOV
+    const aspect = getViewportAspect()
+    const vFovRad = THREE.MathUtils.degToRad(fov)
+    const hFovRad = 2 * Math.atan(Math.tan(vFovRad * 0.5) * aspect)
+    const fitDistanceByWidth = (screenWidth * 0.5) / Math.max(0.001, Math.tan(hFovRad * 0.5))
+    const fitDistanceByHeight = (screenHeight * 0.5) / Math.max(0.001, Math.tan(vFovRad * 0.5))
+    const distance = Math.max(0.8, Math.max(fitDistanceByWidth, fitDistanceByHeight))
 
     const positionA = target.clone().addScaledVector(normal, distance)
     const positionB = target.clone().addScaledVector(normal, -distance)
@@ -2990,37 +3093,58 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
 
     return {
       position: { x: position.x, y: position.y, z: position.z },
-      target: { x: target.x, y: target.y, z: target.z }
+      target: { x: target.x, y: target.y, z: target.z },
+      fov
     }
   }
 
   function syncVirtualCameraModeUi() {
     const enabled = !!state.virtualCameraMode?.enabled
     if (dom.virtualCameraModeToggleBtn) {
-      dom.virtualCameraModeToggleBtn.textContent = enabled ? '关闭虚拟摄像机演播模式' : '启用虚拟摄像机演播模式'
+      dom.virtualCameraModeToggleBtn.textContent = enabled ? '关闭虚拟摄像机主镜头 (F6)' : '启用虚拟摄像机主镜头 (F6)'
       dom.virtualCameraModeToggleBtn.classList.toggle('active-mode', enabled)
     }
-    setVirtualCameraModeStatus(enabled ? '演播模式: 已开启（近2D）' : '演播模式: 关闭')
+    setVirtualCameraModeStatus(enabled ? '演播模式: 已开启（近2D正视）' : '演播模式: 关闭')
   }
 
   function restoreCameraFromVirtualMode() {
     const vm = state.virtualCameraMode
     if (!vm) return
-    const restoreFov = Number.isFinite(vm.savedFov) ? vm.savedFov : 45
-    if (camera) {
-      camera.fov = Math.max(18, Math.min(80, restoreFov))
-      camera.updateProjectionMatrix()
-    }
     if (Number.isFinite(vm.savedTransitionMs)) {
       state.layout.cameraTransitionMs = Math.max(50, Math.min(10000, vm.savedTransitionMs))
       if (dom.cameraTransitionMs) dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
     }
     if (vm.savedFrame) {
-      startCameraTransition(vm.savedFrame, 520, '退出演播模式')
+      startCameraTransition(vm.savedFrame, 540, '退出演播模式')
     }
     vm.savedFrame = null
     vm.savedTransitionMs = null
-    vm.savedFov = null
+  }
+
+  function refreshVirtualCameraStageFrame(durationMs = 260, reason = '更新虚拟摄像机机位') {
+    if (!state.virtualCameraMode?.enabled) return
+    const frame = buildVirtualCameraStageFrame()
+    if (!frame) return
+    startCameraTransition(frame, durationMs, reason)
+  }
+
+  function syncCameraProjectionToMode() {
+    if (!camera) return
+    camera.aspect = clampCameraAspect(getViewportAspect(), getViewportAspect())
+    camera.updateProjectionMatrix()
+  }
+
+  function exitVirtualCameraModeForAutoCut(reason = '') {
+    if (!state.virtualCameraMode?.enabled) return
+    state.virtualCameraMode.enabled = false
+    if (state.virtualCameraMode) {
+      state.virtualCameraMode.savedFrame = null
+      state.virtualCameraMode.savedTransitionMs = null
+    }
+    syncCameraProjectionToMode()
+    syncVirtualCameraModeUi()
+    scheduleSaveLayout()
+    if (reason) setStatus(reason)
   }
 
   function enableVirtualCameraMode() {
@@ -3037,40 +3161,18 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       state.virtualCameraMode = {
         enabled: false,
         savedFrame: null,
-        savedTransitionMs: null,
-        savedFov: null
+        savedTransitionMs: null
       }
     }
     const vm = state.virtualCameraMode
     if (!vm.enabled) {
-      vm.savedFrame = {
-        position: {
-          x: camera.position.x,
-          y: camera.position.y,
-          z: camera.position.z
-        },
-        target: {
-          x: orbit.target.x,
-          y: orbit.target.y,
-          z: orbit.target.z
-        }
-      }
+      vm.savedFrame = captureCurrentCameraFrame()
       vm.savedTransitionMs = state.layout.cameraTransitionMs
-      vm.savedFov = camera ? camera.fov : 45
     }
 
     vm.enabled = true
-    state.layout.cameraTransitionMs = Math.max(320, Math.min(1800, asNumber(state.layout.cameraTransitionMs, 900)))
-    if (dom.cameraTransitionMs) dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
-
-    if (camera) {
-      const savedFov = Number.isFinite(vm.savedFov) ? vm.savedFov : 45
-      camera.fov = Math.max(24, Math.min(40, savedFov * 0.7))
-      camera.updateProjectionMatrix()
-    }
-
-    startCameraTransition(frame, 680, '虚拟摄像机演播模式')
-    setStatus('演播模式已开启：当前镜头聚焦虚拟摄像头屏幕')
+    startCameraTransition(frame, 760, '虚拟摄像机演播模式')
+    setStatus('演播模式已开启：主镜头切到虚拟摄像机，当前构图为近2D正视')
     syncVirtualCameraModeUi()
     scheduleSaveLayout()
   }
@@ -3112,12 +3214,21 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     runtime.videoElement.muted = cfg.muted !== false
     runtime.videoElement.defaultMuted = runtime.videoElement.muted
     runtime.videoElement.volume = runtime.videoElement.muted ? 0 : 1
+    if (runtime.videoTexture) {
+      runtime.videoTexture.wrapS = THREE.ClampToEdgeWrapping
+      runtime.videoTexture.repeat.x = cfg.mirrored !== false ? -1 : 1
+      runtime.videoTexture.repeat.y = 1
+      runtime.videoTexture.offset.x = cfg.mirrored !== false ? 1 : 0
+      runtime.videoTexture.offset.y = 0
+      runtime.videoTexture.needsUpdate = true
+    }
     updateCameraScreenGeometry(runtime)
   }
 
   function syncCameraInputs() {
     const cfg = state.layout?.cameraScreen || DEFAULT_LAYOUT.cameraScreen
     if (dom.cameraMuted) dom.cameraMuted.checked = cfg.muted !== false
+    if (dom.cameraMirrored) dom.cameraMirrored.checked = cfg.mirrored !== false
     if (dom.cameraWidth) dom.cameraWidth.value = String(Math.max(0.1, asNumber(cfg.width, 2.2)).toFixed(2))
     if (dom.cameraHeight) dom.cameraHeight.value = String(Math.max(0.1, asNumber(cfg.height, 1.2)).toFixed(2))
 
@@ -3332,11 +3443,15 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
   function applyCameraSettingsFromInputs() {
     if (!state.layout.cameraScreen) state.layout.cameraScreen = deepClone(DEFAULT_LAYOUT.cameraScreen)
     state.layout.cameraScreen.muted = dom.cameraMuted ? !!dom.cameraMuted.checked : true
+    state.layout.cameraScreen.mirrored = dom.cameraMirrored ? !!dom.cameraMirrored.checked : true
     state.layout.cameraScreen.width = Math.max(0.1, asNumber(dom.cameraWidth ? dom.cameraWidth.value : 2.2, 2.2))
     state.layout.cameraScreen.height = Math.max(0.1, asNumber(dom.cameraHeight ? dom.cameraHeight.value : 1.2, 1.2))
     state.layout.cameraScreen.deviceId = String(dom.cameraDeviceSelect ? dom.cameraDeviceSelect.value : state.layout.cameraScreen.deviceId || '').trim()
     const runtime = slotRuntime.get('camera1')
     if (runtime && runtime.model) applyCameraScreenSettingsToRuntime(runtime)
+    if (runtime && runtime.model && state.virtualCameraMode?.enabled) {
+      refreshVirtualCameraStageFrame(220, '更新虚拟摄像机画幅')
+    }
     syncCameraInputs()
     scheduleSaveLayout()
   }
@@ -3692,6 +3807,22 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         setStatus('已恢复高级参数默认值')
       })
     }
+    if (dom.advAntialiasEnabled) {
+      dom.advAntialiasEnabled.addEventListener('change', () => {
+        if (!state.layout.advancedRender) state.layout.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
+        state.layout.advancedRender.antialiasEnabled = !!dom.advAntialiasEnabled.checked
+        applyAdvancedRenderSettings(true, false)
+        setStatus(`抗锯齿: ${state.layout.advancedRender.antialiasEnabled ? '开启' : '关闭'}`)
+      })
+    }
+    if (dom.advRenderScale) {
+      dom.advRenderScale.addEventListener('change', () => {
+        if (!state.layout.advancedRender) state.layout.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
+        state.layout.advancedRender.renderScale = Math.max(0.7, Math.min(2, asNumber(dom.advRenderScale.value, 1)))
+        applyAdvancedRenderSettings(true, false)
+        setStatus(`渲染分辨率: ${Math.round(state.layout.advancedRender.renderScale * 100)}%`)
+      })
+    }
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'F2') {
@@ -3699,9 +3830,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         applyMode(state.layout.mode === 'edit' ? 'render' : 'edit')
         return
       }
-      if (state.layout.mode !== 'edit') return
       const tag = (document.activeElement && document.activeElement.tagName || '').toUpperCase()
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'F6') {
+        e.preventDefault()
+        toggleVirtualCameraMode()
+        return
+      }
+      if (state.layout.mode !== 'edit') return
       const key = String(e.key || '').toLowerCase()
       if (key === 'shift' || isCameraMoveKey(key)) {
         cameraKeyboardState.pressed.add(key)
@@ -3758,8 +3894,10 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       const w = dom.renderRoot.clientWidth || window.innerWidth
       const h = dom.renderRoot.clientHeight || window.innerHeight
       renderer.setSize(w, h)
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
+      syncCameraProjectionToMode()
+      if (state.virtualCameraMode?.enabled) {
+        refreshVirtualCameraStageFrame(120, '窗口尺寸变化')
+      }
     })
 
     dom.renderRoot.addEventListener('contextmenu', (e) => {
@@ -3906,7 +4044,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
 
     if (nextSurvivorCount === 0 && !nextHunterSelected) {
-      cancelCameraTransition()
+      // 布局保存也会触发本地 BP 状态广播；这里不能粗暴打断手动镜头过渡，
+      // 否则像“虚拟摄像机主镜头”这种非 BP 驱动切镜会在 0.1~0.2s 后被取消。
+      pendingCameraEventKey = ''
     } else {
       let cameraEventKey = ''
       if (nextSurvivorCount > prevSurvivorCount) {
@@ -3915,7 +4055,12 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (!prevHunterSelected && nextHunterSelected) {
         cameraEventKey = 'hunterSelected'
       }
-      if (cameraEventKey) requestCameraEvent(cameraEventKey)
+      if (cameraEventKey) {
+        if (state.virtualCameraMode?.enabled) {
+          exitVirtualCameraModeForAutoCut('检测到 BP 选人，已自动退出虚拟摄像机主镜头')
+        }
+        requestCameraEvent(cameraEventKey)
+      }
     }
 
     // 注意：这里不覆盖本窗口相机/布局，避免切换视角后被回退。

@@ -42,8 +42,9 @@
           <button id="cameraRefreshDevicesBtn" class="btn">刷新设备</button>
           <button id="cameraStartBtn" class="btn">启动摄像头</button>
           <button id="cameraStopBtn" class="btn">停止摄像头</button>
-          <button id="virtualCameraModeToggleBtn" class="btn">启用虚拟摄像机演播模式</button>
+          <button id="virtualCameraModeToggleBtn" class="btn">启用虚拟摄像机主镜头 (F6)</button>
           <label><input id="cameraMuted" type="checkbox" checked> 静音</label>
+          <label><input id="cameraMirrored" type="checkbox" checked> 镜像</label>
           <label>宽<input id="cameraWidth" type="number" step="0.1" min="0.1" value="2.2"></label>
           <label>高<input id="cameraHeight" type="number" step="0.1" min="0.1" value="1.2"></label>
           <button id="applyCameraSettingsBtn" class="btn">应用摄像头参数</button>
@@ -109,10 +110,20 @@
         </div>
         <div class="toolbar-row">
           <span class="label">高级光效与精度</span>
+          <label><input id="advAntialiasEnabled" type="checkbox" checked> 抗锯齿</label>
           <label>曝光<input id="advExposure" type="number" step="0.01" min="0.6" max="2.2" value="1"></label>
           <label>对比<input id="advContrast" type="number" step="0.01" min="0.8" max="1.6" value="1"></label>
           <label>饱和<input id="advSaturation" type="number" step="0.01" min="0.7" max="1.8" value="1"></label>
-          <label>渲染倍率<input id="advRenderScale" type="number" step="0.05" min="0.7" max="2" value="1"></label>
+          <label>渲染分辨率
+            <select id="advRenderScale">
+              <option value="0.75">75%</option>
+              <option value="1" selected>100%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="1.75">175%</option>
+              <option value="2">200%</option>
+            </select>
+          </label>
           <label>阴影贴图倍率<input id="advShadowMapBoost" type="number" step="0.25" min="0.5" max="2" value="1"></label>
           <label>阴影柔和倍率<input id="advShadowRadius" type="number" step="0.1" min="0.5" max="2.5" value="1"></label>
           <label>Shadow Bias<input id="advShadowBias" type="number" step="0.00001" min="-0.001" max="0.001" value="-0.00012"></label>
@@ -192,7 +203,7 @@
       </section>
 
       <div class="toolbar-row hint">
-        左键拖拽旋转，右键拖拽(或 Shift+左键)平移视角，滚轮缩放。WASD前后左右，QE上下；按住 Shift + WASD 调整摄像机朝向。
+        左键拖拽旋转，右键拖拽(或 Shift+左键)平移视角，滚轮缩放。WASD前后左右，QE上下；按住 Shift + WASD 调整摄像机朝向。F2 切换编辑/渲染，F6 切换虚拟摄像机主镜头。
       </div>
     </div>
   </div>
