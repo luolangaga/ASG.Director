@@ -43,7 +43,26 @@ const SETTINGS_SEARCH_INDEX = [
   { label: '自动安装 Blender 插件', keywords: ['blender', '插件', '安装', 'bp', '同步'], tabId: '3d', anchorId: 'model3dSettingsCard' }
 ]
 
+function isSettingsReadingMode() {
+  return !document.getElementById('settingsCategoryNav')
+}
+
+function ensureAllSettingsSectionsVisible() {
+  document.querySelectorAll('[id^="setting-tab-"]').forEach(el => {
+    el.style.display = 'block'
+  })
+}
+
 function switchSettingTab(tabId, e) {
+  if (isSettingsReadingMode()) {
+    ensureAllSettingsSectionsVisible()
+    const section = document.getElementById('setting-tab-' + tabId)
+    if (section && section.scrollIntoView) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    return
+  }
+
   document.querySelectorAll('[id^="setting-tab-"]').forEach(el => el.style.display = 'none');
   const target = document.getElementById('setting-tab-' + tabId)
   if (target) target.style.display = 'block';
@@ -125,14 +144,16 @@ function bindSettingsNavigator() {
   const nav = document.getElementById('settingsCategoryNav')
   const input = document.getElementById('settingsSearchInput')
   const panel = document.getElementById('settingsSearchResults')
-  if (!nav || !input || !panel) return
+  if (!input || !panel) return
 
-  nav.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', (evt) => {
-      const tabId = btn.dataset.settingTab
-      switchSettingTab(tabId, evt)
+  if (nav) {
+    nav.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', (evt) => {
+        const tabId = btn.dataset.settingTab
+        switchSettingTab(tabId, evt)
+      })
     })
-  })
+  }
 
   input.addEventListener('input', () => renderSettingsSearchResults(input.value))
   input.addEventListener('focus', () => renderSettingsSearchResults(input.value))
@@ -157,7 +178,11 @@ function bindSettingsNavigator() {
     if (!inside) panel.style.display = 'none'
   })
 
-  switchSettingTab('plugins')
+  if (isSettingsReadingMode()) {
+    ensureAllSettingsSectionsVisible()
+  } else {
+    switchSettingTab('plugins')
+  }
 }
 
 // ============================================================

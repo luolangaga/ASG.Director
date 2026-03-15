@@ -283,12 +283,7 @@
           </div>
 
           <div class="settings-nav-shell">
-            <div class="settings-category-nav" id="settingsCategoryNav">
-              <button class="tab-btn" data-setting-tab="plugins" onclick="switchSettingTab('plugins')">扩展与插件</button>
-              <button class="tab-btn" data-setting-tab="assets" onclick="switchSettingTab('assets')">资源与素材</button>
-              <button class="tab-btn" data-setting-tab="render" onclick="switchSettingTab('render')">输出与渲染</button>
-              <button class="tab-btn" data-setting-tab="3d" onclick="switchSettingTab('3d')">3D 模型</button>
-            </div>
+            <div class="settings-reading-hint">已切换为连续浏览模式：所有设置卡片均已展开，支持搜索与快速定位。</div>
             <div class="settings-search-wrap">
               <input type="text" id="settingsSearchInput" class="form-input" placeholder="搜索设置项，例如：字体 / 分辨率 / OBS / 3D">
               <div id="settingsSearchResults" class="settings-search-results" style="display:none;"></div>
@@ -301,7 +296,7 @@
             </div>
           </div>
 
-          <div id="setting-tab-plugins" class="settings-section">
+          <div id="setting-tab-plugins" class="settings-section settings-reading-section">
             <div class="settings-section-heading">
               <h3>扩展与插件</h3>
               <p>管理插件、布局商店与 OBS 自动化能力。</p>
@@ -361,7 +356,7 @@
             </div>
           </div>
 
-          <div id="setting-tab-assets" class="settings-section">
+          <div id="setting-tab-assets" class="settings-section settings-reading-section">
             <div class="settings-section-heading">
               <h3>资源与素材</h3>
               <p>管理角色图片、字体、组件与动画。</p>
@@ -377,7 +372,7 @@
             </div>
           </div>
 
-          <div id="setting-tab-render" class="settings-section">
+          <div id="setting-tab-render" class="settings-section settings-reading-section">
             <div class="settings-section-heading">
               <h3>输出与渲染</h3>
               <p>前台输出参数、背景效果、自动开窗与跨设备同步。</p>
@@ -624,7 +619,7 @@
             </div>
           </div>
 
-          <div id="setting-tab-3d" class="settings-section">
+          <div id="setting-tab-3d" class="settings-section settings-reading-section">
             <div class="settings-section-heading">
               <h3>3D 模型</h3>
               <p>配置 MMD 模型路径、渲染参数与性能选项。</p>

@@ -149,11 +149,32 @@
     low: { label: '低', pixelRatio: 1.0, shadowMap: 1024, shadowRadius: 0.75, exposure: 0.98, contrast: 1.0, cinemaOverlay: 0.0, rim: 0.03, bounce: 0.02 },
     medium: { label: '中', pixelRatio: 1.25, shadowMap: 1536, shadowRadius: 0.95, exposure: 1.0, contrast: 1.03, cinemaOverlay: 0.0, rim: 0.06, bounce: 0.04 },
     high: { label: '高', pixelRatio: 1.6, shadowMap: 2048, shadowRadius: 1.15, exposure: 1.02, contrast: 1.06, cinemaOverlay: 0.0, rim: 0.12, bounce: 0.08 },
-    cinematic: { label: '电影级', pixelRatio: 1.9, shadowMap: 3072, shadowRadius: 1.5, exposure: 1.06, contrast: 1.12, cinemaOverlay: 0.5, rim: 0.22, bounce: 0.14 }
+    cinematic: { label: '电影级', pixelRatio: 1.9, shadowMap: 3072, shadowRadius: 1.5, exposure: 1.06, contrast: 1.12, cinemaOverlay: 0.5, rim: 0.22, bounce: 0.14 },
+    ultra: { label: '超清细节', pixelRatio: 2.2, shadowMap: 4096, shadowRadius: 1.85, exposure: 1.08, contrast: 1.15, cinemaOverlay: 0.28, rim: 0.28, bounce: 0.18 }
+  }
+
+  const ADVANCED_RENDER_DEFAULT = {
+    lightTextureEnabled: true,
+    exposure: 1,
+    contrast: 1,
+    saturation: 1,
+    renderScale: 1,
+    shadowMapBoost: 1,
+    shadowRadiusBoost: 1,
+    shadowBias: -0.00012,
+    shadowNormalBias: 0.01,
+    ambientBoost: 1,
+    hemiBoost: 1,
+    keyBoost: 1,
+    fillBoost: 1,
+    rimBoost: 1,
+    bounceBoost: 1
   }
 
   const DEFAULT_LAYOUT = {
     mode: 'edit',
+    toolbarCollapsed: false,
+    advancedRender: deepClone(ADVANCED_RENDER_DEFAULT),
     transparentBackground: true,
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
@@ -313,6 +334,8 @@
 
   const dom = {
     toolbar: document.getElementById('toolbar'),
+    toolbarBody: document.getElementById('toolbarBody'),
+    toolbarCollapseBtn: document.getElementById('toolbarCollapseBtn'),
     renderRoot: document.getElementById('renderRoot'),
     fogOverlay: document.getElementById('fogOverlay'),
     cinemaOverlay: document.getElementById('cinemaOverlay'),
@@ -369,6 +392,23 @@
     , lightColor: document.getElementById('lightColor')
     , lightIntensity: document.getElementById('lightIntensity')
     , applyLightBtn: document.getElementById('applyLightBtn')
+    , advExposure: document.getElementById('advExposure')
+    , advContrast: document.getElementById('advContrast')
+    , advSaturation: document.getElementById('advSaturation')
+    , advRenderScale: document.getElementById('advRenderScale')
+    , advShadowMapBoost: document.getElementById('advShadowMapBoost')
+    , advShadowRadius: document.getElementById('advShadowRadius')
+    , advShadowBias: document.getElementById('advShadowBias')
+    , advShadowNormalBias: document.getElementById('advShadowNormalBias')
+    , advAmbientBoost: document.getElementById('advAmbientBoost')
+    , advLightTextureEnabled: document.getElementById('advLightTextureEnabled')
+    , advHemiBoost: document.getElementById('advHemiBoost')
+    , advKeyBoost: document.getElementById('advKeyBoost')
+    , advFillBoost: document.getElementById('advFillBoost')
+    , advRimBoost: document.getElementById('advRimBoost')
+    , advBounceBoost: document.getElementById('advBounceBoost')
+    , applyAdvancedRenderBtn: document.getElementById('applyAdvancedRenderBtn')
+    , resetAdvancedRenderBtn: document.getElementById('resetAdvancedRenderBtn')
   }
 
   function deepClone(v) {
@@ -444,6 +484,24 @@
     const base = (raw && typeof raw === 'object') ? raw : {}
     const out = deepClone(DEFAULT_LAYOUT)
     out.mode = base.mode === 'render' ? 'render' : 'edit'
+    out.toolbarCollapsed = !!base.toolbarCollapsed
+    out.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
+    const adv = (base?.advancedRender && typeof base.advancedRender === 'object') ? base.advancedRender : {}
+    out.advancedRender.lightTextureEnabled = adv.lightTextureEnabled !== false
+    out.advancedRender.exposure = Math.max(0.6, Math.min(2.2, asNumber(adv.exposure, ADVANCED_RENDER_DEFAULT.exposure)))
+    out.advancedRender.contrast = Math.max(0.8, Math.min(1.6, asNumber(adv.contrast, ADVANCED_RENDER_DEFAULT.contrast)))
+    out.advancedRender.saturation = Math.max(0.7, Math.min(1.8, asNumber(adv.saturation, ADVANCED_RENDER_DEFAULT.saturation)))
+    out.advancedRender.renderScale = Math.max(0.7, Math.min(2, asNumber(adv.renderScale, ADVANCED_RENDER_DEFAULT.renderScale)))
+    out.advancedRender.shadowMapBoost = Math.max(0.5, Math.min(2, asNumber(adv.shadowMapBoost, ADVANCED_RENDER_DEFAULT.shadowMapBoost)))
+    out.advancedRender.shadowRadiusBoost = Math.max(0.5, Math.min(2.5, asNumber(adv.shadowRadiusBoost, ADVANCED_RENDER_DEFAULT.shadowRadiusBoost)))
+    out.advancedRender.shadowBias = Math.max(-0.001, Math.min(0.001, asNumber(adv.shadowBias, ADVANCED_RENDER_DEFAULT.shadowBias)))
+    out.advancedRender.shadowNormalBias = Math.max(0, Math.min(0.1, asNumber(adv.shadowNormalBias, ADVANCED_RENDER_DEFAULT.shadowNormalBias)))
+    out.advancedRender.ambientBoost = Math.max(0, Math.min(3, asNumber(adv.ambientBoost, ADVANCED_RENDER_DEFAULT.ambientBoost)))
+    out.advancedRender.hemiBoost = Math.max(0, Math.min(3, asNumber(adv.hemiBoost, ADVANCED_RENDER_DEFAULT.hemiBoost)))
+    out.advancedRender.keyBoost = Math.max(0, Math.min(3, asNumber(adv.keyBoost, ADVANCED_RENDER_DEFAULT.keyBoost)))
+    out.advancedRender.fillBoost = Math.max(0, Math.min(3, asNumber(adv.fillBoost, ADVANCED_RENDER_DEFAULT.fillBoost)))
+    out.advancedRender.rimBoost = Math.max(0, Math.min(3, asNumber(adv.rimBoost, ADVANCED_RENDER_DEFAULT.rimBoost)))
+    out.advancedRender.bounceBoost = Math.max(0, Math.min(3, asNumber(adv.bounceBoost, ADVANCED_RENDER_DEFAULT.bounceBoost)))
     out.transparentBackground = base.transparentBackground !== false
     out.environmentPreset = (typeof base.environmentPreset === 'string' && ENVIRONMENT_PRESETS[base.environmentPreset])
       ? base.environmentPreset
@@ -894,31 +952,119 @@
     const q = QUALITY_PRESETS[key]
     state.layout.qualityPreset = key
 
+    if (sceneLights.rim) sceneLights.rim.userData.__asgBaseIntensity = q.rim
+    if (sceneLights.bounce) sceneLights.bounce.userData.__asgBaseIntensity = q.bounce
+    if (dom.cinemaOverlay) dom.cinemaOverlay.style.opacity = String(q.cinemaOverlay)
+
+    if (dom.renderQualitySelect) dom.renderQualitySelect.value = key
+    applyAdvancedRenderSettings(false)
+    if (shouldSave) scheduleSaveLayout()
+  }
+
+  function syncAdvancedRenderInputs() {
+    const adv = state.layout?.advancedRender || ADVANCED_RENDER_DEFAULT
+    if (dom.advLightTextureEnabled) dom.advLightTextureEnabled.checked = adv.lightTextureEnabled !== false
+    if (dom.advExposure) dom.advExposure.value = String(adv.exposure.toFixed(2))
+    if (dom.advContrast) dom.advContrast.value = String(adv.contrast.toFixed(2))
+    if (dom.advSaturation) dom.advSaturation.value = String(adv.saturation.toFixed(2))
+    if (dom.advRenderScale) dom.advRenderScale.value = String(adv.renderScale.toFixed(2))
+    if (dom.advShadowMapBoost) dom.advShadowMapBoost.value = String(adv.shadowMapBoost.toFixed(2))
+    if (dom.advShadowRadius) dom.advShadowRadius.value = String(adv.shadowRadiusBoost.toFixed(2))
+    if (dom.advShadowBias) dom.advShadowBias.value = String(adv.shadowBias.toFixed(5))
+    if (dom.advShadowNormalBias) dom.advShadowNormalBias.value = String(adv.shadowNormalBias.toFixed(3))
+    if (dom.advAmbientBoost) dom.advAmbientBoost.value = String(adv.ambientBoost.toFixed(2))
+    if (dom.advHemiBoost) dom.advHemiBoost.value = String(adv.hemiBoost.toFixed(2))
+    if (dom.advKeyBoost) dom.advKeyBoost.value = String(adv.keyBoost.toFixed(2))
+    if (dom.advFillBoost) dom.advFillBoost.value = String(adv.fillBoost.toFixed(2))
+    if (dom.advRimBoost) dom.advRimBoost.value = String(adv.rimBoost.toFixed(2))
+    if (dom.advBounceBoost) dom.advBounceBoost.value = String(adv.bounceBoost.toFixed(2))
+  }
+
+  function readAdvancedRenderFromInputs() {
+    if (!state.layout.advancedRender) state.layout.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
+    const adv = state.layout.advancedRender
+    adv.lightTextureEnabled = dom.advLightTextureEnabled ? !!dom.advLightTextureEnabled.checked : true
+    adv.exposure = Math.max(0.6, Math.min(2.2, asNumber(dom.advExposure?.value, adv.exposure)))
+    adv.contrast = Math.max(0.8, Math.min(1.6, asNumber(dom.advContrast?.value, adv.contrast)))
+    adv.saturation = Math.max(0.7, Math.min(1.8, asNumber(dom.advSaturation?.value, adv.saturation)))
+    adv.renderScale = Math.max(0.7, Math.min(2, asNumber(dom.advRenderScale?.value, adv.renderScale)))
+    adv.shadowMapBoost = Math.max(0.5, Math.min(2, asNumber(dom.advShadowMapBoost?.value, adv.shadowMapBoost)))
+    adv.shadowRadiusBoost = Math.max(0.5, Math.min(2.5, asNumber(dom.advShadowRadius?.value, adv.shadowRadiusBoost)))
+    adv.shadowBias = Math.max(-0.001, Math.min(0.001, asNumber(dom.advShadowBias?.value, adv.shadowBias)))
+    adv.shadowNormalBias = Math.max(0, Math.min(0.1, asNumber(dom.advShadowNormalBias?.value, adv.shadowNormalBias)))
+    adv.ambientBoost = Math.max(0, Math.min(3, asNumber(dom.advAmbientBoost?.value, adv.ambientBoost)))
+    adv.hemiBoost = Math.max(0, Math.min(3, asNumber(dom.advHemiBoost?.value, adv.hemiBoost)))
+    adv.keyBoost = Math.max(0, Math.min(3, asNumber(dom.advKeyBoost?.value, adv.keyBoost)))
+    adv.fillBoost = Math.max(0, Math.min(3, asNumber(dom.advFillBoost?.value, adv.fillBoost)))
+    adv.rimBoost = Math.max(0, Math.min(3, asNumber(dom.advRimBoost?.value, adv.rimBoost)))
+    adv.bounceBoost = Math.max(0, Math.min(3, asNumber(dom.advBounceBoost?.value, adv.bounceBoost)))
+  }
+
+  function applyAdvancedRenderSettings(shouldSave = true, syncFromInputs = true) {
+    if (syncFromInputs) readAdvancedRenderFromInputs()
+    const adv = state.layout.advancedRender
+    const q = QUALITY_PRESETS[state.layout.qualityPreset || 'high'] || QUALITY_PRESETS.high
+    const useStylizedLightTexture = adv.lightTextureEnabled !== false
+
     if (renderer) {
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio))
+      const scaledRatio = Math.min((window.devicePixelRatio || 1) * adv.renderScale, q.pixelRatio * adv.renderScale)
+      renderer.setPixelRatio(Math.max(0.7, Math.min(3, scaledRatio)))
       const w = dom.renderRoot?.clientWidth || window.innerWidth || 1920
       const h = dom.renderRoot?.clientHeight || window.innerHeight || 1080
       renderer.setSize(w, h)
-      renderer.toneMappingExposure = q.exposure
+      renderer.toneMappingExposure = q.exposure * adv.exposure
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
     }
     if (sceneLights.key) {
-      const mapSize = Math.max(1024, Math.round(q.shadowMap))
+      const mapSize = Math.max(1024, Math.min(8192, Math.round(q.shadowMap * adv.shadowMapBoost)))
       sceneLights.key.shadow.mapSize.set(mapSize, mapSize)
-      sceneLights.key.shadow.radius = q.shadowRadius
+      sceneLights.key.shadow.radius = Math.max(0.1, q.shadowRadius * adv.shadowRadiusBoost)
+      sceneLights.key.shadow.bias = adv.shadowBias
+      sceneLights.key.shadow.normalBias = adv.shadowNormalBias
       sceneLights.key.shadow.needsUpdate = true
     }
-    if (sceneLights.rim) sceneLights.rim.intensity = q.rim
-    if (sceneLights.bounce) sceneLights.bounce.intensity = q.bounce
-    if (dom.cinemaOverlay) dom.cinemaOverlay.style.opacity = String(q.cinemaOverlay)
-
-    if (dom.renderQualitySelect) dom.renderQualitySelect.value = key
-    if (dom.renderRoot) {
-      dom.renderRoot.style.filter = key === 'cinematic'
-        ? `contrast(${q.contrast}) saturate(1.06)`
-        : `contrast(${q.contrast})`
+    if (sceneLights.ambient) {
+      const base = asNumber(sceneLights.ambient.userData?.__asgBaseIntensity, sceneLights.ambient.intensity)
+      sceneLights.ambient.intensity = Math.max(0, base * adv.ambientBoost)
     }
+    if (sceneLights.hemi) {
+      const base = asNumber(sceneLights.hemi.userData?.__asgBaseIntensity, sceneLights.hemi.intensity)
+      sceneLights.hemi.intensity = Math.max(0, base * adv.hemiBoost)
+    }
+    if (sceneLights.key) {
+      const base = asNumber(sceneLights.key.userData?.__asgBaseIntensity, sceneLights.key.intensity)
+      sceneLights.key.intensity = Math.max(0, base * adv.keyBoost)
+    }
+    if (sceneLights.fill) {
+      const base = asNumber(sceneLights.fill.userData?.__asgBaseIntensity, sceneLights.fill.intensity)
+      sceneLights.fill.intensity = Math.max(0, base * adv.fillBoost)
+    }
+    if (sceneLights.rim) {
+      const base = asNumber(sceneLights.rim.userData?.__asgBaseIntensity, sceneLights.rim.intensity)
+      sceneLights.rim.intensity = useStylizedLightTexture ? Math.max(0, base * adv.rimBoost) : 0
+    }
+    if (sceneLights.bounce) {
+      const base = asNumber(sceneLights.bounce.userData?.__asgBaseIntensity, sceneLights.bounce.intensity)
+      sceneLights.bounce.intensity = useStylizedLightTexture ? Math.max(0, base * adv.bounceBoost) : 0
+    }
+    if (dom.cinemaOverlay) {
+      dom.cinemaOverlay.style.opacity = useStylizedLightTexture
+        ? String(q.cinemaOverlay)
+        : '0'
+    }
+    if (dom.renderRoot) {
+      if (useStylizedLightTexture) {
+        const contrast = Math.max(0.8, Math.min(1.8, q.contrast * adv.contrast))
+        const saturationBase = state.layout.qualityPreset === 'cinematic' ? 1.06 : 1
+        const saturation = Math.max(0.6, Math.min(2.5, saturationBase * adv.saturation))
+        dom.renderRoot.style.filter = `contrast(${contrast}) saturate(${saturation})`
+      } else {
+        dom.renderRoot.style.filter = 'none'
+      }
+    }
+
+    syncAdvancedRenderInputs()
     if (shouldSave) scheduleSaveLayout()
   }
 
@@ -1084,21 +1230,25 @@
     if (sceneLights.ambient) {
       sceneLights.ambient.color.set(preset.ambientColor)
       sceneLights.ambient.intensity = preset.ambientIntensity
+      sceneLights.ambient.userData.__asgBaseIntensity = preset.ambientIntensity
     }
     if (sceneLights.hemi) {
       sceneLights.hemi.color.set(preset.hemiSkyColor)
       sceneLights.hemi.groundColor.set(preset.hemiGroundColor)
       sceneLights.hemi.intensity = preset.hemiIntensity
+      sceneLights.hemi.userData.__asgBaseIntensity = preset.hemiIntensity
     }
     if (sceneLights.key) {
       sceneLights.key.color.set(preset.keyColor)
       sceneLights.key.intensity = preset.keyIntensity
       sceneLights.key.position.set(preset.keyPos.x, preset.keyPos.y, preset.keyPos.z)
+      sceneLights.key.userData.__asgBaseIntensity = preset.keyIntensity
     }
     if (sceneLights.fill) {
       sceneLights.fill.color.set(preset.fillColor)
       sceneLights.fill.intensity = preset.fillIntensity
       sceneLights.fill.position.set(preset.fillPos.x, preset.fillPos.y, preset.fillPos.z)
+      sceneLights.fill.userData.__asgBaseIntensity = preset.fillIntensity
     }
     if (sceneLights.rim) {
       sceneLights.rim.color.set(preset.keyColor)
@@ -1137,6 +1287,7 @@
     if (dom.shadowStrength) dom.shadowStrength.value = String(Math.max(0, Math.min(1, asNumber(state.layout.shadowStrength, preset.shadowOpacity))).toFixed(2))
     if (dom.droneModeEnabled) dom.droneModeEnabled.checked = !!state.layout.droneMode
     if (dom.renderQualitySelect) dom.renderQualitySelect.value = state.layout.qualityPreset || 'high'
+    applyAdvancedRenderSettings(false, false)
     if (shouldSave) scheduleSaveLayout()
   }
 
@@ -2637,7 +2788,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     applyRenderQualityPreset(state.layout.qualityPreset || 'high', false)
     updateKeyLightShadowFrustum()
     applyMode(state.layout.mode)
-    applyStylizedRenderSettings(false)
+    applyToolbarCollapsed(state.layout.toolbarCollapsed, false)
+    applyAdvancedRenderSettings(false, false)
     applyOrbitFromLayout()
     renderSlotTabs()
     syncTransformInputs()
@@ -2646,6 +2798,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncCameraEditorInputs()
     syncEntranceParticleUi()
     syncStylizedRenderInputs()
+    syncAdvancedRenderInputs()
     if (dom.maxFps) dom.maxFps.value = String(Math.max(10, Math.min(240, asNumber(state.layout.maxFps, 60))))
   }
 
@@ -2660,6 +2813,17 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       dom.modeToggleBtn.textContent = next === 'edit' ? '切换到渲染模式 (F2)' : '切换到编辑模式 (F2)'
     }
     scheduleSaveLayout()
+  }
+
+  function applyToolbarCollapsed(collapsed, shouldSave = true) {
+    const next = !!collapsed
+    state.layout.toolbarCollapsed = next
+    if (dom.toolbar) dom.toolbar.classList.toggle('collapsed', next)
+    if (dom.toolbarCollapseBtn) {
+      dom.toolbarCollapseBtn.textContent = next ? '展开面板' : '收起面板'
+      dom.toolbarCollapseBtn.setAttribute('aria-expanded', next ? 'false' : 'true')
+    }
+    if (shouldSave) scheduleSaveLayout()
   }
 
   function collectPersistLayout() {
@@ -2882,6 +3046,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
   }
 
   function bindUiEvents() {
+    if (dom.toolbarCollapseBtn) {
+      dom.toolbarCollapseBtn.addEventListener('click', () => {
+        applyToolbarCollapsed(!state.layout.toolbarCollapsed, true)
+      })
+    }
     dom.modeToggleBtn.addEventListener('click', () => {
       applyMode(state.layout.mode === 'edit' ? 'render' : 'edit')
     })
@@ -3051,6 +3220,20 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         state.layout.lights.light1.intensity = Math.max(0, asNumber(dom.lightIntensity ? dom.lightIntensity.value : 2.4, 2.4))
         applyLightSettings('light1')
         scheduleSaveLayout()
+      })
+    }
+    if (dom.applyAdvancedRenderBtn) {
+      dom.applyAdvancedRenderBtn.addEventListener('click', () => {
+        applyAdvancedRenderSettings(true, true)
+        setStatus('已应用高级光效与渲染精度参数')
+      })
+    }
+    if (dom.resetAdvancedRenderBtn) {
+      dom.resetAdvancedRenderBtn.addEventListener('click', () => {
+        state.layout.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
+        syncAdvancedRenderInputs()
+        applyAdvancedRenderSettings(true, false)
+        setStatus('已恢复高级参数默认值')
       })
     }
 

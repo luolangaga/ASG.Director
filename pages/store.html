@@ -23,34 +23,37 @@
   </header>
 
   <div class="main-container">
-    <aside class="sidebar">
-      <div class="search-box">
-        <input type="text" id="searchInput" data-i18n-placeholder="store.searchPlaceholder" placeholder="搜索布局包..." onkeyup="handleSearch(event)">
-      </div>
-
-      <h3 data-i18n="store.categoryTitle">分类</h3>
-      <div class="nav-item active" data-view="browse" onclick="switchView('browse')">
-        <span data-i18n="store.viewBrowse">🏪 浏览商店</span>
-      </div>
-      <div class="nav-item" data-view="installed" onclick="switchView('installed')">
-        <span data-i18n="store.viewInstalled">📦 已安装</span>
-      </div>
-      <div class="nav-item" data-view="my-packs" onclick="switchView('my-packs')">
-        <span data-i18n="store.viewMine">👤 我的上传</span>
-      </div>
-
-      <div class="filter-group" style="margin-top: 20px;">
-        <label data-i18n="store.sortLabel">排序方式</label>
-        <select id="sortBy" onchange="loadPacks()">
-          <option value="downloads" data-i18n="store.sortDownloads">最多下载</option>
-          <option value="rating" data-i18n="store.sortRating">最高评分</option>
-          <option value="newest" data-i18n="store.sortNewest">最新发布</option>
-          <option value="updated" data-i18n="store.sortUpdated">最近更新</option>
-        </select>
-      </div>
-    </aside>
-
     <main class="content">
+      <section class="browse-toolbar" aria-label="design-center-toolbar">
+        <div class="view-tabs" role="tablist" aria-label="layout pack views">
+          <button class="view-tab active" data-view="browse" onclick="switchView('browse')" role="tab" aria-selected="true" data-i18n="store.viewBrowse">🏪 浏览商店</button>
+          <button class="view-tab" data-view="installed" onclick="switchView('installed')" role="tab" aria-selected="false" data-i18n="store.viewInstalled">📦 已安装</button>
+          <button class="view-tab" data-view="my-packs" onclick="switchView('my-packs')" role="tab" aria-selected="false" data-i18n="store.viewMine">👤 我的上传</button>
+        </div>
+
+        <div class="toolbar-controls">
+          <div class="search-box">
+            <input
+              type="text"
+              id="searchInput"
+              data-i18n-placeholder="store.searchPlaceholder"
+              placeholder="搜索布局包..."
+              oninput="handleSearch(event)"
+              onkeyup="handleSearch(event)">
+          </div>
+
+          <div class="filter-group" id="sortGroup">
+            <label data-i18n="store.sortLabel">排序方式</label>
+            <select id="sortBy" onchange="loadPacks()">
+              <option value="downloads" data-i18n="store.sortDownloads">最多下载</option>
+              <option value="rating" data-i18n="store.sortRating">最高评分</option>
+              <option value="newest" data-i18n="store.sortNewest">最新发布</option>
+              <option value="updated" data-i18n="store.sortUpdated">最近更新</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
       <div class="content-header">
         <h2 id="contentTitle" data-i18n="store.contentTitleBrowse">浏览商店</h2>
         <span class="pack-count" id="packCount"></span>

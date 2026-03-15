@@ -516,6 +516,15 @@
       position: relative;
     }
 
+    .settings-reading-hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 8px 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
     .settings-quick-links {
       display: flex;
       flex-wrap: wrap;
@@ -610,6 +619,14 @@
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .settings-reading-section {
+      scroll-margin-top: 110px;
+    }
+
+    .settings-reading-section + .settings-reading-section {
+      margin-top: 30px;
     }
 
     @keyframes settings-jump-flash {

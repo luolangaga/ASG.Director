@@ -30,14 +30,12 @@
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
-    "electron": "^41.0.2",
+    "electron": "^28.3.3",
     "electron-builder": "^24.9.1",
     "sharp": "^0.34.5"
   },
   "dependencies": {
     "@microsoft/signalr": "^8.0.0",
-    "@orillusion/core": "^0.8.4",
-    "@orillusion/media-extention": "^0.3.7",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
     "bilibili-live-ws": "^6.3.1",
@@ -51,6 +49,8 @@
   "build": {
     "appId": "DA3D64F4.BPidvevent",
     "productName": "Idvevent导播端",
+    "asar": true,
+    "compression": "maximum",
     "directories": {
       "output": "dist",
       "buildResources": "."
@@ -58,8 +58,7 @@
     "publish": [],
     "win": {
       "target": [
-        "nsis",
-        "appx"
+        "nsis"
       ],
       "icon": "assets/icon.ico"
     },
