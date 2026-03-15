@@ -249,6 +249,10 @@ const ANIMATION_PRESETS = {
 // 动画类别映射
 const CATEGORY_LABELS = {
   entrance: { icon: '🚀', label: '开场动画' },
+  'entrance-ban-survivor': { icon: '🚀', label: '入场(求生者Ban新增)' },
+  'entrance-ban-hunter': { icon: '🚀', label: '入场(监管者Ban新增)' },
+  'entrance-global-ban-survivor': { icon: '🚀', label: '入场(全局Ban求生新增)' },
+  'entrance-global-ban-hunter': { icon: '🚀', label: '入场(全局Ban监管新增)' },
   select: { icon: '👆', label: '选择(通用)' },
   'select-survivor1': { icon: '👆', label: '选择(求生1)' },
   'select-survivor2': { icon: '👆', label: '选择(求生2)' },

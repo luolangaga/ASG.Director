@@ -36,6 +36,20 @@
           <label>高<input id="videoHeight" type="number" step="0.1" min="0.1" value="1.2"></label>
           <button id="applyVideoSettingsBtn" class="btn">应用视频参数</button>
         </div>
+        <div class="toolbar-row">
+          <span class="label">摄像头屏幕</span>
+          <select id="cameraDeviceSelect"></select>
+          <button id="cameraRefreshDevicesBtn" class="btn">刷新设备</button>
+          <button id="cameraStartBtn" class="btn">启动摄像头</button>
+          <button id="cameraStopBtn" class="btn">停止摄像头</button>
+          <button id="virtualCameraModeToggleBtn" class="btn">启用虚拟摄像机演播模式</button>
+          <label><input id="cameraMuted" type="checkbox" checked> 静音</label>
+          <label>宽<input id="cameraWidth" type="number" step="0.1" min="0.1" value="2.2"></label>
+          <label>高<input id="cameraHeight" type="number" step="0.1" min="0.1" value="1.2"></label>
+          <button id="applyCameraSettingsBtn" class="btn">应用摄像头参数</button>
+          <span id="cameraStatus" class="label">摄像头: 未启动</span>
+          <span id="virtualCameraModeStatus" class="label">演播模式: 关闭</span>
+        </div>
       </section>
 
       <section class="toolbar-section">

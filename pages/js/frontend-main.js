@@ -3545,8 +3545,90 @@ function showPopup(type, icon, title, text, team, duration = 3) {
 
 // 更新显示
 let isFirstDisplayUpdate = true
+let lastBanSnapshot = {
+  localSurvivorBans: [],
+  localHunterBans: [],
+  globalSurvivorBans: [],
+  globalHunterBans: []
+}
+
+function normalizeBanNames(list) {
+  return Array.isArray(list) ? list.filter(Boolean).map(v => String(v)) : []
+}
+
+function getNewBanIndices(previousList, currentList) {
+  if (!Array.isArray(currentList) || currentList.length === 0) return []
+  const prevCountMap = new Map()
+  previousList.forEach(name => {
+    prevCountMap.set(name, (prevCountMap.get(name) || 0) + 1)
+  })
+
+  const currentCountMap = new Map()
+  const newIndices = []
+  currentList.forEach((name, index) => {
+    const currentCount = (currentCountMap.get(name) || 0) + 1
+    currentCountMap.set(name, currentCount)
+    const prevCount = prevCountMap.get(name) || 0
+    if (currentCount > prevCount) {
+      newIndices.push(index)
+    }
+  })
+
+  return newIndices
+}
+
+function resolveBanAnimationId(category, targetKeys = []) {
+  if (!window.ASGAnimations) return category
+
+  const api = window.ASGAnimations
+  if (typeof api.getAnimations !== 'function') return category
+
+  const customAnimations = (api.getAnimations()?.custom || []).filter(a => a && a.category === category)
+  if (!customAnimations.length) return category
+
+  const normalizedTargetKeys = (Array.isArray(targetKeys) ? targetKeys : [targetKeys]).filter(Boolean)
+  if (!normalizedTargetKeys.length) {
+    return customAnimations[0]?.id || category
+  }
+
+  // 1) 优先命中“应用目标”里显式勾选了当前 ban 分组/新增框的动画
+  const exactTargetMatch = customAnimations.find(anim =>
+    Array.isArray(anim.targets) && normalizedTargetKeys.some(t => anim.targets.includes(t))
+  )
+  if (exactTargetMatch?.id) return exactTargetMatch.id
+
+  // 2) 回退到同类别但未设置 targets 的通用动画
+  const genericCategoryMatch = customAnimations.find(anim => !Array.isArray(anim.targets) || anim.targets.length === 0)
+  if (genericCategoryMatch?.id) return genericCategoryMatch.id
+
+  // 3) 最终回退：沿用 category 让 ASGAnimations 内部兜底查找
+  return category
+}
+
+function playBanEntranceAnimations(listEl, category, newIndices, targetKeys = []) {
+  if (!listEl || !Array.isArray(newIndices) || newIndices.length === 0) return
+  if (!window.ASGAnimations || typeof window.ASGAnimations.applyAnimation !== 'function') return
+
+  const animationId = resolveBanAnimationId(category, targetKeys)
+  const items = Array.from(listEl.children || [])
+  newIndices.forEach((idx, order) => {
+    const item = items[idx]
+    if (!item) return
+    window.ASGAnimations.applyAnimation(item, animationId, {
+      delay: order * 0.05
+    })
+  })
+}
+
 function updateDisplay(state) {
   if (!state) return
+
+  const previousBanSnapshot = {
+    localSurvivorBans: normalizeBanNames(lastBanSnapshot.localSurvivorBans),
+    localHunterBans: normalizeBanNames(lastBanSnapshot.localHunterBans),
+    globalSurvivorBans: normalizeBanNames(lastBanSnapshot.globalSurvivorBans),
+    globalHunterBans: normalizeBanNames(lastBanSnapshot.globalHunterBans)
+  }
 
   // 地图图片资源列表（异步加载一次，用于更稳健的匹配）
   if (__mapAssetNames == null) {
@@ -3815,6 +3897,10 @@ function updateDisplay(state) {
       item.appendChild(img)
       survivorBanList.appendChild(item)
     })
+    if (!isFirstDisplayUpdate) {
+      const newIndices = getNewBanIndices(previousBanSnapshot.localSurvivorBans, normalizeBanNames(hunterBannedSurvivors))
+      playBanEntranceAnimations(survivorBanList, 'entrance-ban-survivor', newIndices, ['ban-item-survivor', 'survivorBanList'])
+    }
     const survivorBansContainer = document.getElementById('survivorBans')
     applyImageFitToContainer(survivorBansContainer)
 
@@ -3837,6 +3923,10 @@ function updateDisplay(state) {
       item.appendChild(img)
       hunterBanList.appendChild(item)
     })
+    if (!isFirstDisplayUpdate) {
+      const newIndices = getNewBanIndices(previousBanSnapshot.localHunterBans, normalizeBanNames(survivorBannedHunters))
+      playBanEntranceAnimations(hunterBanList, 'entrance-ban-hunter', newIndices, ['ban-item-hunter', 'hunterBanList'])
+    }
     const hunterBansContainer = document.getElementById('hunterBans')
     applyImageFitToContainer(hunterBansContainer)
   }
@@ -3864,6 +3954,10 @@ function updateDisplay(state) {
       item.appendChild(img)
       globalBanSurvivorList.appendChild(item)
     })
+    if (!isFirstDisplayUpdate) {
+      const newIndices = getNewBanIndices(previousBanSnapshot.globalSurvivorBans, normalizeBanNames(globalBannedSurvivors))
+      playBanEntranceAnimations(globalBanSurvivorList, 'entrance-global-ban-survivor', newIndices, ['global-ban-item-survivor', 'globalBanSurvivorList'])
+    }
     const globalBanSurvivorsContainer = document.getElementById('globalBanSurvivors')
     applyImageFitToContainer(globalBanSurvivorsContainer)
   }
@@ -3888,8 +3982,20 @@ function updateDisplay(state) {
       item.appendChild(img)
       globalBanHunterList.appendChild(item)
     })
+    if (!isFirstDisplayUpdate) {
+      const newIndices = getNewBanIndices(previousBanSnapshot.globalHunterBans, normalizeBanNames(globalBannedHunters))
+      playBanEntranceAnimations(globalBanHunterList, 'entrance-global-ban-hunter', newIndices, ['global-ban-item-hunter', 'globalBanHunterList'])
+    }
     const globalBanHuntersContainer = document.getElementById('globalBanHunters')
     applyImageFitToContainer(globalBanHuntersContainer)
+  }
+
+  const latestRoundData = state.currentRoundData || {}
+  lastBanSnapshot = {
+    localSurvivorBans: normalizeBanNames(latestRoundData.hunterBannedSurvivors || []),
+    localHunterBans: normalizeBanNames(latestRoundData.survivorBannedHunters || []),
+    globalSurvivorBans: normalizeBanNames(state.globalBannedSurvivors || []),
+    globalHunterBans: normalizeBanNames(state.globalBannedHunters || [])
   }
   syncBanEditPreviewSlots()
   isFirstDisplayUpdate = false

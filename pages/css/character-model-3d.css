@@ -147,6 +147,11 @@ body {
   background: rgba(255, 255, 255, 0.22);
 }
 
+.btn.active-mode {
+  background: rgba(56, 165, 255, 0.35);
+  border-color: rgba(119, 204, 255, 0.9);
+}
+
 .btn-collapse {
   min-width: 88px;
 }

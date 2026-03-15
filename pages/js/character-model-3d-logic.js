@@ -3,6 +3,7 @@
     { key: 'scene', label: '场景', roleType: 'scene', index: -1 },
     { key: 'light1', label: '光源1', roleType: 'light', index: 0 },
     { key: 'video1', label: '视频屏幕', roleType: 'video', index: 0 },
+    { key: 'camera1', label: '摄像头屏幕', roleType: 'camera', index: 0 },
     { key: 'custom1', label: '自定义模型', roleType: 'custom', index: 0 },
     { key: 'survivor1', label: '求生者1', roleType: 'survivor', index: 0 },
     { key: 'survivor2', label: '求生者2', roleType: 'survivor', index: 1 },
@@ -204,6 +205,13 @@
       width: 2.2,
       height: 1.2
     },
+    cameraScreen: {
+      enabled: false,
+      deviceId: '',
+      muted: true,
+      width: 2.2,
+      height: 1.2
+    },
     customModelPath: '',
     scene: {
       modelPath: '',
@@ -214,6 +222,7 @@
     slots: {
       light1: { position: { x: 0, y: 4.2, z: 3.2 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       video1: { position: { x: 0, y: 1.4, z: -1.8 }, rotation: { x: 0, y: 180, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      camera1: { position: { x: 2.8, y: 1.4, z: -1.8 }, rotation: { x: 0, y: 180, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       custom1: { position: { x: 0, y: 0, z: 2.0 }, rotation: { x: 0, y: 180, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor1: { position: { x: -2.4, y: 0, z: 0.8 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       survivor2: { position: { x: -0.8, y: 0, z: 1.0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
@@ -257,6 +266,13 @@
     bpSelectionState: {
       survivorCount: 0,
       hunterSelected: false
+    },
+    cameraDevices: [],
+    virtualCameraMode: {
+      enabled: false,
+      savedFrame: null,
+      savedTransitionMs: null,
+      savedFov: null
     }
   }
 
@@ -351,6 +367,17 @@
     videoWidth: document.getElementById('videoWidth'),
     videoHeight: document.getElementById('videoHeight'),
     applyVideoSettingsBtn: document.getElementById('applyVideoSettingsBtn'),
+    cameraDeviceSelect: document.getElementById('cameraDeviceSelect'),
+    cameraRefreshDevicesBtn: document.getElementById('cameraRefreshDevicesBtn'),
+    cameraStartBtn: document.getElementById('cameraStartBtn'),
+    cameraStopBtn: document.getElementById('cameraStopBtn'),
+    virtualCameraModeToggleBtn: document.getElementById('virtualCameraModeToggleBtn'),
+    cameraMuted: document.getElementById('cameraMuted'),
+    cameraWidth: document.getElementById('cameraWidth'),
+    cameraHeight: document.getElementById('cameraHeight'),
+    applyCameraSettingsBtn: document.getElementById('applyCameraSettingsBtn'),
+    cameraStatus: document.getElementById('cameraStatus'),
+    virtualCameraModeStatus: document.getElementById('virtualCameraModeStatus'),
     slotTabs: document.getElementById('slotTabs'),
     customModelImportBtn: document.getElementById('customModelImportBtn'),
     customModelClearBtn: document.getElementById('customModelClearBtn'),
@@ -535,6 +562,11 @@
     out.videoScreen.muted = base?.videoScreen?.muted !== false
     out.videoScreen.width = Math.max(0.1, asNumber(base?.videoScreen?.width, out.videoScreen.width))
     out.videoScreen.height = Math.max(0.1, asNumber(base?.videoScreen?.height, out.videoScreen.height))
+    out.cameraScreen.enabled = !!base?.cameraScreen?.enabled
+    out.cameraScreen.deviceId = typeof base?.cameraScreen?.deviceId === 'string' ? base.cameraScreen.deviceId : ''
+    out.cameraScreen.muted = base?.cameraScreen?.muted !== false
+    out.cameraScreen.width = Math.max(0.1, asNumber(base?.cameraScreen?.width, out.cameraScreen.width))
+    out.cameraScreen.height = Math.max(0.1, asNumber(base?.cameraScreen?.height, out.cameraScreen.height))
     out.customModelPath = typeof base?.customModelPath === 'string' ? base.customModelPath : ''
     out.scene.modelPath = typeof base?.scene?.modelPath === 'string' ? base.scene.modelPath : ''
     out.scene.position = ensureVec3(base?.scene?.position, out.scene.position)
@@ -1184,7 +1216,7 @@
   function applyStylizedToAllModels() {
     for (const runtime of slotRuntime.values()) {
       if (!runtime || !runtime.model) continue
-      if (runtime.cfg?.roleType === 'light' || runtime.cfg?.roleType === 'video') continue
+      if (runtime.cfg?.roleType === 'light' || runtime.cfg?.roleType === 'video' || runtime.cfg?.roleType === 'camera') continue
       applyStylizedToObject(runtime.model, runtime.cfg?.roleType || '')
     }
   }
@@ -1640,7 +1672,18 @@
     const frame = state.layout?.cameraKeyframes?.[eventKey]
     if (!frame) return
     const eventLabel = CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey
-    startCameraTransition(frame, state.layout.cameraTransitionMs, eventLabel)
+    let duration = state.layout.cameraTransitionMs
+    if (state.virtualCameraMode?.enabled) {
+      duration = Math.max(780, Math.min(2800, Math.round(duration * 1.35)))
+      const vm = state.virtualCameraMode
+      if (Number.isFinite(vm.savedFov) && camera) {
+        const from = camera.fov
+        const to = Math.max(18, Math.min(80, vm.savedFov))
+        camera.fov = from + (to - from) * 0.72
+        camera.updateProjectionMatrix()
+      }
+    }
+    startCameraTransition(frame, duration, eventLabel)
   }
 
   function requestCameraEvent(eventKey) {
@@ -1698,8 +1741,16 @@
     if (runtime.videoTexture && typeof runtime.videoTexture.dispose === 'function') {
       try { runtime.videoTexture.dispose() } catch { }
     }
+    if (runtime.mediaStream && typeof runtime.mediaStream.getTracks === 'function') {
+      try {
+        runtime.mediaStream.getTracks().forEach((track) => {
+          try { track.stop() } catch { }
+        })
+      } catch { }
+    }
     runtime.videoElement = null
     runtime.videoTexture = null
+    runtime.mediaStream = null
     while (runtime.group.children.length) {
       const child = runtime.group.children.pop()
       disposeObject(child)
@@ -2646,7 +2697,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
 
     if (runtime.cfg?.roleType === 'scene') boundsRadius = Math.max(boundsRadius, 3.2)
     if (runtime.cfg?.roleType === 'light') boundsRadius = Math.max(boundsRadius, 0.45)
-    if (runtime.cfg?.roleType === 'video') boundsRadius = Math.max(boundsRadius, 0.9)
+    if (runtime.cfg?.roleType === 'video' || runtime.cfg?.roleType === 'camera') boundsRadius = Math.max(boundsRadius, 0.9)
 
     const vfov = THREE.MathUtils.degToRad(Math.max(20, Math.min(120, asNumber(camera?.fov, 45))))
     const aspect = Math.max(0.1, asNumber(camera?.aspect, 16 / 9))
@@ -2656,7 +2707,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     focusRadius = Math.max(1.8, Math.min(220, focusRadius))
 
     if (runtime.cfg?.roleType === 'light') focusRadius = Math.max(2.2, Math.min(5.5, focusRadius))
-    if (runtime.cfg?.roleType === 'video') focusRadius = Math.max(2.8, Math.min(9.5, focusRadius))
+    if (runtime.cfg?.roleType === 'video' || runtime.cfg?.roleType === 'camera') focusRadius = Math.max(2.8, Math.min(9.5, focusRadius))
 
     const cosPitch = Math.cos(orbit.pitch)
     const position = {
@@ -2897,6 +2948,399 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.videoHeight) dom.videoHeight.value = String(Math.max(0.1, asNumber(cfg.height, 1.2)).toFixed(2))
   }
 
+  function setCameraStatus(text) {
+    if (dom.cameraStatus) dom.cameraStatus.textContent = text || ''
+  }
+
+  function setVirtualCameraModeStatus(text) {
+    if (dom.virtualCameraModeStatus) dom.virtualCameraModeStatus.textContent = text || ''
+  }
+
+  function isCameraScreenRunning() {
+    const runtime = slotRuntime.get('camera1')
+    return !!(runtime && runtime.mediaStream && runtime.model)
+  }
+
+  function buildVirtualCameraStageFrame() {
+    const runtime = slotRuntime.get('camera1')
+    if (!runtime || !runtime.group || !runtime.model || !THREE || !camera) return null
+
+    const anchor = runtime.model || runtime.group
+    const target = new THREE.Vector3()
+    anchor.getWorldPosition(target)
+
+    const worldQuat = new THREE.Quaternion()
+    anchor.getWorldQuaternion(worldQuat)
+
+    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(worldQuat).normalize()
+    if (!Number.isFinite(normal.x) || !Number.isFinite(normal.y) || !Number.isFinite(normal.z) || normal.lengthSq() < 1e-6) {
+      normal.copy(camera.position).sub(target).normalize()
+    }
+
+    const cfg = state.layout?.cameraScreen || DEFAULT_LAYOUT.cameraScreen
+    const screenMax = Math.max(0.1, asNumber(cfg.width, 2.2), asNumber(cfg.height, 1.2))
+    const currentDistance = Math.max(1.05, camera.position.distanceTo(target))
+    const distance = Math.max(1.05, Math.min(5.8, screenMax * 1.18, currentDistance * 0.92))
+
+    const positionA = target.clone().addScaledVector(normal, distance)
+    const positionB = target.clone().addScaledVector(normal, -distance)
+    const position = positionA.distanceTo(camera.position) <= positionB.distanceTo(camera.position)
+      ? positionA
+      : positionB
+
+    return {
+      position: { x: position.x, y: position.y, z: position.z },
+      target: { x: target.x, y: target.y, z: target.z }
+    }
+  }
+
+  function syncVirtualCameraModeUi() {
+    const enabled = !!state.virtualCameraMode?.enabled
+    if (dom.virtualCameraModeToggleBtn) {
+      dom.virtualCameraModeToggleBtn.textContent = enabled ? '关闭虚拟摄像机演播模式' : '启用虚拟摄像机演播模式'
+      dom.virtualCameraModeToggleBtn.classList.toggle('active-mode', enabled)
+    }
+    setVirtualCameraModeStatus(enabled ? '演播模式: 已开启（近2D）' : '演播模式: 关闭')
+  }
+
+  function restoreCameraFromVirtualMode() {
+    const vm = state.virtualCameraMode
+    if (!vm) return
+    const restoreFov = Number.isFinite(vm.savedFov) ? vm.savedFov : 45
+    if (camera) {
+      camera.fov = Math.max(18, Math.min(80, restoreFov))
+      camera.updateProjectionMatrix()
+    }
+    if (Number.isFinite(vm.savedTransitionMs)) {
+      state.layout.cameraTransitionMs = Math.max(50, Math.min(10000, vm.savedTransitionMs))
+      if (dom.cameraTransitionMs) dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
+    }
+    if (vm.savedFrame) {
+      startCameraTransition(vm.savedFrame, 520, '退出演播模式')
+    }
+    vm.savedFrame = null
+    vm.savedTransitionMs = null
+    vm.savedFov = null
+  }
+
+  function enableVirtualCameraMode() {
+    if (!isCameraScreenRunning()) {
+      setCameraStatus('摄像头: 请先启动摄像头后再启用演播模式')
+      return
+    }
+    const frame = buildVirtualCameraStageFrame()
+    if (!frame) {
+      setCameraStatus('摄像头: 无法定位摄像头屏幕位置')
+      return
+    }
+    if (!state.virtualCameraMode) {
+      state.virtualCameraMode = {
+        enabled: false,
+        savedFrame: null,
+        savedTransitionMs: null,
+        savedFov: null
+      }
+    }
+    const vm = state.virtualCameraMode
+    if (!vm.enabled) {
+      vm.savedFrame = {
+        position: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z
+        },
+        target: {
+          x: orbit.target.x,
+          y: orbit.target.y,
+          z: orbit.target.z
+        }
+      }
+      vm.savedTransitionMs = state.layout.cameraTransitionMs
+      vm.savedFov = camera ? camera.fov : 45
+    }
+
+    vm.enabled = true
+    state.layout.cameraTransitionMs = Math.max(320, Math.min(1800, asNumber(state.layout.cameraTransitionMs, 900)))
+    if (dom.cameraTransitionMs) dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
+
+    if (camera) {
+      const savedFov = Number.isFinite(vm.savedFov) ? vm.savedFov : 45
+      camera.fov = Math.max(24, Math.min(40, savedFov * 0.7))
+      camera.updateProjectionMatrix()
+    }
+
+    startCameraTransition(frame, 680, '虚拟摄像机演播模式')
+    setStatus('演播模式已开启：当前镜头聚焦虚拟摄像头屏幕')
+    syncVirtualCameraModeUi()
+    scheduleSaveLayout()
+  }
+
+  function disableVirtualCameraMode() {
+    if (!state.virtualCameraMode?.enabled) {
+      syncVirtualCameraModeUi()
+      return
+    }
+    state.virtualCameraMode.enabled = false
+    restoreCameraFromVirtualMode()
+    syncVirtualCameraModeUi()
+    setStatus('演播模式已关闭')
+    scheduleSaveLayout()
+  }
+
+  function toggleVirtualCameraMode() {
+    if (state.virtualCameraMode?.enabled) {
+      disableVirtualCameraMode()
+    } else {
+      enableVirtualCameraMode()
+    }
+  }
+
+  function updateCameraScreenGeometry(runtime) {
+    if (!runtime || !runtime.model || !runtime.model.isMesh) return
+    const w = Math.max(0.1, asNumber(state.layout?.cameraScreen?.width, 2.2))
+    const h = Math.max(0.1, asNumber(state.layout?.cameraScreen?.height, 1.2))
+    const oldGeo = runtime.model.geometry
+    runtime.model.geometry = new THREE.PlaneGeometry(w, h, 1, 1)
+    if (oldGeo && typeof oldGeo.dispose === 'function') {
+      try { oldGeo.dispose() } catch { }
+    }
+  }
+
+  function applyCameraScreenSettingsToRuntime(runtime) {
+    if (!runtime || !runtime.videoElement) return
+    const cfg = state.layout?.cameraScreen || DEFAULT_LAYOUT.cameraScreen
+    runtime.videoElement.muted = cfg.muted !== false
+    runtime.videoElement.defaultMuted = runtime.videoElement.muted
+    runtime.videoElement.volume = runtime.videoElement.muted ? 0 : 1
+    updateCameraScreenGeometry(runtime)
+  }
+
+  function syncCameraInputs() {
+    const cfg = state.layout?.cameraScreen || DEFAULT_LAYOUT.cameraScreen
+    if (dom.cameraMuted) dom.cameraMuted.checked = cfg.muted !== false
+    if (dom.cameraWidth) dom.cameraWidth.value = String(Math.max(0.1, asNumber(cfg.width, 2.2)).toFixed(2))
+    if (dom.cameraHeight) dom.cameraHeight.value = String(Math.max(0.1, asNumber(cfg.height, 1.2)).toFixed(2))
+
+    const runtime = slotRuntime.get('camera1')
+    const running = !!(runtime && runtime.mediaStream)
+    if (dom.cameraStartBtn) dom.cameraStartBtn.disabled = running
+    if (dom.cameraStopBtn) dom.cameraStopBtn.disabled = !running
+    if (dom.virtualCameraModeToggleBtn) dom.virtualCameraModeToggleBtn.disabled = !running
+    if (!running) {
+      setCameraStatus('摄像头: 未启动')
+      if (state.virtualCameraMode?.enabled) {
+        disableVirtualCameraMode()
+      }
+    }
+    syncVirtualCameraModeUi()
+  }
+
+  function renderCameraDeviceOptions(preferredId = '') {
+    if (!dom.cameraDeviceSelect) return
+    const devices = Array.isArray(state.cameraDevices) ? state.cameraDevices : []
+    const options = []
+    if (!devices.length) {
+      options.push('<option value="">未检测到摄像头设备</option>')
+    } else {
+      options.push('<option value="">系统默认摄像头</option>')
+      for (const item of devices) {
+        const id = String(item.deviceId || '')
+        const label = String(item.label || '').trim() || `摄像头(${id.slice(0, 8) || '未命名'})`
+        options.push(`<option value="${id}">${label}</option>`)
+      }
+    }
+    dom.cameraDeviceSelect.innerHTML = options.join('')
+
+    const targetId = String(preferredId || state.layout?.cameraScreen?.deviceId || '').trim()
+    if (targetId && devices.some(d => String(d.deviceId || '') === targetId)) {
+      dom.cameraDeviceSelect.value = targetId
+    } else {
+      dom.cameraDeviceSelect.value = ''
+      if (state.layout?.cameraScreen) state.layout.cameraScreen.deviceId = ''
+    }
+  }
+
+  async function refreshCameraDevices(requestPermission = false) {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') {
+      setCameraStatus('摄像头: 当前环境不支持媒体设备枚举')
+      return
+    }
+
+    try {
+      if (requestPermission && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        if (tempStream && typeof tempStream.getTracks === 'function') {
+          tempStream.getTracks().forEach((track) => {
+            try { track.stop() } catch { }
+          })
+        }
+      }
+
+      const list = await navigator.mediaDevices.enumerateDevices()
+      state.cameraDevices = Array.isArray(list)
+        ? list.filter(item => item && item.kind === 'videoinput')
+        : []
+      renderCameraDeviceOptions()
+      if (state.cameraDevices.length) {
+        setCameraStatus(`摄像头: 已发现 ${state.cameraDevices.length} 个设备`)
+      } else {
+        setCameraStatus('摄像头: 未发现设备（可先点击启动授权）')
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 刷新摄像头设备失败:', error)
+      setCameraStatus(`摄像头: 读取设备失败 (${error?.message || 'unknown'})`)
+      state.cameraDevices = []
+      renderCameraDeviceOptions()
+    }
+  }
+
+  async function loadCameraScreenForSlot(key, stream) {
+    const runtime = slotRuntime.get(key)
+    if (!runtime) return { success: false, error: 'slot-not-found' }
+    removeModelFromSlot(key)
+
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.crossOrigin = 'anonymous'
+    video.preload = 'auto'
+    video.playsInline = true
+    video.autoplay = true
+    video.muted = state.layout?.cameraScreen?.muted !== false
+    video.defaultMuted = video.muted
+    video.volume = video.muted ? 0 : 1
+
+    const ready = await new Promise((resolve) => {
+      let done = false
+      const finish = (ok, err) => {
+        if (done) return
+        done = true
+        try { video.removeEventListener('loadedmetadata', onLoaded) } catch { }
+        try { video.removeEventListener('error', onError) } catch { }
+        clearTimeout(timer)
+        resolve({ ok, err })
+      }
+      const onLoaded = () => finish(true, null)
+      const onError = () => finish(false, new Error('摄像头视频流加载失败'))
+      const timer = setTimeout(() => finish(false, new Error('摄像头启动超时')), 10000)
+      video.addEventListener('loadedmetadata', onLoaded, { once: true })
+      video.addEventListener('error', onError, { once: true })
+    })
+
+    if (!ready.ok) {
+      try {
+        if (stream && typeof stream.getTracks === 'function') {
+          stream.getTracks().forEach((track) => {
+            try { track.stop() } catch { }
+          })
+        }
+      } catch { }
+      return { success: false, error: ready.err?.message || 'camera-load-failed' }
+    }
+
+    const texture = new THREE.VideoTexture(video)
+    if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace
+    else if ('encoding' in texture && THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding
+    texture.minFilter = THREE.LinearFilter
+    texture.magFilter = THREE.LinearFilter
+    texture.generateMipmaps = false
+
+    const w = Math.max(0.1, asNumber(state.layout?.cameraScreen?.width, 2.2))
+    const h = Math.max(0.1, asNumber(state.layout?.cameraScreen?.height, 1.2))
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h, 1, 1),
+      new THREE.MeshStandardMaterial({
+        map: texture,
+        emissiveMap: texture,
+        emissive: new THREE.Color(0xffffff),
+        emissiveIntensity: 0.45,
+        side: THREE.DoubleSide,
+        roughness: 0.92,
+        metalness: 0.0
+      })
+    )
+    mesh.castShadow = false
+    mesh.receiveShadow = true
+
+    runtime.videoElement = video
+    runtime.videoTexture = texture
+    runtime.mediaStream = stream
+    runtime.model = mesh
+    runtime.modelPath = 'camera://live'
+    runtime.group.add(mesh)
+    applyCameraScreenSettingsToRuntime(runtime)
+
+    try {
+      const playPromise = video.play()
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => { })
+    } catch { }
+    return { success: true }
+  }
+
+  async function startCameraScreen() {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+      setCameraStatus('摄像头: 当前环境不支持 getUserMedia')
+      return
+    }
+    if (!state.layout.cameraScreen) state.layout.cameraScreen = deepClone(DEFAULT_LAYOUT.cameraScreen)
+
+    const selectedDeviceId = String(dom.cameraDeviceSelect ? dom.cameraDeviceSelect.value : state.layout.cameraScreen.deviceId || '').trim()
+    state.layout.cameraScreen.deviceId = selectedDeviceId
+    const constraints = {
+      video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true,
+      audio: false
+    }
+
+    try {
+      setCameraStatus('摄像头: 启动中...')
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      const result = await loadCameraScreenForSlot('camera1', stream)
+      if (!result || !result.success) {
+        setCameraStatus(`摄像头: 启动失败 (${result?.error || 'unknown'})`)
+        return
+      }
+      state.layout.cameraScreen.enabled = true
+      syncCameraInputs()
+      scheduleSaveLayout()
+      setStatus('摄像头屏幕已启动')
+      setCameraStatus('摄像头: 运行中')
+      await refreshCameraDevices(false)
+      if (dom.cameraDeviceSelect && dom.cameraDeviceSelect.value) {
+        state.layout.cameraScreen.deviceId = dom.cameraDeviceSelect.value
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 启动摄像头失败:', error)
+      const msg = error?.name === 'NotAllowedError'
+        ? '权限被拒绝'
+        : (error?.name === 'NotFoundError' ? '未找到设备' : (error?.message || 'unknown'))
+      setCameraStatus(`摄像头: 启动失败 (${msg})`)
+    }
+  }
+
+  function stopCameraScreen(shouldSave = true) {
+    removeModelFromSlot('camera1')
+    if (!state.layout.cameraScreen) state.layout.cameraScreen = deepClone(DEFAULT_LAYOUT.cameraScreen)
+    state.layout.cameraScreen.enabled = false
+    if (state.virtualCameraMode?.enabled) {
+      state.virtualCameraMode.enabled = false
+      restoreCameraFromVirtualMode()
+    }
+    syncCameraInputs()
+    setCameraStatus('摄像头: 已停止')
+    if (shouldSave) scheduleSaveLayout()
+  }
+
+  function applyCameraSettingsFromInputs() {
+    if (!state.layout.cameraScreen) state.layout.cameraScreen = deepClone(DEFAULT_LAYOUT.cameraScreen)
+    state.layout.cameraScreen.muted = dom.cameraMuted ? !!dom.cameraMuted.checked : true
+    state.layout.cameraScreen.width = Math.max(0.1, asNumber(dom.cameraWidth ? dom.cameraWidth.value : 2.2, 2.2))
+    state.layout.cameraScreen.height = Math.max(0.1, asNumber(dom.cameraHeight ? dom.cameraHeight.value : 1.2, 1.2))
+    state.layout.cameraScreen.deviceId = String(dom.cameraDeviceSelect ? dom.cameraDeviceSelect.value : state.layout.cameraScreen.deviceId || '').trim()
+    const runtime = slotRuntime.get('camera1')
+    if (runtime && runtime.model) applyCameraScreenSettingsToRuntime(runtime)
+    syncCameraInputs()
+    scheduleSaveLayout()
+  }
+
   function applyVideoSettingsFromInputs() {
     if (!state.layout.videoScreen) state.layout.videoScreen = deepClone(DEFAULT_LAYOUT.videoScreen)
     state.layout.videoScreen.loop = dom.videoLoopEnabled ? !!dom.videoLoopEnabled.checked : true
@@ -3063,6 +3507,18 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.videoImportBtn) dom.videoImportBtn.addEventListener('click', importVideoScreen)
     if (dom.videoClearBtn) dom.videoClearBtn.addEventListener('click', clearVideoScreen)
     if (dom.applyVideoSettingsBtn) dom.applyVideoSettingsBtn.addEventListener('click', applyVideoSettingsFromInputs)
+    if (dom.cameraRefreshDevicesBtn) dom.cameraRefreshDevicesBtn.addEventListener('click', () => { void refreshCameraDevices(true) })
+    if (dom.cameraStartBtn) dom.cameraStartBtn.addEventListener('click', () => { void startCameraScreen() })
+    if (dom.cameraStopBtn) dom.cameraStopBtn.addEventListener('click', () => stopCameraScreen(true))
+    if (dom.virtualCameraModeToggleBtn) dom.virtualCameraModeToggleBtn.addEventListener('click', toggleVirtualCameraMode)
+    if (dom.applyCameraSettingsBtn) dom.applyCameraSettingsBtn.addEventListener('click', applyCameraSettingsFromInputs)
+    if (dom.cameraDeviceSelect) {
+      dom.cameraDeviceSelect.addEventListener('change', () => {
+        if (!state.layout.cameraScreen) state.layout.cameraScreen = deepClone(DEFAULT_LAYOUT.cameraScreen)
+        state.layout.cameraScreen.deviceId = String(dom.cameraDeviceSelect.value || '').trim()
+        scheduleSaveLayout()
+      })
+    }
     dom.applyTransformBtn.addEventListener('click', applyInputsToSelectedTransform)
     if (dom.focusSelectedBtn) dom.focusSelectedBtn.addEventListener('click', focusCameraOnSelectedSlot)
     if (dom.cameraEventSelect) {
@@ -3291,6 +3747,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       }
       cameraKeyboardState.pressed.clear()
     })
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === 'function') {
+      navigator.mediaDevices.addEventListener('devicechange', () => {
+        void refreshCameraDevices(false)
+      })
+    }
 
     window.addEventListener('resize', () => {
       if (!renderer || !camera) return
@@ -3490,6 +3951,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (state.layout?.videoScreen?.path) {
       await loadModelForSlot('video1', state.layout.videoScreen.path)
     }
+    if (state.layout?.cameraScreen?.enabled) {
+      await startCameraScreen()
+    }
     if (state.layout?.customModelPath) {
       await loadModelForSlot('custom1', state.layout.customModelPath)
     }
@@ -3524,6 +3988,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     createSceneGraph()
     bindUiEvents()
+    await refreshCameraDevices(false)
     await loadOfficialModelMap()
     await loadInitialState()
     bindRealtimeBpSync()
