@@ -655,6 +655,8 @@ async function refreshLocalPagesList() {
     'frontend.html': '/frontend',
     'scoreboard.html': '/scoreboard',
     'character-display.html': '/character-display',
+    'obs-bp.html': '/obs-bp',
+    'obs-automation-sidebar.html': '/obs-automation-sidebar',
     'lower-third.html': '/lower-third',
     'ticker.html': '/ticker',
     'match-card.html': '/match-card'
@@ -701,7 +703,7 @@ async function refreshLocalPagesList() {
         `
       }
       if (fileName === 'character-display.html') {
-        const hint = '分辨率：1366×768｜OBS：浏览器源→粘贴URL→设置宽高'
+        const hint = '用途：最终节目画面｜分辨率：1366×768｜OBS：浏览器源→粘贴URL→设置宽高｜无需打开角色展示前台窗口'
         return `
           <div data-local-page="true" data-file="${p.fileName}" data-title="${p.title || p.fileName}" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-color);">
             <div style="flex:1; min-width:0;">
@@ -717,7 +719,39 @@ async function refreshLocalPagesList() {
         `
       }
       if (fileName === 'frontend.html') {
-        const hint = '分辨率：可自定义｜OBS：浏览器源→粘贴URL→设置宽高'
+        const hint = '用途：最终节目画面｜分辨率：1686×934（固定）｜OBS：浏览器源→粘贴URL→设置宽高｜无需打开 BP 前台窗口'
+        return `
+          <div data-local-page="true" data-file="${p.fileName}" data-title="${p.title || p.fileName}" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-color);">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:14px;">${p.title || p.fileName}</div>
+              <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${base}</div>
+              <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${hint}</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+              <button class="btn btn-ghost" onclick="showLocalPageQr('${base}')">二维码</button>
+            </div>
+          </div>
+        `
+      }
+      if (fileName === 'obs-bp.html') {
+        const hint = '用途：OBS 侧边栏 BP 控制｜OBS：视图→自定义浏览器停靠栏→名称自定→粘贴URL'
+        return `
+          <div data-local-page="true" data-file="${p.fileName}" data-title="${p.title || p.fileName}" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-color);">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:14px;">${p.title || p.fileName}</div>
+              <div style="font-size:12px; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${base}</div>
+              <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">${hint}</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" onclick="copyLocalPageUrl('${base}')">复制</button>
+              <button class="btn btn-ghost" onclick="showLocalPageQr('${base}')">二维码</button>
+            </div>
+          </div>
+        `
+      }
+      if (fileName === 'obs-automation-sidebar.html') {
+        const hint = '用途：OBS 侧边栏自动化/音乐控制｜OBS：视图→自定义浏览器停靠栏→名称自定→粘贴URL'
         return `
           <div data-local-page="true" data-file="${p.fileName}" data-title="${p.title || p.fileName}" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-color);">
             <div style="flex:1; min-width:0;">

@@ -24,9 +24,18 @@ const PREVIEW_TEMPLATE_VARS = {
   bpSurvivorsText: '园丁, 医生, 前锋, 调香师',
   bpBannedSurvivorsText: '先知, 祭司',
   bpBannedHuntersText: '梦之女巫',
+  mapName: '月亮河公园',
+  currentMap: '月亮河公园',
   matchTitle: 'A队 vs B队',
   matchScore: '2:1',
   matchScoreText: 'A队 2 : 1 B队',
+  teamAName: 'A队',
+  teamBName: 'B队',
+  bpTeamA: 'A队',
+  bpTeamB: 'B队',
+  localTeamA: 'A队',
+  localTeamB: 'B队',
+  phaseName: '地图展示',
   roomId: 'local-bp',
   roomName: '本地 BP',
   timestamp: Date.now()
@@ -162,6 +171,21 @@ function nestedValue(obj, pathExpr) {
   return cursor
 }
 
+function getComponentImageSource(comp, options = {}) {
+  const source = (comp && typeof comp === 'object') ? comp : {}
+  const rawSrc = source.imageData || source.imageUrl || ''
+  if (!rawSrc) return ''
+
+  if (options.resolveTemplates !== true) {
+    return String(rawSrc).trim()
+  }
+
+  const vars = (options.vars && typeof options.vars === 'object') ? options.vars : PREVIEW_TEMPLATE_VARS
+  const eventData = (options.eventData && typeof options.eventData === 'object') ? options.eventData : vars
+  const stringSrc = String(rawSrc)
+  return (stringSrc.includes('{{') ? resolveTemplate(stringSrc, vars, eventData) : stringSrc).trim()
+}
+
 function generateTextHtml(comp) {
   const styles = [
     `font-size: ${comp.fontSize || 16}px`,
@@ -175,18 +199,18 @@ function generateTextHtml(comp) {
   return `<div style="${styles.join('; ')}">${escapeHtml(comp.content || '')}</div>`
 }
 
-function generateImageHtml(comp) {
-  if (!comp.imageUrl && !comp.imageData) {
+function generateImageHtml(comp, options = {}) {
+  const src = getComponentImageSource(comp, options)
+  if (!src) {
     return '<div style="padding:20px;color:#aaa;text-align:center;">暂无图片</div>'
   }
-  const src = comp.imageData || comp.imageUrl
   const styles = [
     `width: ${comp.imageWidth || '100%'}`,
     `height: ${comp.imageHeight || '100%'}`,
     `object-fit: ${comp.objectFit || 'contain'}`,
     'display:block'
   ]
-  return `<img src="${src}" style="${styles.join('; ')}" />`
+  return `<img src="${escapeAttr(src)}" style="${styles.join('; ')}" />`
 }
 
 function deepCloneJson(value, fallback = {}) {
@@ -810,7 +834,7 @@ function selectComponent(id) {
     document.getElementById('propImageWidth').value = comp.imageWidth || 'auto'
     document.getElementById('propImageHeight').value = comp.imageHeight || 'auto'
     document.getElementById('propObjectFit').value = comp.objectFit || 'contain'
-    updateImagePreview(comp.imageData || comp.imageUrl)
+    updateImagePreview(comp)
   }
 
   if (comp.type === 'html') {
@@ -845,7 +869,10 @@ function updatePreview() {
   if (comp.type === 'text') {
     html = generateTextHtml(comp)
   } else if (comp.type === 'image') {
-    html = generateImageHtml(comp)
+    html = generateImageHtml(comp, {
+      vars: PREVIEW_TEMPLATE_VARS,
+      eventData: PREVIEW_TEMPLATE_VARS
+    })
   }
 
   html = resolveTemplate(html, PREVIEW_TEMPLATE_VARS, PREVIEW_TEMPLATE_VARS)
@@ -1094,7 +1121,7 @@ async function selectImage() {
     comp.imageData = result.data
     comp.imageUrl = ''
     document.getElementById('propImageUrl').value = ''
-    updateImagePreview(result.data)
+    updateImagePreview(comp)
     hasUnsavedChanges = true
     saveCurrentComponent(false)
   } catch (error) {
@@ -1106,11 +1133,18 @@ async function selectImage() {
 function updateImagePreview(src) {
   const preview = document.getElementById('imagePreview')
   if (!preview) return
-  if (!src) {
+  const target = (src && typeof src === 'object')
+    ? src
+    : { imageData: '', imageUrl: typeof src === 'string' ? src : '' }
+  const resolvedSrc = getComponentImageSource(target, {
+    vars: PREVIEW_TEMPLATE_VARS,
+    eventData: PREVIEW_TEMPLATE_VARS
+  })
+  if (!resolvedSrc) {
     preview.innerHTML = '<span class="image-preview-placeholder">暂无图片</span>'
     return
   }
-  preview.innerHTML = `<img src="${src}" alt="预览">`
+  preview.innerHTML = `<img src="${escapeAttr(resolvedSrc)}" alt="预览">`
 }
 
 function clearImage() {
@@ -1118,7 +1152,7 @@ function clearImage() {
   if (!comp) return
   comp.imageData = ''
   comp.imageUrl = ''
-  updateImagePreview('')
+  updateImagePreview(comp)
   hasUnsavedChanges = true
   saveCurrentComponent(false)
 }
@@ -1387,7 +1421,7 @@ function setupEventListeners() {
       if (!comp || comp.type !== 'image') return
       comp.imageUrl = e.target.value
       comp.imageData = ''
-      updateImagePreview(e.target.value)
+      updateImagePreview(comp)
       hasUnsavedChanges = true
       saveCurrentComponent(false)
     })

@@ -361,8 +361,42 @@ const bgImagePath = path.join(userDataPath, 'background')
 const userModelsPath = path.join(userDataPath, 'user-models')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
 const configPath = path.join(userDataPath, 'config.json')
+const mainOnboardingSentinelPath = path.join(userDataPath, 'OKTeach.txt')
 const localPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
 const localPagesConfigPath = path.join(localPagesBaseDir, 'pages.json')
+
+function hasMainOnboardingSentinel() {
+  try {
+    return fs.existsSync(mainOnboardingSentinelPath)
+  } catch {
+    return false
+  }
+}
+
+function writeMainOnboardingSentinel(status = 'completed') {
+  try {
+    const content = [
+      'ASG.Director Main Onboarding',
+      `status=${status}`,
+      `updatedAt=${new Date().toISOString()}`
+    ].join('\n')
+    fs.writeFileSync(mainOnboardingSentinelPath, content, 'utf8')
+    return true
+  } catch (error) {
+    console.warn('[Main] 写入 OKTeach.txt 失败:', error?.message || error)
+    return false
+  }
+}
+
+function removeMainOnboardingSentinel() {
+  try {
+    if (fs.existsSync(mainOnboardingSentinelPath)) fs.unlinkSync(mainOnboardingSentinelPath)
+    return true
+  } catch (error) {
+    console.warn('[Main] 删除 OKTeach.txt 失败:', error?.message || error)
+    return false
+  }
+}
 
 function normalizeLocalPagesConfig(input) {
   const base = input && typeof input === 'object' ? input : {}
@@ -1075,6 +1109,8 @@ function buildLocalPagesIndexHtml(pages, baseUrl, baseDir) {
     'frontend.html': '/frontend',
     'scoreboard.html': '/scoreboard',
     'character-display.html': '/character-display',
+    'obs-bp.html': '/obs-bp',
+    'obs-automation-sidebar.html': '/obs-automation-sidebar',
     'lower-third.html': '/lower-third',
     'ticker.html': '/ticker',
     'match-card.html': '/match-card'
@@ -1859,6 +1895,16 @@ function handleLocalPagesRequest(req, res) {
     localPagesHandleHtmlPage(req, res, filePath, 'character-display')
     return
   }
+  if (pathname === '/obs-bp' || pathname === '/obs-bp.html') {
+    const filePath = path.join(dir, 'obs-bp.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'obs-bp')
+    return
+  }
+  if (pathname === '/obs-automation-sidebar' || pathname === '/obs-automation-sidebar.html') {
+    const filePath = path.join(dir, 'obs-automation-sidebar.html')
+    localPagesHandleHtmlPage(req, res, filePath, 'obs-automation-sidebar')
+    return
+  }
   if (pathname === '/lower-third' || pathname === '/lower-third.html') {
     const filePath = path.join(dir, 'lower-third.html')
     localPagesHandleHtmlPage(req, res, filePath, 'lower-third')
@@ -2487,6 +2533,29 @@ ipcMain.handle('main-ui-bootstrap-ready', async () => {
   return { success: true }
 })
 
+ipcMain.handle('main-onboarding:get-status', async () => {
+  return {
+    success: true,
+    shouldShow: !hasMainOnboardingSentinel(),
+    sentinelPath: mainOnboardingSentinelPath
+  }
+})
+
+ipcMain.handle('main-onboarding:mark-seen', async (event, status) => {
+  const normalizedStatus = status === 'skipped' ? 'skipped' : 'completed'
+  const success = writeMainOnboardingSentinel(normalizedStatus)
+  return {
+    success,
+    status: normalizedStatus,
+    sentinelPath: mainOnboardingSentinelPath
+  }
+})
+
+ipcMain.handle('main-onboarding:reset', async () => {
+  const success = removeMainOnboardingSentinel()
+  return { success, sentinelPath: mainOnboardingSentinelPath }
+})
+
 function openLogViewerWindow() {
   if (logViewerWindow && !logViewerWindow.isDestroyed()) {
     if (logViewerWindow.isMinimized()) logViewerWindow.restore()
@@ -2554,9 +2623,17 @@ function createMainWindow() {
   }
   createStartupLoadingWindow()
 
+  const mainWorkArea = screen.getPrimaryDisplay()?.workAreaSize || { width: 1600, height: 900 }
+  const mainWindowWidth = Math.max(960, Math.min(1460, Number(mainWorkArea.width || 1600) - 80))
+  const mainWindowHeight = Math.max(720, Math.min(980, Number(mainWorkArea.height || 900) - 80))
+  const mainWindowMinWidth = Math.min(mainWindowWidth, 1180)
+  const mainWindowMinHeight = Math.min(mainWindowHeight, 820)
+
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 700,
+    width: mainWindowWidth,
+    height: mainWindowHeight,
+    minWidth: mainWindowMinWidth,
+    minHeight: mainWindowMinHeight,
     title: '导播端',
     resizable: true,
     show: false,
@@ -6017,6 +6094,7 @@ let localBpState = {
     },
     survivorScale: 1,
     hunterScale: 1.1,
+    roleScaleOverrides: {},
     videoScreen: {
       path: '',
       loop: true,
@@ -6165,6 +6243,17 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
     : Number.isFinite(Number(m3d?.slots?.hunter?.scale?.x)) ? Number(m3d.slots.hunter.scale.x) : 1.1)
+  {
+    const rawOverrides = (m3d.roleScaleOverrides && typeof m3d.roleScaleOverrides === 'object') ? m3d.roleScaleOverrides : {}
+    const nextOverrides = {}
+    Object.keys(rawOverrides).forEach((key) => {
+      const roleName = String(key || '').replace(/["'“”‘’]/g, '').trim()
+      const scale = Math.max(0.001, Number.isFinite(Number(rawOverrides[key])) ? Number(rawOverrides[key]) : NaN)
+      if (!roleName || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-6) return
+      nextOverrides[roleName] = scale
+    })
+    m3d.roleScaleOverrides = nextOverrides
+  }
   if (!m3d.videoScreen || typeof m3d.videoScreen !== 'object') m3d.videoScreen = {}
   m3d.videoScreen.path = (typeof m3d.videoScreen.path === 'string') ? m3d.videoScreen.path : ''
   m3d.videoScreen.loop = m3d.videoScreen.loop !== false
@@ -6348,6 +6437,9 @@ function __loadCharacterModel3DLayoutFromDiskIntoState__() {
     localBpState.characterModel3DLayout = {
       ...existing,
       ...fromDisk,
+      roleScaleOverrides: (fromDisk.roleScaleOverrides && typeof fromDisk.roleScaleOverrides === 'object')
+        ? fromDisk.roleScaleOverrides
+        : (existing.roleScaleOverrides || {}),
       scene: {
         ...(existing.scene || {}),
         ...(fromDisk.scene || {})
@@ -7237,9 +7329,15 @@ function createLocalBpGuideWindow() {
     return localBpGuideWindow
   }
 
+  const guideWorkArea = screen.getPrimaryDisplay()?.workAreaSize || { width: 1600, height: 900 }
+  const guideWidth = Math.max(1020, Math.min(1360, Number(guideWorkArea.width || 1600) - 60))
+  const guideHeight = Math.max(760, Math.min(920, Number(guideWorkArea.height || 900) - 60))
+
   localBpGuideWindow = new BrowserWindow({
-    width: 860,
-    height: 760,
+    width: guideWidth,
+    height: guideHeight,
+    minWidth: Math.min(guideWidth, 1020),
+    minHeight: Math.min(guideHeight, 760),
     title: 'BP引导',
     resizable: true,
     webPreferences: {
@@ -8079,6 +8177,18 @@ function normalizeCharacterModel3DLayoutInput(input) {
     }
   }
 
+  const normalizeRoleScaleOverrides = (value) => {
+    const src = (value && typeof value === 'object') ? value : {}
+    const out = {}
+    Object.keys(src).forEach((key) => {
+      const roleName = String(key || '').replace(/["'“”‘’]/g, '').trim()
+      const scale = Math.max(0.001, Number.isFinite(Number(src[key])) ? Number(src[key]) : NaN)
+      if (!roleName || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-6) return
+      out[roleName] = scale
+    })
+    return out
+  }
+
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
     advancedRender: {
@@ -8143,6 +8253,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     hunterScale: Math.max(0.001, Number.isFinite(Number(base.hunterScale))
       ? Number(base.hunterScale)
       : Number.isFinite(Number(base?.slots?.hunter?.scale?.x)) ? Number(base.slots.hunter.scale.x) : 1.1),
+    roleScaleOverrides: normalizeRoleScaleOverrides(base.roleScaleOverrides),
     videoScreen: {
       path: typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : '',
       loop: base?.videoScreen?.loop !== false,
@@ -8342,6 +8453,7 @@ ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
     localBpState.characterModel3DLayout = {
       ...prev,
       ...incoming,
+      roleScaleOverrides: incoming.roleScaleOverrides || {},
       scene: { ...(prev.scene || {}), ...(incoming.scene || {}) },
       slots: { ...(prev.slots || {}), ...(incoming.slots || {}) },
       lights: { ...(prev.lights || {}), ...(incoming.lights || {}) },

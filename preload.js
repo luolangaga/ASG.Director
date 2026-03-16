@@ -147,6 +147,7 @@ const electronAPI = {
 
   // 本地前台（仅前台窗口）
   openLocalFrontend: () => ipcRenderer.invoke('open-local-frontend'),
+  openLocalBpGuide: () => ipcRenderer.invoke('open-local-bp-guide'),
   openCustomFrontendWindow: (windowId) => ipcRenderer.invoke('open-custom-frontend-window', windowId),
   closeCustomFrontendWindow: (windowId) => ipcRenderer.invoke('close-custom-frontend-window', windowId),
 
@@ -235,6 +236,9 @@ const electronAPI = {
   // 应用控制
   restartApp: () => ipcRenderer.invoke('app-restart'),
   notifyMainUiBootstrapReady: () => ipcRenderer.invoke('main-ui-bootstrap-ready'),
+  getMainOnboardingStatus: () => ipcRenderer.invoke('main-onboarding:get-status'),
+  markMainOnboardingSeen: (status) => ipcRenderer.invoke('main-onboarding:mark-seen', status),
+  resetMainOnboardingSeen: () => ipcRenderer.invoke('main-onboarding:reset'),
 
   // 应用更新
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),

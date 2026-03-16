@@ -106,7 +106,9 @@ let state = {
   teamA: { name: '求生者队', logo: '', meta: 'W0 D0' },
   teamB: { name: '监管者队', logo: '', meta: 'W0 D0' },
   gameLabel: 'GAME 1',
-  mapName: ''
+  mapName: '',
+  currentMap: '',
+  selectedMap: ''
 }
 
 let editMode = false
@@ -275,6 +277,7 @@ function closeFontSelector() {
 function normalizeFileSrc(src) {
   if (!src || typeof src !== 'string') return ''
   if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return src
+  if (src.startsWith('../assets/') || src.startsWith('./assets/')) return src
   if (src.startsWith('/background/') || src.startsWith('/assets/') || src.startsWith('/userdata/')) return src
   if (window.__ASG_OBS_MODE__ && typeof window.__rewriteAssetPath__ === 'function') {
     const rewritten = window.__rewriteAssetPath__(src)
@@ -308,7 +311,12 @@ async function loadState() {
       if (data.teamA) state.teamA = data.teamA
       if (data.teamB) state.teamB = data.teamB
       if (data.gameLabel) state.gameLabel = data.gameLabel
-      if (data.mapName) state.mapName = data.mapName
+      const resolvedMapName = data.mapName || data.currentMap || data.selectedMap || ''
+      if (resolvedMapName) {
+        state.mapName = resolvedMapName
+        state.currentMap = resolvedMapName
+        state.selectedMap = resolvedMapName
+      }
     }
   } catch (e) {
     console.error('加载状态失败:', e)
@@ -541,6 +549,7 @@ function render() {
       setWidgetContent('hunter-talents', `<div class="empty-character">?</div>`)
       setWidgetContent('hunter-skills', `<div class="empty-character">?</div>`)
     }
+    refreshCustomComponents(state)
     return
   }
 
@@ -584,12 +593,126 @@ function render() {
       ? `<div class="abilities-row hunter-skills">${hunterSkillsHtml}</div>`
       : (editMode ? `<div class="empty-character">?</div>` : '')
   )
+
+  refreshCustomComponents(state)
 }
 
 function escapeHtml(text) {
   const div = document.createElement('div')
   div.textContent = text
   return div.innerHTML
+}
+
+let customCharacterDisplayComponents = []
+
+function getCharacterDisplayTemplateVars() {
+  const survivors = Array.isArray(state.survivors) ? state.survivors : []
+  const hunter = state.hunter || ''
+  const resolvedMapName = state.mapName || state.currentMap || state.selectedMap || ''
+  return {
+    mapName: resolvedMapName,
+    currentMap: resolvedMapName,
+    selectedMap: resolvedMapName,
+    gameLabel: state.gameLabel || '',
+    teamAName: state.teamA?.name || '',
+    teamBName: state.teamB?.name || '',
+    teamALogo: state.teamA?.logo || '',
+    teamBLogo: state.teamB?.logo || '',
+    teamAMeta: state.teamA?.meta || '',
+    teamBMeta: state.teamB?.meta || '',
+    hunter,
+    bpHunter: hunter,
+    'bpSurvivors.0': survivors[0] || '',
+    'bpSurvivors.1': survivors[1] || '',
+    'bpSurvivors.2': survivors[2] || '',
+    'bpSurvivors.3': survivors[3] || '',
+    bpSurvivors: survivors,
+    bpSurvivorsText: survivors.filter(Boolean).join(', '),
+    survivor0: survivors[0] || '',
+    survivor1: survivors[1] || '',
+    survivor2: survivors[2] || '',
+    survivor3: survivors[3] || '',
+    player0: state.playerNames?.[0] || '',
+    player1: state.playerNames?.[1] || '',
+    player2: state.playerNames?.[2] || '',
+    player3: state.playerNames?.[3] || '',
+    player4: state.playerNames?.[4] || ''
+  }
+}
+
+function resolveCharacterDisplayTemplate(template, eventData = {}) {
+  if (typeof template !== 'string' || !template) return ''
+  const vars = getCharacterDisplayTemplateVars()
+  const nestedValue = (obj, pathExpr) => {
+    if (!obj || typeof obj !== 'object' || !pathExpr) return undefined
+    const parts = String(pathExpr).split('.')
+    let cursor = obj
+    for (const part of parts) {
+      if (cursor == null) return undefined
+      cursor = cursor[part]
+    }
+    return cursor
+  }
+  return template.replace(/\{\{([^}]+)\}\}/g, (full, rawPath) => {
+    const key = String(rawPath || '').trim()
+    if (!key) return ''
+    if (key.startsWith('eventData.')) return nestedValue(eventData, key.slice(10)) ?? ''
+    if (Object.prototype.hasOwnProperty.call(vars, key)) return vars[key] ?? ''
+    return nestedValue(vars, key) ?? ''
+  })
+}
+
+function applyCustomComponentContent(comp, container, eventData = {}) {
+  if (!comp || !container) return
+  const content = container.querySelector('.custom-component-content')
+  if (!content) return
+
+  const styleId = `custom-css-${comp.id}`
+  let styleEl = document.getElementById(styleId)
+  if (comp.customCss) {
+    if (!styleEl) {
+      styleEl = document.createElement('style')
+      styleEl.id = styleId
+      document.head.appendChild(styleEl)
+    }
+    styleEl.textContent = resolveCharacterDisplayTemplate(comp.customCss, eventData)
+  } else if (styleEl) {
+    styleEl.remove()
+  }
+
+  let htmlContent = resolveCharacterDisplayTemplate(comp.html || '', eventData)
+  if (comp.type === 'image') {
+    const imgFit = comp.objectFit || 'contain'
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = htmlContent
+    const img = tempDiv.querySelector('img')
+    const fallbackSrc = resolveCharacterDisplayTemplate(comp.imageData || comp.imageUrl || '', eventData)
+    if (img) {
+      img.style.width = '100%'
+      img.style.height = '100%'
+      img.style.objectFit = imgFit
+      img.style.display = 'block'
+      const rawImgSrc = img.getAttribute('src') || ''
+      if ((!rawImgSrc || rawImgSrc.includes('{{') || rawImgSrc.includes('null') || rawImgSrc.includes('undefined')) && fallbackSrc) {
+        img.setAttribute('src', normalizeFileSrc(fallbackSrc))
+      } else if (rawImgSrc) {
+        img.setAttribute('src', normalizeFileSrc(resolveCharacterDisplayTemplate(rawImgSrc, eventData)))
+      }
+      htmlContent = tempDiv.innerHTML
+    } else if (fallbackSrc) {
+      htmlContent = `<img src="${escapeHtml(normalizeFileSrc(fallbackSrc))}" style="width: 100%; height: 100%; object-fit: ${imgFit}; display: block;" draggable="false" />`
+    }
+  }
+
+  content.innerHTML = htmlContent
+}
+
+function refreshCustomComponents(eventData = {}) {
+  customCharacterDisplayComponents.forEach(comp => {
+    const container = document.getElementById(comp.id)
+    if (!container) return
+    applyCustomComponentContent(comp, container, eventData)
+  })
 }
 
 // 监听状态更新
@@ -617,7 +740,12 @@ if (window.electronAPI && window.electronAPI.onLocalBpStateUpdate) {
       if (data.teamA) state.teamA = data.teamA
       if (data.teamB) state.teamB = data.teamB
       if (data.gameLabel) state.gameLabel = data.gameLabel
-      if (data.mapName) state.mapName = data.mapName
+      const resolvedMapName = data.mapName || data.currentMap || data.selectedMap || ''
+      if (resolvedMapName) {
+        state.mapName = resolvedMapName
+        state.currentMap = resolvedMapName
+        state.selectedMap = resolvedMapName
+      }
 
       // 收到角色展示布局时应用（导入布局包/其他窗口更新时会走这里）
       if (data.characterDisplayLayout && typeof data.characterDisplayLayout === 'object') {
@@ -655,6 +783,12 @@ function setupOBSMode() {
         const data = JSON.parse(event.data)
         if (data.type === 'local-bp-update' && data.payload) {
           state = { ...state, ...data.payload }
+          const resolvedMapName = state.mapName || state.currentMap || state.selectedMap || ''
+          if (resolvedMapName) {
+            state.mapName = resolvedMapName
+            state.currentMap = resolvedMapName
+            state.selectedMap = resolvedMapName
+          }
           render()
         }
       } catch (e) {
@@ -1068,14 +1202,19 @@ async function loadCustomComponents() {
     const res = await window.electronAPI.loadLayout()
     if (res.success && res.layout && res.layout.customComponents) {
       const components = res.layout.customComponents.filter(c => c.targetPages && c.targetPages.includes('characterDisplay'))
+      customCharacterDisplayComponents = components
       components.forEach(c => createCustomComponent(c, res.layout))
+      refreshCustomComponents()
       console.log('[CharacterDisplay] 已加载自定义组件:', components.length)
     }
   } catch (e) { console.error('[CharacterDisplay] 加载自定义组件失败', e) }
 }
 
 function createCustomComponent(comp, fullLayout) {
-  if (document.getElementById(comp.id)) return
+  if (document.getElementById(comp.id)) {
+    refreshCustomComponents()
+    return
+  }
 
   const container = document.createElement('div')
   container.id = comp.id
@@ -1138,36 +1277,11 @@ function createCustomComponent(comp, fullLayout) {
     if (!document.getElementById(styleId)) {
       const s = document.createElement('style')
       s.id = styleId
-      s.textContent = comp.customCss
       document.head.appendChild(s)
     }
   }
-
-  let htmlContent = comp.html || ''
-
-  // 图片优化
-  if (comp.type === 'image') {
-    const imgFit = comp.objectFit || 'contain'
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = htmlContent
-    const img = tempDiv.querySelector('img')
-    if (img) {
-      img.style.width = '100%'
-      img.style.height = '100%'
-      img.style.objectFit = imgFit
-      img.style.display = 'block'
-      if ((!img.src || img.src.includes('null')) && comp.imageData) {
-        img.src = comp.imageData
-      }
-      htmlContent = tempDiv.innerHTML
-    } else if (comp.imageData || comp.imageUrl) {
-      const src = comp.imageData || comp.imageUrl
-      htmlContent = `<img src="${src}" style="width: 100%; height: 100%; object-fit: ${imgFit}; display: block;" draggable="false" />`
-    }
-  }
-
-  content.innerHTML = htmlContent
   container.appendChild(content)
+  applyCustomComponentContent(comp, container)
 
   document.body.appendChild(container)
 
@@ -1179,28 +1293,30 @@ function createCustomComponent(comp, fullLayout) {
 }
 
 // 初始化
-loadLayoutFromState().then(async () => {
-  // 在加载完状态布局后，加载自定义组件
-  await loadCustomComponents()
+async function bootstrapCharacterDisplay() {
+  try {
+    await Promise.all([
+      loadLayoutFromState(),
+      loadState()
+    ])
 
-  // 没有 layout.positions 时也要有默认布局
-  if (!Object.keys(layoutPositions || {}).length) {
-    applyInitialLayout(null)
+    // 在主动拉取完本地 BP 状态后，再加载自定义组件，避免组件先以空模板渲染
+    await loadCustomComponents()
+    refreshCustomComponents(state)
+
+    // 没有 layout.positions 时也要有默认布局
+    if (!Object.keys(layoutPositions || {}).length) {
+      applyInitialLayout(null)
+    }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    // 出错也要初始化拖拽
+    initDraggable()
   }
+}
 
-  // 由于是异步加载，需要重新初始化拖拽，或者手动为新组件添加事件
-  // 这里我们在所有组件加载完后调用 initDraggable
-  // 注意：initDraggable 会给所有 .draggable-container 绑定事件。
-  // 为了防止重复绑定，initDraggable 最好支持幂等性（先移除再添加，或者检查标记）。
-  // 现在的 code 并没有这样，所以我们确保只调用一次。
-  initDraggable()
-}).catch(e => {
-  console.error(e)
-  // 出错也要初始化拖拽
-  initDraggable()
-})
-
-loadState()
+bootstrapCharacterDisplay()
 setupOBSMode()
 // initDraggable() // 移入 promise chain
 

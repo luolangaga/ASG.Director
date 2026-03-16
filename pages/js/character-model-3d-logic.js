@@ -199,6 +199,7 @@
     },
     survivorScale: 1,
     hunterScale: 1.1,
+    roleScaleOverrides: {},
     videoScreen: {
       path: '',
       loop: true,
@@ -398,6 +399,18 @@
     rotZ: document.getElementById('rotZ'),
     uniScale: document.getElementById('uniScale'),
     applyTransformBtn: document.getElementById('applyTransformBtn'),
+    openRoleScaleModalBtn: document.getElementById('openRoleScaleModalBtn'),
+    roleScaleModal: document.getElementById('roleScaleModal'),
+    closeRoleScaleModalBtn: document.getElementById('closeRoleScaleModalBtn'),
+    roleScaleRoleSelect: document.getElementById('roleScaleRoleSelect'),
+    roleScaleModalEmpty: document.getElementById('roleScaleModalEmpty'),
+    roleScaleModalFields: document.getElementById('roleScaleModalFields'),
+    roleScaleValue: document.getElementById('roleScaleValue'),
+    roleScaleBaseValue: document.getElementById('roleScaleBaseValue'),
+    roleScaleEffectiveValue: document.getElementById('roleScaleEffectiveValue'),
+    roleScaleRoleInfo: document.getElementById('roleScaleRoleInfo'),
+    applyRoleScaleBtn: document.getElementById('applyRoleScaleBtn'),
+    resetRoleScaleBtn: document.getElementById('resetRoleScaleBtn'),
     cameraEventSelect: document.getElementById('cameraEventSelect'),
     saveCameraKeyframeBtn: document.getElementById('saveCameraKeyframeBtn'),
     previewCameraKeyframeBtn: document.getElementById('previewCameraKeyframeBtn'),
@@ -536,6 +549,48 @@
     }
   }
 
+  function normalizeRoleScaleOverrides(input) {
+    const source = (input && typeof input === 'object') ? input : {}
+    const out = {}
+    Object.keys(source).forEach((key) => {
+      const roleName = sanitizeRoleName(key)
+      const scale = Math.max(0.001, asNumber(source[key], NaN))
+      if (!roleName || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-6) return
+      out[roleName] = scale
+    })
+    return out
+  }
+
+  function isRoleSlotKey(key) {
+    return key === 'hunter' || (typeof key === 'string' && key.startsWith('survivor'))
+  }
+
+  function getRoleNameForSlot(key) {
+    return sanitizeRoleName(state.slotDisplayNames?.[key] || '')
+  }
+
+  function getRoleScaleOverride(roleName) {
+    const normalized = sanitizeRoleName(roleName)
+    if (!normalized) return 1
+    return Math.max(0.001, asNumber(state.layout?.roleScaleOverrides?.[normalized], 1))
+  }
+
+  function getRoleScaleMultiplierForSlot(key) {
+    if (!isRoleSlotKey(key)) return 1
+    return getRoleScaleOverride(getRoleNameForSlot(key))
+  }
+
+  function getBaseUniformScaleForSlot(key, transform) {
+    const s = ensureVec3(transform?.scale, { x: 1, y: 1, z: 1 })
+    if (key.startsWith('survivor')) {
+      return Math.max(0.001, asNumber(state.layout?.survivorScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
+    }
+    if (key === 'hunter') {
+      return Math.max(0.001, asNumber(state.layout?.hunterScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
+    }
+    return Math.max(0.001, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1))))
+  }
+
   function normalizeLayout(raw) {
     const base = (raw && typeof raw === 'object') ? raw : {}
     const out = deepClone(DEFAULT_LAYOUT)
@@ -587,6 +642,7 @@
     }
     out.survivorScale = Math.max(0.001, asNumber(base?.survivorScale, 1))
     out.hunterScale = Math.max(0.001, asNumber(base?.hunterScale, out.slots.hunter.scale.x))
+    out.roleScaleOverrides = normalizeRoleScaleOverrides(base?.roleScaleOverrides)
     out.videoScreen.path = typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : ''
     out.videoScreen.loop = base?.videoScreen?.loop !== false
     out.videoScreen.muted = base?.videoScreen?.muted !== false
@@ -1806,12 +1862,9 @@
     } else if (key === 'light1') {
       runtime.group.scale.set(1, 1, 1)
     } else {
-      const uniform = (key.startsWith('survivor'))
-        ? Math.max(0.001, asNumber(state.layout?.survivorScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
-        : (key === 'hunter')
-          ? Math.max(0.001, asNumber(state.layout?.hunterScale, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1)))))
-        : Math.max(0.001, asNumber(s.x, asNumber(s.y, asNumber(s.z, 1))))
-      runtime.group.scale.set(uniform, uniform, uniform)
+      const uniform = getBaseUniformScaleForSlot(key, t)
+      const effectiveUniform = uniform * getRoleScaleMultiplierForSlot(key)
+      runtime.group.scale.set(effectiveUniform, effectiveUniform, effectiveUniform)
     }
   }
 
@@ -2696,6 +2749,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       const roleName = survivors[i] || ''
       const slotKey = `survivor${i + 1}`
       state.slotDisplayNames[slotKey] = roleName || ''
+      applyTransformToGroup(slotKey, state.layout.slots[slotKey])
       const modelPath = survivorModels[i] || ''
       state.slotModelPaths[slotKey] = modelPath || ''
       if (roleName && !modelPath) {
@@ -2706,6 +2760,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     const hunterName = state.bp.hunter || ''
     state.slotDisplayNames.hunter = hunterName || ''
+    applyTransformToGroup('hunter', state.layout.slots.hunter)
     const hunterModel = await findOfficialModel(hunterName)
     state.slotModelPaths.hunter = hunterModel || ''
     if (hunterName && !hunterModel) {
@@ -2713,6 +2768,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     await loadModelForSlot('hunter', hunterModel)
     renderSlotTabs()
+    syncRoleScaleModal(false)
   }
 
   async function runBpRoleSyncLoop() {
@@ -2743,7 +2799,10 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       return
     }
     if (!state.layout.slots[key]) state.layout.slots[key] = {}
-    const uniform = Math.max(0.001, asNumber(g.scale.x, 1))
+    const effectiveUniform = Math.max(0.001, asNumber(g.scale.x, 1))
+    const uniform = isRoleSlotKey(key)
+      ? Math.max(0.001, effectiveUniform / Math.max(0.001, getRoleScaleMultiplierForSlot(key)))
+      : effectiveUniform
     if (key.startsWith('survivor')) {
       state.layout.survivorScale = uniform
       for (let i = 1; i <= 4; i++) {
@@ -2822,6 +2881,168 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     startCameraTransition(frame, 420, `对焦 ${label}`)
   }
 
+  function getRoleScaleEntries() {
+    const map = new Map()
+    SLOT_CONFIGS.forEach((cfg) => {
+      if (cfg.roleType !== 'survivor' && cfg.roleType !== 'hunter') return
+      const roleName = getRoleNameForSlot(cfg.key)
+      if (!roleName) return
+      const existing = map.get(roleName)
+      if (existing) {
+        existing.slots.push(cfg.key)
+        existing.slotLabels.push(cfg.label)
+        return
+      }
+      map.set(roleName, {
+        roleName,
+        slots: [cfg.key],
+        slotLabels: [cfg.label]
+      })
+    })
+    return Array.from(map.values())
+  }
+
+  function getPreferredRoleScaleEntry(entries) {
+    const list = Array.isArray(entries) ? entries : []
+    if (!list.length) return null
+    const currentValue = sanitizeRoleName(dom.roleScaleRoleSelect?.value || '')
+    if (currentValue) {
+      const matchByCurrent = list.find(entry => entry.roleName === currentValue)
+      if (matchByCurrent) return matchByCurrent
+    }
+    const selectedRoleName = getRoleNameForSlot(state.selectedSlot)
+    if (selectedRoleName) {
+      const matchBySlot = list.find(entry => entry.roleName === selectedRoleName)
+      if (matchBySlot) return matchBySlot
+    }
+    return list[0]
+  }
+
+  function getPrimarySlotForRoleScaleEntry(entry) {
+    if (!entry || !Array.isArray(entry.slots) || !entry.slots.length) return ''
+    if (entry.slots.includes(state.selectedSlot)) return state.selectedSlot
+    return entry.slots[0]
+  }
+
+  function isRoleScaleModalOpen() {
+    return !!dom.roleScaleModal?.classList.contains('open')
+  }
+
+  function syncRoleScaleModal(preferSelectedSlot = false) {
+    if (!dom.roleScaleRoleSelect || !dom.roleScaleModalEmpty || !dom.roleScaleModalFields) return
+    const entries = getRoleScaleEntries()
+    const selectedRoleName = preferSelectedSlot ? getRoleNameForSlot(state.selectedSlot) : ''
+    const preferred = selectedRoleName
+      ? entries.find(entry => entry.roleName === selectedRoleName) || getPreferredRoleScaleEntry(entries)
+      : getPreferredRoleScaleEntry(entries)
+
+    dom.roleScaleRoleSelect.innerHTML = entries.map((entry) => {
+      const selected = preferred && preferred.roleName === entry.roleName ? ' selected' : ''
+      return `<option value="${entry.roleName}"${selected}>${entry.roleName} (${entry.slotLabels.join(' / ')})</option>`
+    }).join('')
+
+    const activeEntry = preferred || null
+    const hasEntry = !!activeEntry
+    dom.roleScaleRoleSelect.disabled = !hasEntry
+    dom.roleScaleModalEmpty.style.display = hasEntry ? 'none' : 'block'
+    dom.roleScaleModalFields.style.display = hasEntry ? 'block' : 'none'
+    if (dom.applyRoleScaleBtn) dom.applyRoleScaleBtn.disabled = !hasEntry
+    if (dom.resetRoleScaleBtn) dom.resetRoleScaleBtn.disabled = !hasEntry
+
+    if (!hasEntry) {
+      if (dom.roleScaleValue) dom.roleScaleValue.value = '1.000'
+      if (dom.roleScaleBaseValue) dom.roleScaleBaseValue.value = '0.000'
+      if (dom.roleScaleEffectiveValue) dom.roleScaleEffectiveValue.value = '0.000'
+      if (dom.roleScaleRoleInfo) dom.roleScaleRoleInfo.textContent = ''
+      return
+    }
+
+    const primarySlot = getPrimarySlotForRoleScaleEntry(activeEntry)
+    const baseScale = Math.max(0.001, asNumber(state.layout?.slots?.[primarySlot]?.scale?.x,
+      primarySlot === 'hunter' ? state.layout?.hunterScale : state.layout?.survivorScale))
+    const roleScale = getRoleScaleOverride(activeEntry.roleName)
+    const effectiveScale = baseScale * roleScale
+    if (dom.roleScaleValue) dom.roleScaleValue.value = roleScale.toFixed(3)
+    if (dom.roleScaleBaseValue) dom.roleScaleBaseValue.value = baseScale.toFixed(3)
+    if (dom.roleScaleEffectiveValue) dom.roleScaleEffectiveValue.value = effectiveScale.toFixed(3)
+    if (dom.roleScaleRoleInfo) {
+      const path = state.slotModelPaths?.[primarySlot] || '未找到本地模型路径'
+      dom.roleScaleRoleInfo.textContent = [
+        `影响角色: ${activeEntry.roleName}`,
+        `影响槽位: ${activeEntry.slotLabels.join(' / ')}`,
+        `参考槽位: ${SLOT_CONFIGS.find(item => item.key === primarySlot)?.label || primarySlot}`,
+        `模型路径: ${path}`
+      ].join('\n')
+    }
+  }
+
+  function openRoleScaleModal() {
+    syncRoleScaleModal(true)
+    if (!dom.roleScaleModal) return
+    dom.roleScaleModal.classList.add('open')
+    dom.roleScaleModal.setAttribute('aria-hidden', 'false')
+    if (dom.roleScaleValue && dom.roleScaleModalFields?.style.display !== 'none') {
+      window.setTimeout(() => {
+        try { dom.roleScaleValue.focus() } catch { }
+      }, 0)
+    }
+  }
+
+  function closeRoleScaleModal() {
+    if (!dom.roleScaleModal) return
+    dom.roleScaleModal.classList.remove('open')
+    dom.roleScaleModal.setAttribute('aria-hidden', 'true')
+  }
+
+  function applyRoleScaleOverrideToRole(roleName) {
+    const normalized = sanitizeRoleName(roleName)
+    if (!normalized) return
+    SLOT_CONFIGS.forEach((cfg) => {
+      if (!isRoleSlotKey(cfg.key)) return
+      if (getRoleNameForSlot(cfg.key) !== normalized) return
+      applyTransformToGroup(cfg.key, state.layout.slots[cfg.key])
+    })
+    updateKeyLightShadowFrustum()
+  }
+
+  function applyRoleScaleFromModal() {
+    const roleName = sanitizeRoleName(dom.roleScaleRoleSelect?.value || '')
+    if (!roleName) {
+      setStatus('当前没有可设置的角色')
+      return
+    }
+    const nextScale = Math.max(0.001, asNumber(dom.roleScaleValue?.value, 1))
+    if (!state.layout.roleScaleOverrides || typeof state.layout.roleScaleOverrides !== 'object') {
+      state.layout.roleScaleOverrides = {}
+    }
+    if (Math.abs(nextScale - 1) < 1e-6) {
+      delete state.layout.roleScaleOverrides[roleName]
+    } else {
+      state.layout.roleScaleOverrides[roleName] = nextScale
+    }
+    applyRoleScaleOverrideToRole(roleName)
+    syncTransformInputs()
+    syncRoleScaleModal(false)
+    scheduleSaveLayout()
+    setStatus(`已更新角色专属缩放: ${roleName} × ${nextScale.toFixed(3)}`)
+  }
+
+  function resetRoleScaleFromModal() {
+    const roleName = sanitizeRoleName(dom.roleScaleRoleSelect?.value || '')
+    if (!roleName) {
+      setStatus('当前没有可重置的角色')
+      return
+    }
+    if (state.layout.roleScaleOverrides && typeof state.layout.roleScaleOverrides === 'object') {
+      delete state.layout.roleScaleOverrides[roleName]
+    }
+    applyRoleScaleOverrideToRole(roleName)
+    syncTransformInputs()
+    syncRoleScaleModal(false)
+    scheduleSaveLayout()
+    setStatus(`已清除角色专属缩放: ${roleName}`)
+  }
+
   function syncTransformInputs() {
     const tr = getSelectedTransform()
     if (!tr) return
@@ -2886,6 +3107,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         state.layout.slots[slotKey] = slotTr
         applyTransformToGroup(slotKey, slotTr)
       }
+      if (isRoleScaleModalOpen()) syncRoleScaleModal(false)
       scheduleSaveLayout()
       return
     } else if (state.selectedSlot === 'hunter') {
@@ -2898,6 +3120,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (state.selectedSlot === 'camera1' && state.virtualCameraMode?.enabled) {
       refreshVirtualCameraStageFrame(220, '更新虚拟摄像机位置')
     }
+    if (isRoleScaleModalOpen()) syncRoleScaleModal(false)
     scheduleSaveLayout()
   }
 
@@ -2917,6 +3140,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         state.selectedSlot = btn.dataset.slot || 'survivor1'
         renderSlotTabs()
         syncTransformInputs()
+        if (isRoleScaleModalOpen()) syncRoleScaleModal(true)
       })
     })
   }
@@ -2937,6 +3161,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     applyOrbitFromLayout()
     renderSlotTabs()
     syncTransformInputs()
+    syncRoleScaleModal(false)
     syncLightInputs()
     syncVideoInputs()
     syncCameraInputs()
@@ -2952,6 +3177,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     state.layout.mode = next
     document.body.classList.toggle('render-mode', next === 'render')
     document.body.classList.toggle('edit-mode', next === 'edit')
+    if (next !== 'edit') closeRoleScaleModal()
     if (grid) grid.visible = next === 'edit'
     if (axes) axes.visible = next === 'edit'
     if (dom.modeToggleBtn) {
@@ -3635,6 +3861,20 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       })
     }
     dom.applyTransformBtn.addEventListener('click', applyInputsToSelectedTransform)
+    if (dom.openRoleScaleModalBtn) dom.openRoleScaleModalBtn.addEventListener('click', openRoleScaleModal)
+    if (dom.closeRoleScaleModalBtn) dom.closeRoleScaleModalBtn.addEventListener('click', closeRoleScaleModal)
+    if (dom.roleScaleRoleSelect) {
+      dom.roleScaleRoleSelect.addEventListener('change', () => {
+        syncRoleScaleModal(false)
+      })
+    }
+    if (dom.applyRoleScaleBtn) dom.applyRoleScaleBtn.addEventListener('click', applyRoleScaleFromModal)
+    if (dom.resetRoleScaleBtn) dom.resetRoleScaleBtn.addEventListener('click', resetRoleScaleFromModal)
+    if (dom.roleScaleModal) {
+      dom.roleScaleModal.addEventListener('click', (e) => {
+        if (e.target === dom.roleScaleModal) closeRoleScaleModal()
+      })
+    }
     if (dom.focusSelectedBtn) dom.focusSelectedBtn.addEventListener('click', focusCameraOnSelectedSlot)
     if (dom.cameraEventSelect) {
       dom.cameraEventSelect.addEventListener('change', () => {
@@ -3825,6 +4065,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isRoleScaleModalOpen()) {
+        e.preventDefault()
+        closeRoleScaleModal()
+        return
+      }
       if (e.key === 'F2') {
         e.preventDefault()
         applyMode(state.layout.mode === 'edit' ? 'render' : 'edit')

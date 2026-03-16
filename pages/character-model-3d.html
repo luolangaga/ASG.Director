@@ -159,8 +159,12 @@
           <label>RotX<input id="rotX" type="number" step="1"></label>
           <label>RotY<input id="rotY" type="number" step="1"></label>
           <label>RotZ<input id="rotZ" type="number" step="1"></label>
-          <label>Scale（求生者共用 / 监管者独立）<input id="uniScale" type="number" step="0.01" min="0.01"></label>
+          <label>基础Scale<input id="uniScale" type="number" step="0.01" min="0.01"></label>
           <button id="applyTransformBtn" class="btn">应用</button>
+          <button id="openRoleScaleModalBtn" class="btn" type="button">角色专属缩放</button>
+        </div>
+        <div class="toolbar-row hint">
+          基础 Scale 仍控制槽位/阵营整体大小；“角色专属缩放”用于修正某个官方角色模型本身偏大或偏小的问题。
         </div>
       </section>
 
@@ -213,6 +217,40 @@
   <div id="cinemaOverlay" class="cinema-overlay"></div>
   <div id="fpsBadge" class="fps-badge">FPS: --</div>
   <div id="statusBar" class="status-bar">初始化中...</div>
+
+  <div id="roleScaleModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card role-scale-modal" role="dialog" aria-modal="true" aria-labelledby="roleScaleModalTitle">
+      <div class="modal-header">
+        <div id="roleScaleModalTitle" class="modal-title">角色专属缩放</div>
+        <button id="closeRoleScaleModalBtn" class="btn" type="button">关闭</button>
+      </div>
+      <div class="modal-body">
+        <div class="toolbar-row">
+          <label>角色
+            <select id="roleScaleRoleSelect"></select>
+          </label>
+        </div>
+        <div id="roleScaleModalEmpty" class="modal-empty">
+          当前没有已载入的求生者或监管者，先在 BP 里选中角色后再设置。
+        </div>
+        <div id="roleScaleModalFields">
+          <div class="toolbar-row grid role-scale-grid">
+            <label>角色倍率<input id="roleScaleValue" type="number" step="0.01" min="0.01"></label>
+            <label>参考槽位基础Scale<input id="roleScaleBaseValue" type="number" step="0.01" disabled></label>
+            <label>参考槽位实际Scale<input id="roleScaleEffectiveValue" type="number" step="0.01" disabled></label>
+          </div>
+          <div id="roleScaleRoleInfo" class="role-scale-info"></div>
+          <div class="toolbar-row">
+            <button id="applyRoleScaleBtn" class="btn" type="button">应用角色缩放</button>
+            <button id="resetRoleScaleBtn" class="btn" type="button">清除角色修正</button>
+          </div>
+          <div class="toolbar-row hint">
+            实际展示缩放 = 槽位基础 Scale × 角色倍率。角色倍率按角色名保存，不绑定到某个槽位。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="./js/character-model-3d-logic.js"></script>
 </body>

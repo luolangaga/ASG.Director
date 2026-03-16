@@ -125,7 +125,7 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
               <div>
                 <h3>自定义页面（OBS）</h3>
-                <p>把本地 HTML 逐个映射为 HTTP 地址，方便 OBS 录制。</p>
+                <p>把 BP前台、角色展示等页面映射成 HTTP 地址；浏览器源可直接捕获，OBS 侧边栏也能直接挂控制面板。</p>
               </div>
               <span id="localPagesStatus" class="status-badge">未启动</span>
             </div>
@@ -151,9 +151,10 @@
 
             <div style="margin-top:12px; font-size:12px; color:var(--text-secondary); line-height:1.6;">
               <div style="font-weight:600; color:var(--text-primary); margin-bottom:6px;">推荐使用 OBS 浏览器源</div>
-              <div>添加方式：OBS → 来源 → 浏览器 → 粘贴 URL → 设置宽高。</div>
-              <div>推荐分辨率：比分板 1280×720；角色展示 1366×768；BP前台按需求自定义。</div>
-              <div>优势：无需打开前台窗口也能录制，资源占用更低，捕获更稳定。</div>
+              <div>节目画面：OBS → 来源 → 浏览器 → 粘贴 BP前台 / 角色展示 / 比分板 等 URL。</div>
+              <div>侧边栏控制：OBS → 视图 → 自定义浏览器停靠栏 → 粘贴 OBS BP控制 / OBS自动化侧边栏 URL。</div>
+              <div>推荐分辨率：BP前台 1686×934；比分板 1280×720；角色展示 1366×768。</div>
+              <div>BP前台、角色展示等页面走浏览器源时，不需要额外打开对应前台窗口；3D角色展示则建议使用窗口捕获。</div>
             </div>
 
             <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">

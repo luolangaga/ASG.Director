@@ -3,6 +3,13 @@
  * 为首次使用的用户提供交互式引导教程
  */
 
+// 在这里直接填网络图片 URL，就会显示在主页面教程弹窗里；留空则不显示。
+const ONBOARDING_IMAGE_SLOTS = {
+  obsBrowserSource: 'http://api.idvevent.cn/uploads/markdown/20260316142438-377a07a5.png',
+  obsCustomDock: 'http://api.idvevent.cn/uploads/markdown/20260316144817-30d64db9.png',
+  obsWorkflow: ''
+}
+
 const ASGOnboarding = {
   // 本地存储key
   STORAGE_KEY: 'asg_onboarding_completed',
@@ -15,184 +22,166 @@ const ASGOnboarding = {
   steps: [
     {
       id: 'welcome',
-      title: '欢迎使用 Idvevent Director! 🎉',
+      title: '欢迎使用 ASG.Director',
       content: `
-        <p>感谢您选择 Idvevent Director 作为您的赛事导播工具！</p>
-        <p>接下来我们将带您快速了解核心功能，让您成为专业导播只需 3 分钟！</p>
-        <div style="display:flex; gap:20px; margin-top:20px; justify-content:center;">
-          <div style="text-align:center;">
-            <div style="font-size:40px;">📋</div>
-            <div style="font-size:13px; color:#aaa; margin-top:4px;">本地BP</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:40px;">🎨</div>
-            <div style="font-size:13px; color:#aaa; margin-top:4px;">编辑模式</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:40px;">🛒</div>
-            <div style="font-size:13px; color:#aaa; margin-top:4px;">组件商店</div>
-          </div>
+        <div style="padding:12px 14px; border-radius:12px; border:1px solid rgba(255,84,84,0.48); background:rgba(255,84,84,0.14); color:#ffd6d6; margin-bottom:14px; line-height:1.7;">
+          <strong>强烈推荐你观看这个教程。</strong><br>
+          我们和很多其他 BP 软件在概念上不同：<strong>本地 BP 是主控，节目画面优先给 OBS 浏览器源，控制面板再挂进 OBS 侧边栏</strong>。
         </div>
-      `,
-      target: null,
-      position: 'center'
-    },
-    {
-      id: 'local-bp',
-      title: '本地 BP 模式 📋',
-      content: `
-        <p><strong>本地BP</strong> 是您进行赛事导播的核心功能。</p>
+        <p>主页面教程现在只负责做总引导，不会再在这个窗口里把所有细节讲完。</p>
+        <p>接下来你会看到几个直接打开新窗口的入口：</p>
         <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
-          <li>无需联网，单机操作即可完成BP</li>
-          <li>支持队伍信息、角色选择、天赋配置</li>
-          <li>一键推送到OBS前端展示</li>
+          <li>本地 BP 引导窗口</li>
+          <li>3D 角色展示教程入口</li>
         </ul>
-        <p>点击 <strong>"立即开始"</strong> 按钮即可进入本地BP控制台！</p>
+        <p style="font-size:12px; color:#aaa;">OBS 的细节说明会继续放在这个弹窗里，并且支持直接插网络图片。</p>
       `,
-      target: '#localBpBtn',
-      position: 'bottom',
-      highlight: true
+      target: null,
+      position: 'center'
     },
     {
-      id: 'local-bp-features',
-      title: '本地BP控制台功能 🎮',
+      id: 'workflow',
+      title: '先记住这条主流程',
       content: `
-        <p>在本地BP控制台中，您可以：</p>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0;">
-          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px;">
-            <div style="font-size:18px; margin-bottom:4px;">🎮 BP控制</div>
-            <div style="font-size:12px; color:#aaa;">选择角色、配置Ban位</div>
+          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
+            <div style="font-size:18px; margin-bottom:6px;">1. 控制比赛</div>
+            <div style="font-size:12px; color:#aaa;">进入本地 BP，录入队伍、角色、地图、比分和赛后信息。</div>
           </div>
-          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px;">
-            <div style="font-size:18px; margin-bottom:4px;">🗺️ 对局信息</div>
-            <div style="font-size:12px; color:#aaa;">设置队伍名称、Logo</div>
+          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
+            <div style="font-size:18px; margin-bottom:6px;">2. 输出到 OBS</div>
+            <div style="font-size:12px; color:#aaa;">优先使用首页里的本地页面 URL，直接做浏览器源。</div>
           </div>
-          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px;">
-            <div style="font-size:18px; margin-bottom:4px;">🧠 天赋技能</div>
-            <div style="font-size:12px; color:#aaa;">配置选手天赋和技能</div>
+          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
+            <div style="font-size:18px; margin-bottom:6px;">3. 把控制挂进 OBS</div>
+            <div style="font-size:12px; color:#aaa;">把 OBS BP 控制、OBS 自动化侧边栏挂到 OBS 停靠栏里。</div>
           </div>
-          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px;">
-            <div style="font-size:18px; margin-bottom:4px;">📊 比分管理</div>
-            <div style="font-size:12px; color:#aaa;">实时更新比赛分数</div>
+          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
+            <div style="font-size:18px; margin-bottom:6px;">4. 需要演出再开 3D</div>
+            <div style="font-size:12px; color:#aaa;">3D 角色展示是独立窗口，用来做更重的场景、镜头和光影。</div>
           </div>
+        </div>
+        <p style="font-size:12px; color:#aaa;">BP前台固定分辨率已经是 <strong>1686×934</strong>，不再是可随意改的尺寸。</p>
+      `,
+      target: null,
+      position: 'center'
+    },
+    {
+      id: 'launch-guides',
+      title: '从这里打开需要的新窗口',
+      content: `
+        <p>主页面只负责做总引导。下面两个按钮会直接打开对应窗口或入口：</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-top:16px;">
+          <button class="onboarding-action-card" onclick="ASGOnboarding.openLocalBpGuide()">
+            <span class="onboarding-action-icon">📋</span>
+            <span class="onboarding-action-title">打开本地BP教程</span>
+            <span class="onboarding-action-desc">进入单独窗口，直接看 BP 操作流程。</span>
+          </button>
+          <button class="onboarding-action-card" onclick="ASGOnboarding.openModel3DGuide()">
+            <span class="onboarding-action-icon">🎬</span>
+            <span class="onboarding-action-title">打开 3D 教程入口</span>
+            <span class="onboarding-action-desc">切到 3D 模型页并启动 3D 角色展示专属教程。</span>
+          </button>
+        </div>
+        <div style="margin-top:14px; font-size:12px; color:#aaa; line-height:1.7;">
+          OBS 的浏览器源和侧边栏说明继续看下面几步，不会再单独弹新页面。
         </div>
       `,
       target: null,
       position: 'center'
     },
     {
-      id: 'edit-mode',
-      title: '编辑模式 ✨',
+      id: 'obs-browser-source',
+      title: 'OBS：给节目画面加浏览器源',
       content: `
-        <p>Idvevent Director 支持强大的<strong>实时编辑功能</strong>！</p>
-        <div style="background:linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,140,0,0.1)); padding:16px; border-radius:12px; margin:12px 0; border:1px solid rgba(255,215,0,0.3);">
-          <div style="font-weight:bold; margin-bottom:8px;">💡 快捷键提示</div>
-          <div style="display:flex; gap:16px; flex-wrap:wrap;">
-            <div><kbd style="background:#333; padding:4px 8px; border-radius:4px;">F2</kbd> 切换编辑模式</div>
-            <div><kbd style="background:#333; padding:4px 8px; border-radius:4px;">F12</kbd> 开发者工具</div>
-          </div>
-        </div>
-        <p>在编辑模式下，您可以：</p>
-        <ul style="margin:8px 0; padding-left:20px; line-height:1.6;">
-          <li>拖拽调整组件位置</li>
-          <li>双击修改字体样式</li>
-          <li>右键打开组件设置</li>
+        <p>节目画面用的页面，推荐都走 <strong>浏览器源</strong>：</p>
+        <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
+          <li>OBS → 来源 → <strong>+</strong> → <strong>浏览器</strong></li>
+          <li>名称自定，例如“BP前台”“角色展示”“比分板-A队”</li>
+          <li>粘贴 Director 首页复制的 URL，不要勾“本地文件”</li>
+          <li>按固定宽高填写：BP前台 1686×934，角色展示 1366×768，比分板 1280×720</li>
         </ul>
+        <p style="font-size:12px; color:#aaa;">这些页面通常不需要额外打开对应前台窗口，OBS 直接抓 URL 就行。</p>
       `,
-      target: null,
-      position: 'center'
+      media: [
+        {
+          src: ONBOARDING_IMAGE_SLOTS.obsBrowserSource,
+          alt: 'OBS 浏览器源示意图',
+          caption: '这里可以放你的浏览器源示意图，直接填网络图片 URL。'
+        }
+      ],
+      target: '#localPagesCard',
+      position: 'center',
+      highlight: true,
+      viewId: 'home'
     },
     {
-      id: 'obs-browser-capture',
-      title: 'OBS 浏览器捕获推荐 📺',
+      id: 'obs-dock',
+      title: 'OBS：把控制挂到侧边栏',
       content: `
-        <p>推荐使用<strong>浏览器源</strong>捕获本地页面，画面稳定且更省资源。</p>
-        <ul style="margin:8px 0; padding-left:20px; line-height:1.6;">
-          <li>OBS → 来源 → 浏览器</li>
-          <li>粘贴页面 URL</li>
-          <li>按页面分辨率设置宽高</li>
+        <p><strong>OBS BP控制</strong> 和 <strong>OBS自动化侧边栏</strong> 不是节目画面，它们更适合挂到 OBS 侧边栏。</p>
+        <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
+          <li>OBS 顶部菜单 → <strong>视图 → 自定义浏览器停靠栏</strong></li>
+          <li>名称可以填“ASG BP控制”或“ASG 自动化”</li>
+          <li>URL 分别填首页里的 <strong>OBS BP控制</strong> / <strong>OBS自动化侧边栏</strong></li>
+          <li>停靠完成后直接拖到 OBS 左右两侧即可</li>
         </ul>
-        <div style="margin-top:8px; font-size:12px; color:#aaa; line-height:1.6;">
-          分辨率：比分板 1280×720；角色展示 1366×768；BP前台可在设置中自定义。
-        </div>
-        <div style="margin-top:8px; font-size:12px; color:#aaa; line-height:1.6;">
-          好处：无需打开前台窗口也能录制，内存占用更低，捕获更稳定。
-        </div>
+        <p style="font-size:12px; color:#aaa;">如果你想在这个弹窗里放图，继续用下面的图片槽位配置即可。</p>
+      `,
+      media: [
+        {
+          src: ONBOARDING_IMAGE_SLOTS.obsCustomDock,
+          alt: 'OBS 自定义浏览器停靠栏示意图',
+          caption: '这里可以放你的 OBS 停靠栏示意图。'
+        },
+        {
+          src: ONBOARDING_IMAGE_SLOTS.obsWorkflow,
+          alt: 'Director 与 OBS 工作流示意图',
+          caption: '这里可以放一张总流程图，例如“本地BP -> 浏览器源/停靠栏 -> OBS”。'
+        }
+      ],
+      target: '#localPagesCard',
+      position: 'center',
+      highlight: true,
+      viewId: 'home'
+    },
+    {
+      id: 'local-pages-summary',
+      title: '首页最关键的区域还是这里',
+      content: `
+        <p><strong>自定义页面（OBS）</strong> 是给 OBS 提供 URL 的地方。</p>
+        <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
+          <li><strong>BP前台</strong> 固定分辨率：<strong>1686×934</strong></li>
+          <li><strong>角色展示</strong> 固定分辨率：<strong>1366×768</strong></li>
+          <li><strong>比分板</strong> 固定分辨率：<strong>1280×720</strong></li>
+          <li><strong>OBS BP控制 / OBS自动化侧边栏</strong> 是给 OBS 停靠栏用的控制页面</li>
+        </ul>
+        <p style="font-size:12px; color:#aaa;">2D 页面优先浏览器源，3D 角色展示优先窗口捕获。</p>
       `,
       target: '#localPagesCard',
       position: 'top',
-      highlight: true
-    },
-    {
-      id: 'settings',
-      title: '表现设置 🎨',
-      content: `
-        <p>在这里您可以个性化您的导播界面：</p>
-        <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
-          <li><strong>3D模型</strong> - 配置MMD角色模型</li>
-          <li><strong>渲染分辨率</strong> - 调整OBS输出分辨率</li>
-          <li><strong>字体与资源</strong> - 自定义字体和组件</li>
-        </ul>
-      `,
-      target: '#nav-settings',
-      position: 'right',
-      highlight: true
-    },
-    {
-      id: 'store',
-      title: '设置中心 🛒',
-      content: `
-        <p><strong>设置中心</strong>已经整合动画、字体、组件包与插件入口。</p>
-        <div style="background:rgba(72,187,120,0.15); padding:16px; border-radius:12px; margin:12px 0; border:1px solid rgba(72,187,120,0.3);">
-          <div style="display:flex; align-items:center; gap:12px;">
-          <div style="font-size:32px;">⚙️</div>
-            <div>
-              <div style="font-weight:bold;">资源与插件集中管理</div>
-              <div style="font-size:12px; color:#81c784;">更清爽的入口体验</div>
-            </div>
-          </div>
-        </div>
-        <p>打开设置中心，快速找到所需功能。</p>
-      `,
-      target: '#nav-settings',
-      position: 'right',
-      highlight: true
-    },
-    {
-      id: 'plugins',
-      title: '插件系统 🧩',
-      content: `
-        <p>ASG Director 支持<strong>插件扩展</strong>，让功能更加丰富！</p>
-        <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
-          <li>从插件商店下载社区插件</li>
-          <li>插件会在侧边栏显示入口</li>
-          <li>支持自定义页面和功能</li>
-        </ul>
-        <div style="font-size:12px; color:#aaa; margin-top:12px;">
-          💡 提示：您可以在「设置中心」中管理已安装的插件
-        </div>
-      `,
-      target: '#pluginMenubar',
-      position: 'right',
-      highlight: true
+      highlight: true,
+      viewId: 'home'
     },
     {
       id: 'complete',
-      title: '准备就绪！🚀',
+      title: '准备就绪',
       content: `
-        <p>恭喜您完成了新手引导！</p>
-        <div style="text-align:center; margin:20px 0;">
-          <div style="font-size:60px; margin-bottom:12px;">🎊</div>
-          <div style="font-size:16px; font-weight:bold; color:#FFD700;">现在开始您的专业导播之旅吧！</div>
-        </div>
+        <p>核心流程已经完整了：</p>
+        <ul style="margin:12px 0; padding-left:20px; line-height:1.8;">
+          <li>用本地 BP 控比赛</li>
+          <li>用首页 URL 给 OBS 加浏览器源</li>
+          <li>把控制面板挂进 OBS 侧边栏</li>
+          <li>需要高级演出时，再打开 3D 角色展示做窗口捕获</li>
+        </ul>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
           <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px; text-align:center; cursor:pointer;" onclick="ASGOnboarding.quickAction('localBp')">
             <div style="font-size:24px;">📋</div>
             <div style="font-size:12px; margin-top:4px;">开始本地BP</div>
           </div>
-          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px; text-align:center; cursor:pointer;" onclick="ASGOnboarding.quickAction('store')">
-            <div style="font-size:24px;">🛒</div>
-            <div style="font-size:12px; margin-top:4px;">浏览商店</div>
+          <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px; text-align:center; cursor:pointer;" onclick="ASGOnboarding.openModel3DGuide()">
+            <div style="font-size:24px;">🎬</div>
+            <div style="font-size:12px; margin-top:4px;">打开 3D 入口</div>
           </div>
         </div>
       `,
@@ -262,8 +251,10 @@ const ASGOnboarding = {
         
         #asg-onboarding-card {
           position: absolute;
-          width: 420px;
-          max-width: 90vw;
+          width: 640px;
+          max-width: 94vw;
+          height: min(84vh, 860px);
+          max-height: 84vh;
           background: linear-gradient(145deg, #1e1e2e 0%, #2a2a3e 100%);
           border: 1px solid rgba(255, 215, 0, 0.3);
           border-radius: 20px;
@@ -274,6 +265,8 @@ const ASGOnboarding = {
           transform: translateY(20px) scale(0.95);
           transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
           z-index: 100002;
+          display: flex;
+          flex-direction: column;
         }
         
         #asg-onboarding-card.show {
@@ -285,6 +278,7 @@ const ASGOnboarding = {
         .onboarding-header {
           padding: 24px 24px 16px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
         }
         
         .onboarding-title {
@@ -302,6 +296,9 @@ const ASGOnboarding = {
           color: #e0e0e0;
           font-size: 14px;
           line-height: 1.7;
+          flex: 1;
+          min-height: 0;
+          overflow: auto;
         }
         
         .onboarding-body p {
@@ -319,6 +316,72 @@ const ASGOnboarding = {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
+          flex-shrink: 0;
+          background: linear-gradient(180deg, rgba(42, 42, 62, 0.92), rgba(30, 30, 46, 0.98));
+        }
+
+        .onboarding-action-card {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 14px 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+          text-align: left;
+          cursor: pointer;
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .onboarding-action-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255, 215, 0, 0.35);
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .onboarding-action-icon {
+          font-size: 24px;
+          line-height: 1;
+        }
+
+        .onboarding-action-title {
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .onboarding-action-desc {
+          font-size: 12px;
+          color: #b9bfd2;
+          line-height: 1.7;
+        }
+
+        .onboarding-media {
+          margin-top: 14px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .onboarding-media-item {
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(0, 0, 0, 0.18);
+        }
+
+        .onboarding-media-item img {
+          display: block;
+          width: 100%;
+          height: auto;
+          max-height: 320px;
+          object-fit: contain;
+          background: rgba(0, 0, 0, 0.16);
+        }
+
+        .onboarding-media-item figcaption {
+          padding: 10px 12px;
+          font-size: 12px;
+          color: #b9bfd2;
         }
         
         .onboarding-progress {
@@ -474,6 +537,7 @@ const ASGOnboarding = {
 
     this.currentStep = stepIndex;
     localStorage.setItem(this.CURRENT_STEP_KEY, stepIndex.toString());
+    this.prepareStepContext(step);
 
     const card = document.getElementById('asg-onboarding-card');
     const backdrop = document.getElementById('asg-onboarding-backdrop');
@@ -489,7 +553,7 @@ const ASGOnboarding = {
     setTimeout(() => {
       // 更新内容
       titleEl.innerHTML = step.title;
-      bodyEl.innerHTML = step.content;
+      bodyEl.innerHTML = this.renderStepContent(step);
 
       // 更新进度点
       progressEl.innerHTML = this.steps.map((s, i) => {
@@ -522,32 +586,8 @@ const ASGOnboarding = {
       buttonsEl.innerHTML = buttonsHtml;
 
       // 处理高亮和定位
-      if (step.target && step.highlight) {
-        const targetEl = document.querySelector(step.target);
-        if (targetEl) {
-          const rect = targetEl.getBoundingClientRect();
-          const padding = 8;
-
-          highlight.style.display = 'block';
-          highlight.style.left = (rect.left - padding) + 'px';
-          highlight.style.top = (rect.top - padding) + 'px';
-          highlight.style.width = (rect.width + padding * 2) + 'px';
-          highlight.style.height = (rect.height + padding * 2) + 'px';
-
-          backdrop.classList.remove('show');
-
-          // 定位卡片
-          this.positionCard(card, rect, step.position);
-        } else {
-          this.centerCard(card);
-          highlight.style.display = 'none';
-          backdrop.classList.add('show');
-        }
-      } else {
-        this.centerCard(card);
-        highlight.style.display = 'none';
-        backdrop.classList.add('show');
-      }
+      this.repositionCardForStep(step, card, highlight, backdrop);
+      this.bindMediaReflow(step, card, highlight, backdrop);
 
       // 显示卡片
       setTimeout(() => {
@@ -557,9 +597,77 @@ const ASGOnboarding = {
     }, 200);
   },
 
+  renderStepContent(step) {
+    const baseContent = step && typeof step.content === 'string' ? step.content : ''
+    const media = Array.isArray(step && step.media) ? step.media : []
+    if (!media.length) return baseContent
+
+    const mediaHtml = media.map(item => {
+      if (!item || !item.src) return ''
+      const alt = this.escapeHtml(item.alt || '')
+      const caption = this.escapeHtml(item.caption || '')
+      return `
+        <figure class="onboarding-media-item">
+          <img src="${item.src}" alt="${alt}">
+          ${caption ? `<figcaption>${caption}</figcaption>` : ''}
+        </figure>
+      `
+    }).join('')
+
+    return `${baseContent}<div class="onboarding-media">${mediaHtml}</div>`
+  },
+
+  escapeHtml(text) {
+    const div = document.createElement('div')
+    div.textContent = text == null ? '' : String(text)
+    return div.innerHTML
+  },
+
+  bindMediaReflow(step, card, highlight, backdrop) {
+    const images = Array.from(card.querySelectorAll('.onboarding-media-item img'))
+    images.forEach(img => {
+      const handle = () => {
+        window.requestAnimationFrame(() => {
+          this.repositionCardForStep(step, card, highlight, backdrop)
+        })
+      }
+      if (!img.complete) {
+        img.addEventListener('load', handle, { once: true })
+        img.addEventListener('error', handle, { once: true })
+      }
+    })
+  },
+
+  repositionCardForStep(step, card, highlight, backdrop) {
+    if (step.target && step.highlight) {
+      const targetEl = document.querySelector(step.target)
+      if (targetEl) {
+        if (targetEl.scrollIntoView) {
+          targetEl.scrollIntoView({ block: step.scrollBlock || 'center', inline: 'nearest' })
+        }
+        const rect = targetEl.getBoundingClientRect()
+        const padding = 8
+
+        highlight.style.display = 'block'
+        highlight.style.left = (rect.left - padding) + 'px'
+        highlight.style.top = (rect.top - padding) + 'px'
+        highlight.style.width = (rect.width + padding * 2) + 'px'
+        highlight.style.height = (rect.height + padding * 2) + 'px'
+
+        backdrop.classList.remove('show')
+        this.positionCard(card, rect, step.position)
+        return
+      }
+    }
+
+    this.centerCard(card)
+    highlight.style.display = 'none'
+    backdrop.classList.add('show')
+  },
+
   // 定位卡片相对于目标元素
   positionCard(card, targetRect, position) {
-    const cardWidth = 420;
+    const cardWidth = Math.min(card.offsetWidth || 640, window.innerWidth - 40);
     const cardHeight = card.offsetHeight || 350;
     const padding = 20;
 
@@ -623,6 +731,26 @@ const ASGOnboarding = {
     if (oldArrow) oldArrow.remove();
   },
 
+  prepareStepContext(step) {
+    if (!step) return;
+
+    if (step.viewId && typeof switchView === 'function') {
+      try {
+        switchView(step.viewId);
+      } catch (error) {
+        console.warn('[ASG Onboarding] 切换视图失败:', error);
+      }
+    }
+
+    if (step.settingTab && typeof switchSettingTab === 'function') {
+      try {
+        switchSettingTab(step.settingTab);
+      } catch (error) {
+        console.warn('[ASG Onboarding] 切换设置标签失败:', error);
+      }
+    }
+  },
+
   // 下一步
   next() {
     if (this.currentStep < this.steps.length - 1) {
@@ -638,111 +766,123 @@ const ASGOnboarding = {
   },
 
   // 跳过引导
-  skip() {
-    if (confirm('确定要跳过新手引导吗？\n\n您可以随时在设置中重新开始引导。')) {
-      this.complete();
-    }
+  async skip() {
+    if (!confirm('确定要跳过主页面教程吗？')) return
+    await this.finish('skipped')
   },
 
   // 完成引导
-  complete() {
-    localStorage.setItem(this.STORAGE_KEY, 'true');
-    localStorage.removeItem(this.CURRENT_STEP_KEY);
+  async complete() {
+    await this.finish('completed')
+  },
 
+  closeOverlay() {
     const overlay = document.getElementById('asg-onboarding-overlay');
     const card = document.getElementById('asg-onboarding-card');
     const backdrop = document.getElementById('asg-onboarding-backdrop');
 
-    card.classList.remove('show');
-    backdrop.classList.remove('show');
+    if (card) card.classList.remove('show');
+    if (backdrop) backdrop.classList.remove('show');
 
     setTimeout(() => {
       if (overlay) overlay.remove();
     }, 400);
+  },
 
-    // 显示完成提示
+  async markSeen(status) {
+    try {
+      if (window.electronAPI && typeof window.electronAPI.markMainOnboardingSeen === 'function') {
+        await window.electronAPI.markMainOnboardingSeen(status)
+      }
+    } catch (error) {
+      console.warn('[ASG Onboarding] 写入 OKTeach.txt 失败:', error)
+    }
+  },
+
+  async finish(status) {
+    localStorage.setItem(this.STORAGE_KEY, 'true');
+    localStorage.removeItem(this.CURRENT_STEP_KEY);
+    await this.markSeen(status)
+    this.closeOverlay()
+
     if (typeof showStatus === 'function') {
-      showStatus('🎉 新手引导完成！祝您使用愉快！', 'success');
+      if (status === 'skipped') {
+        showStatus('已跳过主页面教程。如果有不懂的内容，可以点击左下角的 ❓ 重新查看教程。', 'info');
+      } else {
+        showStatus('主页面教程已完成。以后如果有不懂的内容，可以点击左下角的 ❓ 重新查看教程。', 'success');
+      }
     }
   },
 
   // ----------------------------------------------------------------------
-  // MMD 模型配置专属教程
+  // 3D 角色展示专属教程（兼容旧的 startMMDTutorial 调用）
   // ----------------------------------------------------------------------
-  mmdSteps: [
+  model3dSteps: [
     {
-      id: 'mmd-intro',
-      title: '配置 3D MMD 模型 💃',
+      id: 'model3d-intro',
+      title: '3D 角色展示入口',
       content: `
-              <p>Idvevent Director 支持加载精美的 MMD (MikuMikuDance) 模型！</p>
-              <p>为了让他动起来，您需要准备两个重要的资源目录：</p>
+              <p>新的 <strong>角色模型3D展示</strong> 已经是独立工作流。</p>
+              <p>先在这里完成模型资源检查，再进入 3D 窗口做场景编辑。</p>
               <ul style="margin:10px 0; padding-left:20px; line-height:1.6;">
-                <li><strong>模型文件 (.pmx)</strong>：角色的 3D 模型文件</li>
-                <li><strong>动作文件 (.vmd)</strong>：让角色动起来的动作数据</li>
+                <li>入口：设置中心 → 3D 模型</li>
+                <li>先检测官方模型资源，再打开 3D 展示窗口</li>
+                <li>OBS 最终通过窗口捕获拿到 3D 画面</li>
               </ul>
-              <div style="font-size:12px; color:#aaa; margin-top:10px;">
-                💡 提示：目前仅支持 PMX 格式的模型文件。
-              </div>
             `,
       target: '#model3dSettingsCard',
-      position: 'center',
-      highlight: true
-    },
-    {
-      id: 'mmd-survivor',
-      title: '1. 设置求生者模型目录 🏃‍♀️',
-      content: `
-              <p>请点击文件夹图标，选择存放<strong>求生者模型</strong>的文件夹。</p>
-              <p>文件夹结构建议：</p>
-              <pre style="background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; font-size:11px; margin:6px 0;">
-📂 Survivors/
-  📂 Doctor/
-    📄 doctor.pmx
-    📂 tex/
-  📂 Gardener/
-    📄 gardener.pmx</pre>
-              <p style="font-size:12px; color:#aaa;">系统会自动扫描该目录下的所有 .pmx 文件。</p>
-            `,
-      target: '#survivorModelDir',
-      position: 'bottom',
-      highlight: true
-    },
-    {
-      id: 'mmd-hunter',
-      title: '2. 设置监管者模型目录 👹',
-      content: `
-              <p>同样地，选择存放<strong>监管者模型</strong>的文件夹。</p>
-              <p>请确保模型文件的贴图路径正确，否则可能会导致模型显示为全白。</p>
-            `,
-      target: '#hunterModelDir',
-      position: 'bottom',
-      highlight: true
-    },
-    {
-      id: 'mmd-motion',
-      title: '3. 设置待机动作 🎬',
-      content: `
-              <p>选择存放<strong>动作文件 (.vmd)</strong> 的目录。</p>
-              <p>系统会从中随机选择动作作为待机动画，让角色在 BP 界面上生动地站立！</p>
-            `,
-      target: '#survivorMotionDir',
-      position: 'bottom',
-      highlight: true
-    },
-    {
-      id: 'mmd-apply',
-      title: '4. 保存并应用 ✅',
-      content: `
-              <p>配置完成后，别忘了点击底部的 <strong>"保存并应用"</strong> 按钮。</p>
-              <p>如果有红字报错，请检查控制台或日志，通常是因为文件路径包含特殊字符或文件损坏。</p>
-            `,
-      target: 'button[onclick="applyModel3dSettings(true)"]',
       position: 'top',
-      highlight: true
+      highlight: true,
+      viewId: 'settings',
+      settingTab: '3d'
+    },
+    {
+      id: 'model3d-download',
+      title: '1. 先准备模型资源',
+      content: `
+              <p>第一次使用时，优先点 <strong>“检测/下载官方模型”</strong>。</p>
+              <p>如果本机还没有模型资源，打开 3D 展示窗口前会提示下载。</p>
+              <p style="font-size:12px; color:#aaa;">这样可以避免开窗后才发现模型缺失。</p>
+            `,
+      target: 'button[onclick="checkOfficialModelsAndDownloadFromSettings()"]',
+      position: 'bottom',
+      highlight: true,
+      viewId: 'settings',
+      settingTab: '3d'
+    },
+    {
+      id: 'model3d-open',
+      title: '2. 打开 3D 角色展示窗口',
+      content: `
+              <p>点击 <strong>“打开角色模型3D展示”</strong> 进入独立的 3D 编辑与渲染窗口。</p>
+              <p>场景、灯光、镜头、视频屏幕、摄像头屏幕等操作都在那个窗口完成。</p>
+            `,
+      target: 'button[onclick="openCharacterModel3DFromSettings()"]',
+      position: 'bottom',
+      highlight: true,
+      viewId: 'settings',
+      settingTab: '3d'
+    },
+    {
+      id: 'model3d-obs',
+      title: '3. 在 OBS 中捕获 3D 窗口',
+      content: `
+              <p>3D 展示不是本地页面 URL，它走的是<strong>窗口捕获</strong>。</p>
+              <ul style="margin:10px 0; padding-left:20px; line-height:1.6;">
+                <li>OBS → 来源 → + → 窗口捕获</li>
+                <li>窗口选择“角色模型3D展示”</li>
+                <li>需要透明演出时，再按你的场景做裁切或透明处理</li>
+              </ul>
+            `,
+      target: '#model3dSettingsCard',
+      position: 'top',
+      highlight: true,
+      viewId: 'settings',
+      settingTab: '3d'
     }
   ],
 
-  startMMDTutorial() {
+  startModel3DTutorial() {
     // 先切换到3D Tab
     if (typeof switchSettingTab === 'function') {
       switchSettingTab('3d');
@@ -756,8 +896,8 @@ const ASGOnboarding = {
     const originalSteps = this.steps;
     const originalStepIndex = this.currentStep;
 
-    // 临时替换为 MMD 步骤
-    this.steps = this.mmdSteps;
+    // 临时替换为 3D 步骤
+    this.steps = this.model3dSteps;
     this.createUI(); // 重建UI
 
     // 启动引导
@@ -777,26 +917,25 @@ const ASGOnboarding = {
 
     // 劫持 exit 方法
     const originalComplete = this.complete.bind(this);
+    const originalSkip = this.skip.bind(this);
     this.complete = () => {
-      originalComplete();
+      this.closeOverlay();
       restore();
       // 恢复原始 complete 方法
       this.complete = originalComplete;
-    };
-
-    const originalSkip = this.skip.bind(this);
-    this.skip = () => {
-      // 这里我们不需要 confirm，直接跳过并恢复
-      document.getElementById('asg-onboarding-card').classList.remove('show');
-      document.getElementById('asg-onboarding-backdrop').classList.remove('show');
-      setTimeout(() => {
-        if (document.getElementById('asg-onboarding-overlay'))
-          document.getElementById('asg-onboarding-overlay').remove();
-      }, 400);
-
-      restore();
       this.skip = originalSkip;
     };
+
+    this.skip = () => {
+      this.closeOverlay();
+      restore();
+      this.skip = originalSkip;
+      this.complete = originalComplete;
+    };
+  },
+
+  startMMDTutorial() {
+    return this.startModel3DTutorial();
   },
 
   // 快捷操作
@@ -819,25 +958,77 @@ const ASGOnboarding = {
             }
           }, 300);
           break;
+        case 'settings3d':
+          if (typeof switchView === 'function') {
+            switchView('settings');
+          }
+          setTimeout(() => {
+            if (typeof switchSettingTab === 'function') {
+              switchSettingTab('3d');
+            }
+          }, 150);
+          break;
       }
     }, 100);
   },
 
-  // 检查是否需要显示引导
-  shouldShow() {
+  async openLocalBpGuide() {
+    try {
+      const result = await (window.electronAPI?.openLocalBpGuide?.() || window.electronAPI?.invoke?.('open-local-bp-guide'))
+      if (!result || !result.success) {
+        throw new Error(result?.error || '打开本地BP教程失败')
+      }
+      if (typeof showStatus === 'function') {
+        showStatus('本地BP教程窗口已打开。', 'success')
+      }
+    } catch (error) {
+      if (typeof showStatus === 'function') {
+        showStatus(`打开失败: ${error?.message || error}`, 'error')
+      }
+    }
+  },
+
+  openModel3DGuide() {
+    if (typeof switchView === 'function') {
+      switchView('settings')
+    }
+    setTimeout(() => {
+      if (typeof this.startModel3DTutorial === 'function') {
+        this.startModel3DTutorial()
+      }
+    }, 180)
+  },
+
+  async shouldShow() {
+    try {
+      if (window.electronAPI && typeof window.electronAPI.getMainOnboardingStatus === 'function') {
+        const status = await window.electronAPI.getMainOnboardingStatus()
+        if (status && status.success) return !!status.shouldShow
+      }
+    } catch (error) {
+      console.warn('[ASG Onboarding] 读取 OKTeach.txt 状态失败:', error)
+    }
     return localStorage.getItem(this.STORAGE_KEY) !== 'true';
   },
 
   // 重置引导（用于测试或用户手动触发）
-  reset() {
+  async reset(options = {}) {
+    if (options.clearSeenFile && window.electronAPI && typeof window.electronAPI.resetMainOnboardingSeen === 'function') {
+      try {
+        await window.electronAPI.resetMainOnboardingSeen()
+      } catch (error) {
+        console.warn('[ASG Onboarding] 删除 OKTeach.txt 失败:', error)
+      }
+    }
     localStorage.removeItem(this.STORAGE_KEY);
     localStorage.removeItem(this.CURRENT_STEP_KEY);
     console.log('[Idvevent Onboarding] 引导已重置');
   },
 
   // 启动引导
-  start() {
-    if (!this.shouldShow()) {
+  async start(options = {}) {
+    const force = !!(options && options.force)
+    if (!force && !(await this.shouldShow())) {
       console.log('[ASG Onboarding] 用户已完成引导，跳过');
       return false;
     }
@@ -868,9 +1059,9 @@ const ASGOnboarding = {
   },
 
   // 强制启动（忽略已完成状态）
-  forceStart() {
-    this.reset();
-    this.start();
+  async forceStart() {
+    localStorage.removeItem(this.CURRENT_STEP_KEY);
+    await this.start({ force: true });
   }
 };
 
@@ -881,7 +1072,11 @@ window.ASGOnboarding = ASGOnboarding;
 // 页面加载完成后自动检查并启动
 document.addEventListener('DOMContentLoaded', () => {
   // 延迟启动以确保页面完全加载
-  setTimeout(() => {
-    // ASGOnboarding.start(); // User requested manual start only
+  setTimeout(async () => {
+    try {
+      await ASGOnboarding.start()
+    } catch (error) {
+      console.warn('[ASG Onboarding] 自动启动失败:', error)
+    }
   }, 1000);
 });

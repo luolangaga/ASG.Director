@@ -826,6 +826,7 @@ async function init() {
   window.electronAPI.onRoomData(async (data) => {
     console.log('收到房间数据:', data)
     roomData = data
+    customComponentTemplateEventData = Object.assign({}, customComponentTemplateEventData, data || {})
 
     // 显示队伍名称和logo
     if (roomData.teamAName) {
@@ -873,9 +874,11 @@ async function init() {
       } catch (e) {
         console.warn('[Frontend] 初始化拉取本地BP状态失败:', e?.message || e)
       }
+      refreshCustomComponentsByTemplate(data)
       return
     }
 
+    refreshCustomComponentsByTemplate(data)
     connectToServer()
   })
 
@@ -1114,6 +1117,149 @@ async function loadPluginWidgets() {
 
 // ========= 用户自定义组件系统 =========
 let customComponentsLoaded = []
+let customComponentTemplateState = null
+let customComponentTemplateEventData = {}
+
+function escapeCustomComponentAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+}
+
+function getCustomComponentTemplateValue(obj, pathExpr) {
+  const source = (obj && typeof obj === 'object') ? obj : null
+  if (!source || !pathExpr) return undefined
+  const parts = String(pathExpr).split('.')
+  let cursor = source
+  for (const part of parts) {
+    if (cursor == null) return undefined
+    cursor = cursor[part]
+  }
+  return cursor
+}
+
+function buildCustomComponentTemplateVars(eventData = {}) {
+  const state = (customComponentTemplateState && typeof customComponentTemplateState === 'object') ? customComponentTemplateState : {}
+  const roundData = (state.currentRoundData && typeof state.currentRoundData === 'object') ? state.currentRoundData : {}
+  const survivors = Array.isArray(roundData.selectedSurvivors)
+    ? roundData.selectedSurvivors
+    : (Array.isArray(state.survivors) ? state.survivors : [])
+  const bannedSurvivors = Array.isArray(roundData.hunterBannedSurvivors)
+    ? roundData.hunterBannedSurvivors
+    : (Array.isArray(state.hunterBannedSurvivors) ? state.hunterBannedSurvivors : [])
+  const bannedHunters = Array.isArray(roundData.survivorBannedHunters)
+    ? roundData.survivorBannedHunters
+    : (Array.isArray(state.survivorBannedHunters) ? state.survivorBannedHunters : [])
+  const teamAName = roomData?.teamAName || state?.teamA?.name || ''
+  const teamBName = roomData?.teamBName || state?.teamB?.name || ''
+  const mapName = state.currentMap || state.mapName || ''
+  const hunter = roundData.selectedHunter || state.hunter || ''
+
+  return {
+    timestamp: Date.now(),
+    roomId: roomData?.roomId || '',
+    roomName: roomData?.roomName || roomData?.roomId || '',
+    roomStatus: roomData?.status || '',
+    mapName,
+    currentMap: mapName,
+    bpHunter: hunter,
+    selectedHunter: hunter,
+    bpSurvivors: survivors,
+    'bpSurvivors.0': survivors[0] || '',
+    'bpSurvivors.1': survivors[1] || '',
+    'bpSurvivors.2': survivors[2] || '',
+    'bpSurvivors.3': survivors[3] || '',
+    bpSurvivorsText: survivors.filter(Boolean).join(', '),
+    bpBannedSurvivors: bannedSurvivors,
+    bpBannedHunters: bannedHunters,
+    bpBannedSurvivorsText: bannedSurvivors.filter(Boolean).join(', '),
+    bpBannedHuntersText: bannedHunters.filter(Boolean).join(', '),
+    bpTeamA: teamAName,
+    bpTeamB: teamBName,
+    localTeamA: teamAName,
+    localTeamB: teamBName,
+    teamAName,
+    teamBName,
+    matchTitle: teamAName && teamBName ? `${teamAName} vs ${teamBName}` : ''
+  }
+}
+
+function resolveCustomComponentTemplate(template, eventData = customComponentTemplateEventData) {
+  if (typeof template !== 'string' || !template) return ''
+  const vars = buildCustomComponentTemplateVars(eventData)
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, rawPath) => {
+    const path = String(rawPath || '').trim()
+    if (!path) return ''
+    if (path.startsWith('eventData.')) {
+      return getCustomComponentTemplateValue(eventData, path.slice(10)) ?? ''
+    }
+    if (Object.prototype.hasOwnProperty.call(vars, path)) {
+      return vars[path] ?? ''
+    }
+    return getCustomComponentTemplateValue(vars, path) ?? ''
+  })
+}
+
+function applyCustomComponentContent(container, comp, eventData = customComponentTemplateEventData) {
+  const content = container.querySelector('.custom-component-content')
+  if (!content) return
+
+  const styleId = `custom-css-${comp.id}`
+  let styleEl = document.getElementById(styleId)
+  if (comp.customCss) {
+    if (!styleEl) {
+      styleEl = document.createElement('style')
+      styleEl.id = styleId
+      document.head.appendChild(styleEl)
+    }
+    styleEl.textContent = resolveCustomComponentTemplate(comp.customCss, eventData)
+  } else if (styleEl) {
+    styleEl.remove()
+  }
+
+  let htmlContent = resolveCustomComponentTemplate(
+    comp.html || '<div style="padding: 10px; color: #aaa;">空组件</div>',
+    eventData
+  )
+
+  if (comp.type === 'image') {
+    const imgFit = comp.objectFit || 'contain'
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = htmlContent
+    const img = tempDiv.querySelector('img')
+    if (img) {
+      img.style.width = '100%'
+      img.style.height = '100%'
+      img.style.objectFit = imgFit
+      img.style.display = 'block'
+      if ((!img.getAttribute('src') || img.getAttribute('src').includes('{{')) && comp.imageData) {
+        img.setAttribute('src', comp.imageData)
+      }
+      htmlContent = tempDiv.innerHTML
+    } else if (comp.imageData || comp.imageUrl) {
+      const src = resolveCustomComponentTemplate(comp.imageData || comp.imageUrl || '', eventData)
+      htmlContent = src
+        ? `<img src="${escapeCustomComponentAttr(src)}" style="width: 100%; height: 100%; object-fit: ${imgFit}; display: block;" draggable="false" />`
+        : '<div style="padding:20px;color:#aaa;text-align:center;">暂无图片</div>'
+    }
+  }
+
+  content.innerHTML = htmlContent
+}
+
+function refreshCustomComponentsByTemplate(eventData = customComponentTemplateEventData) {
+  customComponentTemplateEventData = (eventData && typeof eventData === 'object')
+    ? Object.assign({}, customComponentTemplateEventData, eventData)
+    : customComponentTemplateEventData
+  customComponentsLoaded
+    .filter(c => c && c.targetPages && c.targetPages.includes('frontend'))
+    .forEach(comp => {
+      const container = document.getElementById(comp.id)
+      if (!container) return
+      applyCustomComponentContent(container, comp, customComponentTemplateEventData)
+    })
+}
 
 // 加载用户自定义组件
 async function loadCustomComponents() {
@@ -1199,9 +1345,6 @@ function createCustomComponent(comp) {
   if (document.getElementById(comp.id)) {
     console.log(`[Frontend] 组件 ${comp.id} 已存在，更新内容`)
     const container = document.getElementById(comp.id)
-    const content = container.querySelector('.custom-component-content')
-    if (content) content.innerHTML = comp.html || ''
-
     // 更新布局位置
     const layoutPos = currentLayout[comp.id]
     if (layoutPos) {
@@ -1211,6 +1354,7 @@ function createCustomComponent(comp) {
       container.style.width = layoutPos.width + 'px'
       if (layoutPos.height !== 'auto' && layoutPos.height) container.style.height = layoutPos.height + 'px'
     }
+    applyCustomComponentContent(container, comp, customComponentTemplateEventData)
     return
   }
 
@@ -1272,63 +1416,9 @@ function createCustomComponent(comp) {
   const content = document.createElement('div')
   content.className = 'custom-component-content'
   content.style.cssText = 'width: 100%; height: 100%; overflow: hidden;'
-
-  // 如果有自定义CSS，添加到页面
-  if (comp.customCss) {
-    const styleId = `custom-css-${comp.id}`
-    let styleEl = document.getElementById(styleId)
-    if (!styleEl) {
-      styleEl = document.createElement('style')
-      styleEl.id = styleId
-      document.head.appendChild(styleEl)
-    }
-    styleEl.textContent = comp.customCss
-  }
-
-  // 处理内容和图片修复
-  let htmlContent = comp.html || '<div style="padding: 10px; color: #aaa;">空组件</div>'
-
-  // 对于图片组件，进行更严格的检查和修复，并强制跟随容器大小
-  if (comp.type === 'image') {
-    console.log(`[Frontend] 处理图片组件，imageData 长度: ${comp.imageData ? comp.imageData.length : 0}`)
-
-    // 强制使用 100% 宽高，跟随容器
-    const imgWidth = '100%'
-    const imgHeight = '100%'
-    const imgFit = comp.objectFit || 'contain'
-
-    // 检查是否需要修复 HTML
-    const needsFix = !htmlContent.includes('<img') ||
-      htmlContent.includes('src=""') ||
-      htmlContent.includes('src="undefined"') ||
-      htmlContent.includes('src="null"')
-
-    // 哪怕不需要修复 HTML，我们也要强制修改 IMG 的样式
-    // 创建一个临时容器来解析 HTML
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = htmlContent
-    const img = tempDiv.querySelector('img')
-
-    if (img) {
-      // 找到了 img 标签，重置其样式
-      img.style.width = '100%'
-      img.style.height = '100%'
-      img.style.objectFit = imgFit
-      img.style.display = 'block'
-      // 如果 src 有问题且有 imageData，修复它
-      if ((!img.src || img.src.includes('null') || img.src.includes('undefined')) && comp.imageData) {
-        img.src = comp.imageData
-      }
-      htmlContent = tempDiv.innerHTML
-    } else if (comp.imageData || comp.imageUrl) {
-      // 没找到 img 标签（或者 needsFix 为 true），重建它
-      const src = comp.imageData || comp.imageUrl
-      htmlContent = `<img src="${src}" style="width: 100%; height: 100%; object-fit: ${imgFit}; display: block;" draggable="false" />`
-    }
-  }
-
-  content.innerHTML = htmlContent
+  content.innerHTML = ''
   container.appendChild(content)
+  applyCustomComponentContent(container, comp, customComponentTemplateEventData)
 
   // 添加调整大小手柄
   const handles = ['nw', 'ne', 'sw', 'se']
@@ -3044,6 +3134,7 @@ function showPopup(type, icon, title, text, team, duration = 3) {
 let isFirstDisplayUpdate = true
 function updateDisplay(state) {
   if (!state) return
+  customComponentTemplateState = state
 
   // 地图图片资源列表（异步加载一次，用于更稳健的匹配）
   if (__mapAssetNames == null) {
@@ -3389,6 +3480,7 @@ function updateDisplay(state) {
     applyImageFitToContainer(globalBanHuntersContainer)
   }
   isFirstDisplayUpdate = false
+  refreshCustomComponentsByTemplate(state)
 }
 
 // ========= 地图图片展示（assets/map） =========
