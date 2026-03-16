@@ -76,8 +76,15 @@
       "backgroundColor": "#FFFFFF"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns"
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/macos/entitlements.mac.plist",
+      "entitlementsInherit": "assets/macos/entitlements.mac.inherit.plist"
     },
     "files": [
       "main.js",

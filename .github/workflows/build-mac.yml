@@ -55,12 +55,44 @@ jobs:
         run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If signing secrets are missing, force unsigned build instead of producing a partially-signed broken app.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
+          # macOS codesign (Developer ID Application certificate in .p12)
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # macOS notarization (Apple account API)
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Verify generated macOS installers are valid
+        run: |
+          set -euo pipefail
+          ls -lah dist
+
+          dmg_file=$(find dist -maxdepth 1 -name '*.dmg' | head -n1)
+          if [ -z "$dmg_file" ]; then
+            echo "No DMG generated"
+            exit 1
+          fi
+
+          echo "Checking DMG: $dmg_file"
+          hdiutil verify "$dmg_file"
+
+          # Keep ZIP artifact as a fallback channel for users who still encounter DMG issues.
+          zip_file=$(find dist -maxdepth 1 -name '*.zip' | head -n1 || true)
+          if [ -n "${zip_file:-}" ]; then
+            echo "Checking ZIP: $zip_file"
+            unzip -t "$zip_file"
+          fi
 
       - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mac-build
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/*.zip
           retention-days: 5
 
   build-windows:
@@ -118,4 +150,5 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/*.dmg
+            release-assets/*.zip
             release-assets/*.exe
