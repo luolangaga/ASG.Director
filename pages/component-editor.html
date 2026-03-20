@@ -129,6 +129,7 @@
                     <select class="property-input" id="propType" disabled>
                         <option value="text">📝 文本</option>
                         <option value="image">🖼️ 图片</option>
+                        <option value="ban-list">🚫 Ban位列表</option>
                         <option value="html">🌐 自定义 HTML</option>
                     </select>
                 </div>
@@ -230,6 +231,102 @@
                     <label class="property-label">自定义样式 (CSS)</label>
                     <textarea class="property-input" id="propCustomCss" rows="4"
                         placeholder=".my-class { color: red; }"></textarea>
+                </div>
+            </div>
+
+            <!-- Ban 列表类型属性 -->
+            <div class="properties-section" id="banListProperties" style="display: none;">
+                <div class="properties-section-title">Ban位列表设置</div>
+                <div class="property-group">
+                    <label class="property-label">数据源</label>
+                    <select class="property-input" id="propBanSource">
+                        <option value="localSurvivor">对接Ban - 求生者</option>
+                        <option value="localHunter">对接Ban - 监管者</option>
+                        <option value="globalSurvivor">全局Ban - 求生者</option>
+                        <option value="globalHunter">全局Ban - 监管者</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">图片引用</label>
+                    <select class="property-input" id="propBanImageVariant">
+                        <option value="header">头像</option>
+                        <option value="half">半身图</option>
+                        <option value="big">立绘</option>
+                    </select>
+                </div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">每行最多</label>
+                        <input type="number" class="property-input" id="propBanMaxPerRow" value="4" min="1" max="12">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">项尺寸</label>
+                        <input type="number" class="property-input" id="propBanItemSize" value="72" min="24" max="200">
+                    </div>
+                </div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">项间距</label>
+                        <input type="number" class="property-input" id="propBanItemGap" value="10" min="0" max="80">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">行间距</label>
+                        <input type="number" class="property-input" id="propBanRowGap" value="10" min="0" max="80">
+                    </div>
+                </div>
+                <div class="property-row">
+                    <div class="property-group">
+                        <label class="property-label">图片宽度</label>
+                        <input type="text" class="property-input" id="propBanImageWidth" value="100%" placeholder="100% / 72px / auto">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">图片高度</label>
+                        <input type="text" class="property-input" id="propBanImageHeight" value="100%" placeholder="100% / 72px / auto">
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">图片填充方式</label>
+                    <select class="property-input" id="propBanImageFit">
+                        <option value="contain">包含 (contain)</option>
+                        <option value="cover">覆盖 (cover)</option>
+                        <option value="fill">拉伸 (fill)</option>
+                        <option value="none">原始 (none)</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label class="target-page-item" style="padding: 10px 12px;">
+                        <input type="checkbox" id="propBanUseGrayscale" checked>
+                        <span class="target-page-name">启用黑白滤镜</span>
+                    </label>
+                </div>
+                <div class="property-group">
+                    <label class="property-label">覆盖层</label>
+                    <select class="property-input" id="propBanOverlayType">
+                        <option value="slash">红色斜线</option>
+                        <option value="image">自定义图片</option>
+                        <option value="none">无</option>
+                    </select>
+                </div>
+                <div class="property-group" id="banOverlayImageGroup">
+                    <label class="property-label">覆盖图片</label>
+                    <div class="image-picker">
+                        <div class="image-preview" id="banOverlayImagePreview">
+                            <span class="image-preview-placeholder">暂无覆盖图</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="selectBanOverlayImage()" style="flex: 1;">📁
+                                选择覆盖图</button>
+                            <button class="btn btn-ghost btn-sm" onclick="clearBanOverlayImage()">清除</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="property-group" id="banOverlayImageUrlGroup">
+                    <label class="property-label">或输入覆盖图 URL / 内部资源</label>
+                    <input type="text" class="property-input" id="propBanOverlayImageUrl"
+                        placeholder="https://... / asg:///... / data:image/...">
+                </div>
+                <div class="property-label">
+                    会按 BP 前台内置 Ban 位样式渲染，并随 BP 状态自动更新。自定义覆盖图会写入组件数据，导出/导入组件包时一起带走。
                 </div>
             </div>
 
@@ -363,6 +460,10 @@
                     <div class="type-option" data-type="image">
                         <span class="type-option-icon">🖼️</span>
                         <span class="type-option-name">图片</span>
+                    </div>
+                    <div class="type-option" data-type="ban-list">
+                        <span class="type-option-icon">🚫</span>
+                        <span class="type-option-name">Ban位列表</span>
                     </div>
                     <div class="type-option" data-type="html">
                         <span class="type-option-icon">🌐</span>

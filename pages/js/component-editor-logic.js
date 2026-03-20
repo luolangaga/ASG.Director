@@ -41,6 +41,27 @@ const PREVIEW_TEMPLATE_VARS = {
   timestamp: Date.now()
 }
 
+const COMPONENT_TYPE_META = {
+  text: { icon: '📝', label: '文本' },
+  image: { icon: '🖼️', label: '图片' },
+  'ban-list': { icon: '🚫', label: 'Ban位列表' },
+  html: { icon: '🌐', label: 'HTML' }
+}
+
+const BAN_SOURCE_OPTIONS = {
+  localSurvivor: '对接Ban - 求生者',
+  localHunter: '对接Ban - 监管者',
+  globalSurvivor: '全局Ban - 求生者',
+  globalHunter: '全局Ban - 监管者'
+}
+
+const PREVIEW_BAN_DATA = {
+  localSurvivor: ['先知', '祭司'],
+  localHunter: ['梦之女巫', '歌剧演员'],
+  globalSurvivor: ['园丁', '佣兵', '机械师'],
+  globalHunter: ['红蝶', '渔女']
+}
+
 const COMPONENT_TRIGGER_DEFS = [
   { value: 'component:init', label: '组件加载完成' },
   { value: 'component:click', label: '组件被点击' },
@@ -113,6 +134,215 @@ function showToast(message, type = 'info') {
   toast.className = 'toast ' + type
   toast.classList.add('show')
   setTimeout(() => toast.classList.remove('show'), 2500)
+}
+
+function getComponentTypeMeta(type) {
+  return COMPONENT_TYPE_META[type] || { icon: '📦', label: '组件' }
+}
+
+function clampNumber(value, min, max, fallback) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return fallback
+  return Math.min(max, Math.max(min, Math.round(num)))
+}
+
+function normalizeBanListSource(value) {
+  return Object.prototype.hasOwnProperty.call(BAN_SOURCE_OPTIONS, value) ? value : 'localSurvivor'
+}
+
+function getBanListDefaults(source) {
+  const normalizedSource = normalizeBanListSource(source)
+  const defaults = normalizedSource.startsWith('global')
+    ? { maxPerRow: normalizedSource === 'globalSurvivor' ? 5 : 4, itemSize: 62, itemGap: 8, rowGap: 8 }
+    : { maxPerRow: 4, itemSize: 72, itemGap: 10, rowGap: 10 }
+  return Object.assign({ source: normalizedSource }, defaults)
+}
+
+function normalizeBanOverlayType(value) {
+  return ['none', 'slash', 'image'].includes(value) ? value : 'slash'
+}
+
+function normalizeBanImageVariant(value) {
+  return ['header', 'half', 'big'].includes(value) ? value : 'header'
+}
+
+function getBanImageDefaults(variant) {
+  const normalizedVariant = normalizeBanImageVariant(variant)
+  if (normalizedVariant === 'half') {
+    return { variant: normalizedVariant, width: '88%', height: '100%', fit: 'contain' }
+  }
+  if (normalizedVariant === 'big') {
+    return { variant: normalizedVariant, width: '100%', height: '100%', fit: 'contain' }
+  }
+  return { variant: normalizedVariant, width: '100%', height: '100%', fit: 'contain' }
+}
+
+function buildBanListComponentDraft(source = 'localSurvivor') {
+  const defaults = getBanListDefaults(source)
+  const imageDefaults = getBanImageDefaults('header')
+  return {
+    banSource: defaults.source,
+    banMaxPerRow: defaults.maxPerRow,
+    banItemSize: defaults.itemSize,
+    banItemGap: defaults.itemGap,
+    banRowGap: defaults.rowGap,
+    banImageVariant: imageDefaults.variant,
+    banImageWidth: imageDefaults.width,
+    banImageHeight: imageDefaults.height,
+    banImageFit: imageDefaults.fit,
+    banUseGrayscale: true,
+    banOverlayType: 'slash',
+    banOverlayImageData: '',
+    banOverlayImageUrl: ''
+  }
+}
+
+function resolvePreviewBanItems(source) {
+  return PREVIEW_BAN_DATA[normalizeBanListSource(source)] || PREVIEW_BAN_DATA.localSurvivor
+}
+
+function getBanOverlayImageSource(comp, options = {}) {
+  return getComponentImageSource({
+    imageData: comp && comp.banOverlayImageData,
+    imageUrl: comp && comp.banOverlayImageUrl
+  }, options)
+}
+
+function generateBanListHtml(comp, options = {}) {
+  const source = normalizeBanListSource(comp && comp.banSource)
+  const defaults = getBanListDefaults(source)
+  const imageDefaults = getBanImageDefaults(comp && comp.banImageVariant)
+  const maxPerRow = clampNumber(comp && comp.banMaxPerRow, 1, 12, defaults.maxPerRow)
+  const itemSize = clampNumber(comp && comp.banItemSize, 24, 200, defaults.itemSize)
+  const itemGap = clampNumber(comp && comp.banItemGap, 0, 80, defaults.itemGap)
+  const rowGap = clampNumber(comp && comp.banRowGap, 0, 80, defaults.rowGap)
+  const imageVariant = normalizeBanImageVariant(comp && comp.banImageVariant)
+  const imageWidth = (comp && comp.banImageWidth) || imageDefaults.width
+  const imageHeight = (comp && comp.banImageHeight) || imageDefaults.height
+  const imageFit = (comp && comp.banImageFit) || imageDefaults.fit
+  const useGrayscale = comp && comp.banUseGrayscale !== false
+  const overlayType = normalizeBanOverlayType(comp && comp.banOverlayType)
+  const overlaySrc = overlayType === 'image'
+    ? getBanOverlayImageSource(comp, {
+      resolveTemplates: true,
+      vars: options.vars || PREVIEW_TEMPLATE_VARS,
+      eventData: options.eventData || PREVIEW_TEMPLATE_VARS
+    })
+    : ''
+  const variant = source.startsWith('global') ? 'global' : 'local'
+  const items = Array.isArray(options.items) && options.items.length ? options.items : resolvePreviewBanItems(source)
+  const slashColor = variant === 'global' ? '#9c27b0' : '#ff4444'
+  const borderColor = variant === 'global' ? 'rgba(156, 39, 176, 0.55)' : 'rgba(255, 255, 255, 0.32)'
+  const itemBackground = variant === 'global'
+    ? 'linear-gradient(180deg, rgba(126, 87, 194, 0.24), rgba(33, 14, 54, 0.18))'
+    : 'linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(18, 24, 38, 0.2))'
+  const textColor = variant === 'global' ? '#f1d4ff' : '#f3f6fb'
+
+  const itemMarkup = items.map(name => `
+    <div style="
+      width:${itemSize}px;
+      height:${itemSize}px;
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:visible;
+      border:1px solid ${borderColor};
+      background:${itemBackground};
+      box-sizing:border-box;
+      border-radius:0;
+    ">
+      <div style="
+        position:absolute;
+        inset:${variant === 'global' ? '8%' : '10%'};
+        border:${variant === 'global' ? '0' : '1px dashed rgba(255,255,255,0.24)'};
+        background:rgba(255,255,255,0.04);
+      "></div>
+      <span style="
+        position:relative;
+        z-index:1;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:${escapeAttr(String(imageWidth))};
+        height:${escapeAttr(String(imageHeight))};
+        max-width:100%;
+        max-height:100%;
+        box-sizing:border-box;
+        overflow:${imageFit === 'contain' ? 'visible' : 'hidden'};
+      ">
+        <span style="
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          width:100%;
+          height:100%;
+          box-sizing:border-box;
+          border:1px dashed rgba(255,255,255,0.35);
+          background:rgba(255,255,255,0.06);
+          filter:${useGrayscale ? 'grayscale(1)' : 'none'};
+        ">
+          <span style="
+            display:block;
+            width:100%;
+            text-align:center;
+            padding:0 6px;
+            font-size:${variant === 'global' ? 11 : 12}px;
+            line-height:1.2;
+            font-weight:${variant === 'global' ? 700 : 600};
+            color:${textColor};
+            text-shadow:0 1px 2px rgba(0,0,0,0.5);
+          ">${escapeHtml(name)}</span>
+        </span>
+      </span>
+      <span style="
+        position:absolute;
+        left:6px;
+        bottom:6px;
+        z-index:3;
+        padding:1px 4px;
+        font-size:9px;
+        line-height:1;
+        color:rgba(255,255,255,0.75);
+        background:rgba(0,0,0,0.4);
+      ">${escapeHtml(imageVariant)} · ${escapeHtml(String(imageFit))}</span>
+      ${overlayType === 'slash' ? `<span style="
+        position:absolute;
+        left:-4%;
+        right:-4%;
+        top:50%;
+        height:${variant === 'global' ? 2 : 3}px;
+        background:${slashColor};
+        transform:translateY(-50%) rotate(-45deg);
+        z-index:2;
+      "></span>` : ''}
+      ${overlayType === 'image' && overlaySrc ? `<img src="${escapeAttr(overlaySrc)}" alt="" style="
+        position:absolute;
+        inset:0;
+        width:100%;
+        height:100%;
+        object-fit:fill;
+        z-index:2;
+        pointer-events:none;
+      " />` : ''}
+    </div>
+  `).join('')
+
+  return `
+    <div style="
+      width:100%;
+      height:100%;
+      display:grid;
+      grid-template-columns:repeat(${maxPerRow}, ${itemSize}px);
+      justify-content:start;
+      align-content:start;
+      column-gap:${itemGap}px;
+      row-gap:${rowGap}px;
+      box-sizing:border-box;
+    ">
+      ${itemMarkup}
+    </div>
+  `
 }
 
 async function openComponentBehaviorTutorial() {
@@ -756,14 +986,14 @@ function renderComponentList() {
   }
 
   list.innerHTML = components.map(comp => {
-    const typeIcons = { text: '📝', image: '🖼️', html: '🌐' }
+    const typeMeta = getComponentTypeMeta(comp.type)
     const active = comp.id === selectedComponentId ? 'active' : ''
     return `
       <div class="component-item ${active}" data-id="${comp.id}" draggable="true" onclick="selectComponent('${comp.id}')">
-        <div class="component-icon">${typeIcons[comp.type] || '📦'}</div>
+        <div class="component-icon">${typeMeta.icon}</div>
         <div class="component-info">
           <div class="component-name">${escapeHtml(comp.name || '未命名')}</div>
-          <div class="component-type">${comp.type === 'text' ? '文本' : comp.type === 'image' ? '图片' : 'HTML'}</div>
+          <div class="component-type">${escapeHtml(typeMeta.label)}</div>
         </div>
         <div class="component-actions">
           <button onclick="event.stopPropagation(); duplicateComponent('${comp.id}')" title="复制">📋</button>
@@ -817,6 +1047,7 @@ function selectComponent(id) {
 
   document.getElementById('textProperties').style.display = comp.type === 'text' ? 'block' : 'none'
   document.getElementById('imageProperties').style.display = comp.type === 'image' ? 'block' : 'none'
+  document.getElementById('banListProperties').style.display = comp.type === 'ban-list' ? 'block' : 'none'
   document.getElementById('htmlProperties').style.display = comp.type === 'html' ? 'block' : 'none'
 
   if (comp.type === 'text') {
@@ -835,6 +1066,25 @@ function selectComponent(id) {
     document.getElementById('propImageHeight').value = comp.imageHeight || 'auto'
     document.getElementById('propObjectFit').value = comp.objectFit || 'contain'
     updateImagePreview(comp)
+  }
+
+  if (comp.type === 'ban-list') {
+    const defaults = getBanListDefaults(comp.banSource)
+    const imageDefaults = getBanImageDefaults(comp.banImageVariant)
+    document.getElementById('propBanSource').value = normalizeBanListSource(comp.banSource)
+    document.getElementById('propBanMaxPerRow').value = comp.banMaxPerRow || defaults.maxPerRow
+    document.getElementById('propBanItemSize').value = comp.banItemSize || defaults.itemSize
+    document.getElementById('propBanItemGap').value = comp.banItemGap || defaults.itemGap
+    document.getElementById('propBanRowGap').value = comp.banRowGap || defaults.rowGap
+    document.getElementById('propBanImageVariant').value = normalizeBanImageVariant(comp.banImageVariant)
+    document.getElementById('propBanImageWidth').value = comp.banImageWidth || imageDefaults.width
+    document.getElementById('propBanImageHeight').value = comp.banImageHeight || imageDefaults.height
+    document.getElementById('propBanImageFit').value = comp.banImageFit || imageDefaults.fit
+    document.getElementById('propBanUseGrayscale').checked = comp.banUseGrayscale !== false
+    document.getElementById('propBanOverlayType').value = normalizeBanOverlayType(comp.banOverlayType)
+    document.getElementById('propBanOverlayImageUrl').value = comp.banOverlayImageUrl || ''
+    updateBanOverlayImagePreview(comp)
+    updateBanOverlayFieldsVisibility(comp.banOverlayType)
   }
 
   if (comp.type === 'html') {
@@ -870,6 +1120,11 @@ function updatePreview() {
     html = generateTextHtml(comp)
   } else if (comp.type === 'image') {
     html = generateImageHtml(comp, {
+      vars: PREVIEW_TEMPLATE_VARS,
+      eventData: PREVIEW_TEMPLATE_VARS
+    })
+  } else if (comp.type === 'ban-list') {
+    html = generateBanListHtml(comp, {
       vars: PREVIEW_TEMPLATE_VARS,
       eventData: PREVIEW_TEMPLATE_VARS
     })
@@ -956,6 +1211,11 @@ function confirmNewComponent() {
     comp.imageHeight = '100%'
     comp.objectFit = 'contain'
     comp.html = generateImageHtml(comp)
+  } else if (type === 'ban-list') {
+    Object.assign(comp, buildBanListComponentDraft())
+    comp.width = '340'
+    comp.height = '140'
+    comp.html = generateBanListHtml(comp)
   } else {
     comp.html = '<div style="padding:12px;color:#fff;">{{matchTitle}}</div>'
     comp.customCss = ''
@@ -1054,6 +1314,24 @@ function saveCurrentComponent(shouldRenderList = true) {
     comp.imageHeight = document.getElementById('propImageHeight').value || '100%'
     comp.objectFit = document.getElementById('propObjectFit').value || 'contain'
     comp.html = generateImageHtml(comp)
+  } else if (comp.type === 'ban-list') {
+    const defaults = getBanListDefaults(document.getElementById('propBanSource').value)
+    const imageDefaults = getBanImageDefaults(document.getElementById('propBanImageVariant').value)
+    comp.banSource = normalizeBanListSource(document.getElementById('propBanSource').value)
+    comp.banMaxPerRow = clampNumber(document.getElementById('propBanMaxPerRow').value, 1, 12, defaults.maxPerRow)
+    comp.banItemSize = clampNumber(document.getElementById('propBanItemSize').value, 24, 200, defaults.itemSize)
+    comp.banItemGap = clampNumber(document.getElementById('propBanItemGap').value, 0, 80, defaults.itemGap)
+    comp.banRowGap = clampNumber(document.getElementById('propBanRowGap').value, 0, 80, defaults.rowGap)
+    comp.banImageVariant = normalizeBanImageVariant(document.getElementById('propBanImageVariant').value)
+    comp.banImageWidth = document.getElementById('propBanImageWidth').value || imageDefaults.width
+    comp.banImageHeight = document.getElementById('propBanImageHeight').value || imageDefaults.height
+    comp.banImageFit = document.getElementById('propBanImageFit').value || imageDefaults.fit
+    comp.banUseGrayscale = document.getElementById('propBanUseGrayscale').checked
+    comp.banOverlayType = normalizeBanOverlayType(document.getElementById('propBanOverlayType').value)
+    comp.banOverlayImageUrl = document.getElementById('propBanOverlayImageUrl').value || ''
+    if (comp.banOverlayImageUrl) comp.banOverlayImageData = ''
+    updateBanOverlayFieldsVisibility(comp.banOverlayType)
+    comp.html = generateBanListHtml(comp)
   } else if (comp.type === 'html') {
     comp.html = document.getElementById('codeEditor').value || ''
     comp.customCss = document.getElementById('propCustomCss').value || ''
@@ -1130,8 +1408,8 @@ async function selectImage() {
   }
 }
 
-function updateImagePreview(src) {
-  const preview = document.getElementById('imagePreview')
+function updateImagePreviewForElement(previewId, src) {
+  const preview = document.getElementById(previewId)
   if (!preview) return
   const target = (src && typeof src === 'object')
     ? src
@@ -1147,6 +1425,38 @@ function updateImagePreview(src) {
   preview.innerHTML = `<img src="${escapeAttr(resolvedSrc)}" alt="预览">`
 }
 
+function updateImagePreview(src) {
+  updateImagePreviewForElement('imagePreview', src)
+}
+
+async function selectBanOverlayImage() {
+  try {
+    const result = await window.electronAPI.invoke('select-component-image')
+    if (!result || !result.success || !result.data) return
+
+    const comp = components.find(item => item.id === selectedComponentId)
+    if (!comp) return
+
+    comp.banOverlayImageData = result.data
+    comp.banOverlayImageUrl = ''
+    const urlInput = document.getElementById('propBanOverlayImageUrl')
+    if (urlInput) urlInput.value = ''
+    updateBanOverlayImagePreview(comp)
+    hasUnsavedChanges = true
+    saveCurrentComponent(false)
+  } catch (error) {
+    console.error('选择覆盖图失败:', error)
+    showToast('选择覆盖图失败', 'error')
+  }
+}
+
+function updateBanOverlayImagePreview(src) {
+  const target = (src && typeof src === 'object')
+    ? { imageData: src.banOverlayImageData || '', imageUrl: src.banOverlayImageUrl || '' }
+    : { imageData: '', imageUrl: typeof src === 'string' ? src : '' }
+  updateImagePreviewForElement('banOverlayImagePreview', target)
+}
+
 function clearImage() {
   const comp = components.find(item => item.id === selectedComponentId)
   if (!comp) return
@@ -1155,6 +1465,27 @@ function clearImage() {
   updateImagePreview(comp)
   hasUnsavedChanges = true
   saveCurrentComponent(false)
+}
+
+function clearBanOverlayImage() {
+  const comp = components.find(item => item.id === selectedComponentId)
+  if (!comp) return
+  comp.banOverlayImageData = ''
+  comp.banOverlayImageUrl = ''
+  const urlInput = document.getElementById('propBanOverlayImageUrl')
+  if (urlInput) urlInput.value = ''
+  updateBanOverlayImagePreview(comp)
+  hasUnsavedChanges = true
+  saveCurrentComponent(false)
+}
+
+function updateBanOverlayFieldsVisibility(overlayType) {
+  const normalized = normalizeBanOverlayType(overlayType)
+  const imageGroup = document.getElementById('banOverlayImageGroup')
+  const imageUrlGroup = document.getElementById('banOverlayImageUrlGroup')
+  const show = normalized === 'image'
+  if (imageGroup) imageGroup.style.display = show ? 'block' : 'none'
+  if (imageUrlGroup) imageUrlGroup.style.display = show ? 'block' : 'none'
 }
 
 function insertTemplateVariable(token) {
@@ -1427,10 +1758,33 @@ function setupEventListeners() {
     })
   }
 
+  const banOverlayImageUrlInput = document.getElementById('propBanOverlayImageUrl')
+  if (banOverlayImageUrlInput) {
+    banOverlayImageUrlInput.addEventListener('input', e => {
+      const comp = components.find(item => item.id === selectedComponentId)
+      if (!comp || comp.type !== 'ban-list') return
+      comp.banOverlayImageUrl = e.target.value
+      comp.banOverlayImageData = ''
+      updateBanOverlayImagePreview(comp)
+      hasUnsavedChanges = true
+      saveCurrentComponent(false)
+    })
+  }
+
+  const banOverlayTypeInput = document.getElementById('propBanOverlayType')
+  if (banOverlayTypeInput) {
+    banOverlayTypeInput.addEventListener('change', e => {
+      updateBanOverlayFieldsVisibility(e.target.value)
+      saveCurrentComponent(false)
+    })
+  }
+
   const autoSaveInputs = [
     'propName', 'propWidth', 'propHeight',
     'propTextContent', 'propFontSize', 'propFontWeight', 'propTextAlign',
     'propImageWidth', 'propImageHeight', 'propObjectFit',
+    'propBanSource', 'propBanImageVariant', 'propBanMaxPerRow', 'propBanItemSize', 'propBanItemGap', 'propBanRowGap',
+    'propBanImageWidth', 'propBanImageHeight', 'propBanImageFit', 'propBanOverlayImageUrl',
     'propCustomCss'
   ]
 
@@ -1438,6 +1792,13 @@ function setupEventListeners() {
     const el = document.getElementById(id)
     if (!el) return
     el.addEventListener('input', () => saveCurrentComponent(id === 'propName'))
+    el.addEventListener('change', () => saveCurrentComponent(id === 'propName'))
+  })
+
+  ;['propBanUseGrayscale'].forEach(id => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.addEventListener('change', () => saveCurrentComponent(false))
   })
 
   document.querySelectorAll('#targetPages input[type="checkbox"]').forEach(cb => {

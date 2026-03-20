@@ -299,6 +299,12 @@
       "name": "幻灯师",
       "enName": "Huandengshi",
       "abbr": "hds"
+    },
+    {
+      "id": "dns",
+      "name": "斗牛士",
+      "enName": "douniushi",
+      "abbr": "dns"
     }
   ],
   "hunters": [

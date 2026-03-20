@@ -440,12 +440,16 @@ function applyBpTemplateVariables(targetVars, eventData = {}) {
   const selectedCount = survivors.filter(Boolean).length
   const bannedSurvivors = eventData.hunterBannedSurvivors || []
   const bannedHunters = eventData.survivorBannedHunters || []
+  const globalBannedSurvivors = eventData.globalBannedSurvivors || []
+  const globalBannedHunters = eventData.globalBannedHunters || []
 
   Object.assign(targetVars, {
     bpHunter: eventData.hunter || eventData.selectedHunter || eventData.character || '',
     bpSurvivors: survivors,
     bpBannedSurvivors: bannedSurvivors,
     bpBannedHunters: bannedHunters,
+    bpGlobalBannedSurvivors: globalBannedSurvivors,
+    bpGlobalBannedHunters: globalBannedHunters,
     bpRound: eventData.round || eventData.currentRound || 0,
     bpSurvivorSelectedCount: Number.isFinite(eventData.selectedCount) ? eventData.selectedCount : selectedCount,
     bpLatestSurvivor: eventData.survivor || eventData.character || '',
@@ -456,6 +460,8 @@ function applyBpTemplateVariables(targetVars, eventData = {}) {
     bpSurvivorsText: survivors.filter(s => s).join(', '),
     bpBannedSurvivorsText: bannedSurvivors.filter(s => s).join(', '),
     bpBannedHuntersText: bannedHunters.filter(s => s).join(', '),
+    bpGlobalBannedSurvivorsText: globalBannedSurvivors.filter(s => s).join(', '),
+    bpGlobalBannedHuntersText: globalBannedHunters.filter(s => s).join(', '),
     bpTeamA: eventData.teamAName || eventData.teamA || '',
     bpTeamB: eventData.teamBName || eventData.teamB || ''
   })
@@ -490,6 +496,8 @@ function buildTemplateEventDataFromState(state, rawData = {}) {
     character: data.character || data.survivor || latestSurvivor || roundData.selectedHunter || st.hunter || '',
     hunterBannedSurvivors: data.hunterBannedSurvivors || roundData.hunterBannedSurvivors || st.hunterBannedSurvivors || [],
     survivorBannedHunters: data.survivorBannedHunters || roundData.survivorBannedHunters || st.survivorBannedHunters || [],
+    globalBannedSurvivors: data.globalBannedSurvivors || st.globalBannedSurvivors || [],
+    globalBannedHunters: data.globalBannedHunters || st.globalBannedHunters || [],
     round: asTemplateInt(data.round, asTemplateInt(st.currentRound || data.currentRound, 0)),
     currentRound: asTemplateInt(data.currentRound, asTemplateInt(st.currentRound || data.round, 0)),
     scoreData: data.scoreData || latestScoreDataForTemplate || undefined
@@ -760,6 +768,258 @@ function toCoord(value, fallbackValue) {
   return Number.isFinite(n) ? Math.round(n) : fallbackValue
 }
 
+function getCharacterAssetFolder(roleType, variant) {
+  const table = roleType === 'survivor'
+    ? { header: 'surHeader', half: 'surHalf', big: 'surBig' }
+    : { header: 'hunHeader', half: 'hunHalf', big: 'hunBig' }
+  return table[variant] || null
+}
+
+function getCharacterAssetSrc(roleType, variant, name) {
+  const folder = getCharacterAssetFolder(roleType, variant)
+  if (!folder || !name) return ''
+  return `../assets/${folder}/${name}.png`
+}
+
+function normalizeBanNames(list) {
+  if (!Array.isArray(list)) return []
+  return list
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+}
+
+function normalizeCustomBanSource(value) {
+  return ['localSurvivor', 'localHunter', 'globalSurvivor', 'globalHunter'].includes(value)
+    ? value
+    : 'localSurvivor'
+}
+
+function clampCustomBanNumber(value, min, max, fallback) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return fallback
+  return Math.min(max, Math.max(min, Math.round(num)))
+}
+
+function getCustomBanDefaults(source) {
+  const normalizedSource = normalizeCustomBanSource(source)
+  return normalizedSource.startsWith('global')
+    ? { maxPerRow: normalizedSource === 'globalSurvivor' ? 5 : 4, itemSize: 62, itemGap: 8, rowGap: 8 }
+    : { maxPerRow: 4, itemSize: 72, itemGap: 10, rowGap: 10 }
+}
+
+function normalizeCustomBanOverlayType(value) {
+  return ['none', 'slash', 'image'].includes(value) ? value : 'slash'
+}
+
+function normalizeCustomBanImageVariant(value) {
+  return ['header', 'half', 'big'].includes(value) ? value : 'header'
+}
+
+function getCustomBanImageDefaults(variant) {
+  const normalizedVariant = normalizeCustomBanImageVariant(variant)
+  if (normalizedVariant === 'half') {
+    return { variant: normalizedVariant, width: '88%', height: '100%', fit: 'contain' }
+  }
+  if (normalizedVariant === 'big') {
+    return { variant: normalizedVariant, width: '100%', height: '100%', fit: 'contain' }
+  }
+  return { variant: normalizedVariant, width: '100%', height: '100%', fit: 'contain' }
+}
+
+function getCustomBanMeta(source) {
+  const normalizedSource = normalizeCustomBanSource(source)
+  const isGlobal = normalizedSource.startsWith('global')
+  return {
+    source: normalizedSource,
+    isGlobal,
+    roleType: normalizedSource.endsWith('Hunter') ? 'hunter' : 'survivor',
+    itemClass: isGlobal ? 'global-ban-item' : 'ban-item',
+    slashColor: isGlobal ? '#9c27b0' : '#ff4444',
+    slashHeight: isGlobal ? 2 : 3,
+    textSize: isGlobal ? 8 : 10,
+    textColor: '#ffffff'
+  }
+}
+
+function resolveCustomBanEntries(comp, eventData = {}) {
+  const source = normalizeCustomBanSource(comp && comp.banSource)
+  const normalizedData = normalizeTemplateEventData(eventData)
+  const state = latestFrontendStateForTemplate || eventData.state || normalizedData.state || {}
+  const roundData = (state && typeof state.currentRoundData === 'object') ? state.currentRoundData : {}
+
+  let list = []
+  if (source === 'localSurvivor') {
+    list = normalizedData.hunterBannedSurvivors || eventData.hunterBannedSurvivors || roundData.hunterBannedSurvivors || state.hunterBannedSurvivors || []
+  } else if (source === 'localHunter') {
+    list = normalizedData.survivorBannedHunters || eventData.survivorBannedHunters || roundData.survivorBannedHunters || state.survivorBannedHunters || []
+  } else if (source === 'globalSurvivor') {
+    list = normalizedData.globalBannedSurvivors || eventData.globalBannedSurvivors || state.globalBannedSurvivors || []
+  } else if (source === 'globalHunter') {
+    list = normalizedData.globalBannedHunters || eventData.globalBannedHunters || state.globalBannedHunters || []
+  }
+
+  return normalizeBanNames(list)
+}
+
+function resolveCustomBanOverlaySrc(comp, eventData = {}) {
+  const raw = comp && (comp.banOverlayImageData || comp.banOverlayImageUrl) ? (comp.banOverlayImageData || comp.banOverlayImageUrl) : ''
+  if (!raw) return ''
+  return resolveCustomComponentTemplate(String(raw), eventData).trim()
+}
+
+function createCustomBanItemElement(name, meta, itemSize, comp, eventData = {}) {
+  const imageDefaults = getCustomBanImageDefaults(comp && comp.banImageVariant)
+  const imageVariant = normalizeCustomBanImageVariant(comp && comp.banImageVariant)
+  const imageWidth = toCssSize(comp && comp.banImageWidth, imageDefaults.width, true) || imageDefaults.width
+  const imageHeight = toCssSize(comp && comp.banImageHeight, imageDefaults.height, true) || imageDefaults.height
+  const imageFit = normalizeImageFitOption(comp && comp.banImageFit) || imageDefaults.fit
+  const item = document.createElement('div')
+  item.className = meta.itemClass
+  item.style.width = `${itemSize}px`
+  item.style.height = `${itemSize}px`
+  item.style.position = 'relative'
+  item.style.display = 'flex'
+  item.style.alignItems = 'center'
+  item.style.justifyContent = 'center'
+  item.style.overflow = 'visible'
+  item.style.background = 'transparent'
+  item.style.border = 'none'
+  item.style.borderRadius = '0'
+
+  const mediaFrame = document.createElement('div')
+  mediaFrame.style.width = imageWidth
+  mediaFrame.style.height = imageHeight
+  mediaFrame.style.maxWidth = '100%'
+  mediaFrame.style.maxHeight = '100%'
+  mediaFrame.style.display = 'flex'
+  mediaFrame.style.alignItems = 'center'
+  mediaFrame.style.justifyContent = 'center'
+  mediaFrame.style.position = 'relative'
+  mediaFrame.style.zIndex = '1'
+  mediaFrame.style.overflow = imageFit === 'contain' ? 'visible' : 'hidden'
+
+  const img = document.createElement('img')
+  img.src = getCharacterAssetSrc(meta.roleType, imageVariant, name)
+  img.alt = name
+  img.title = name
+  img.draggable = false
+  img.style.width = '100%'
+  img.style.height = '100%'
+  img.style.objectFit = imageFit
+  img.style.filter = comp && comp.banUseGrayscale === false
+    ? 'none'
+    : (meta.isGlobal ? 'grayscale(80%) brightness(0.8)' : 'grayscale(100%)')
+  img.onerror = function () {
+    this.style.display = 'none'
+    const text = document.createElement('span')
+    text.textContent = name
+    text.style.fontSize = `${meta.textSize}px`
+    text.style.color = meta.textColor
+    text.style.textAlign = 'center'
+    text.style.lineHeight = '1.2'
+    text.style.padding = '0 4px'
+    mediaFrame.appendChild(text)
+  }
+  mediaFrame.appendChild(img)
+  item.appendChild(mediaFrame)
+
+  const overlayType = normalizeCustomBanOverlayType(comp && comp.banOverlayType)
+  if (overlayType === 'slash') {
+    const slash = document.createElement('span')
+    slash.setAttribute('aria-hidden', 'true')
+    slash.style.position = 'absolute'
+    slash.style.top = '50%'
+    slash.style.left = '0'
+    slash.style.right = '0'
+    slash.style.height = `${meta.slashHeight}px`
+    slash.style.background = meta.slashColor
+    slash.style.transform = 'translateY(-50%) rotate(-45deg)'
+    slash.style.zIndex = '1'
+    item.appendChild(slash)
+  } else if (overlayType === 'image') {
+    const overlaySrc = resolveCustomBanOverlaySrc(comp, eventData)
+    if (overlaySrc) {
+      const overlay = document.createElement('img')
+      overlay.src = overlaySrc
+      overlay.alt = ''
+      overlay.draggable = false
+      overlay.style.position = 'absolute'
+      overlay.style.inset = '0'
+      overlay.style.width = '100%'
+      overlay.style.height = '100%'
+      overlay.style.objectFit = 'fill'
+      overlay.style.pointerEvents = 'none'
+      overlay.style.zIndex = '2'
+      item.appendChild(overlay)
+    }
+  }
+
+  return item
+}
+
+function ensureBanPreviewItems(listEl, itemClassName) {
+  if (!listEl) return
+  Array.from(listEl.querySelectorAll('.ban-edit-preview')).forEach(el => el.remove())
+  if (!editMode) return
+
+  const realCount = Array.from(listEl.children).filter(el => !el.classList.contains('ban-edit-preview')).length
+  const needCount = Math.max(0, 2 - realCount)
+  for (let i = 0; i < needCount; i++) {
+    const item = document.createElement('div')
+    item.className = `${itemClassName} ban-edit-preview`
+    item.setAttribute('aria-hidden', 'true')
+    item.style.width = listEl.dataset.previewItemSize || '72px'
+    item.style.height = listEl.dataset.previewItemSize || '72px'
+    item.style.position = 'relative'
+    item.style.boxSizing = 'border-box'
+    item.style.border = '1px solid rgba(255,255,255,0.85)'
+
+    const frame = document.createElement('span')
+    frame.style.display = 'block'
+    frame.style.width = '84%'
+    frame.style.height = '84%'
+    frame.style.margin = '8%'
+    frame.style.border = '1px dashed rgba(255,255,255,0.6)'
+    frame.style.background = 'rgba(255,255,255,0.05)'
+    item.appendChild(frame)
+    listEl.appendChild(item)
+  }
+}
+
+function renderCustomBanListContent(content, comp, eventData = {}) {
+  if (!content) return
+  const meta = getCustomBanMeta(comp && comp.banSource)
+  const defaults = getCustomBanDefaults(meta.source)
+  const itemSize = clampCustomBanNumber(comp && comp.banItemSize, 24, 200, defaults.itemSize)
+  const itemGap = clampCustomBanNumber(comp && comp.banItemGap, 0, 80, defaults.itemGap)
+  const rowGap = clampCustomBanNumber(comp && comp.banRowGap, 0, 80, defaults.rowGap)
+  const maxPerRow = clampCustomBanNumber(comp && comp.banMaxPerRow, 1, 12, defaults.maxPerRow)
+  const entries = resolveCustomBanEntries(comp, eventData)
+
+  content.innerHTML = ''
+  content.style.overflow = 'visible'
+
+  const list = document.createElement('div')
+  list.className = 'custom-ban-list-grid'
+  list.dataset.previewItemSize = `${itemSize}px`
+  list.style.display = 'grid'
+  list.style.gridTemplateColumns = `repeat(${maxPerRow}, ${itemSize}px)`
+  list.style.columnGap = `${itemGap}px`
+  list.style.rowGap = `${rowGap}px`
+  list.style.alignContent = 'start'
+  list.style.justifyContent = 'start'
+  list.style.width = '100%'
+  list.style.height = '100%'
+  list.style.boxSizing = 'border-box'
+
+  entries.forEach(name => {
+    list.appendChild(createCustomBanItemElement(name, meta, itemSize, comp, eventData))
+  })
+
+  content.appendChild(list)
+  ensureBanPreviewItems(list, meta.itemClass)
+}
+
 function buildLegacyComponentHtml(comp) {
   if (!comp || typeof comp !== 'object') return ''
   if (comp.type === 'text') {
@@ -789,7 +1049,7 @@ function buildLegacyComponentHtml(comp) {
 function getComponentLabel(comp) {
   if (!comp || typeof comp !== 'object') return '组件'
   const baseName = (typeof comp.name === 'string' && comp.name.trim()) ? comp.name.trim() : comp.id
-  const typeMap = { text: '文本', image: '图片', html: 'HTML' }
+  const typeMap = { text: '文本', image: '图片', 'ban-list': 'Ban位列表', html: 'HTML' }
   const typeLabel = typeMap[comp.type] || '组件'
   return `${baseName} (${typeLabel})`
 }
@@ -963,6 +1223,7 @@ function ensureComponentEditorShell(container, comp) {
 function applyCustomComponentContent(container, comp, eventData = {}) {
   const content = container.querySelector('.custom-component-content')
   if (!content) return
+  content.style.overflow = comp.type === 'ban-list' ? 'visible' : 'hidden'
   const runtimeState = getComponentBehaviorRuntime(comp.id)
   const templateScope = buildBehaviorTemplateScope(comp, runtimeState, eventData?.eventType || eventData?.type || '')
 
@@ -1004,6 +1265,11 @@ function applyCustomComponentContent(container, comp, eventData = {}) {
         ? `<img src="${src}" style="width: 100%; height: 100%; object-fit: ${imgFit}; display: block;" draggable="false" />`
         : '<div style="padding:10px;color:#aaa;">空图片组件</div>'
     }
+  }
+
+  if (comp.type === 'ban-list') {
+    renderCustomBanListContent(content, comp, eventData)
+    return
   }
 
   content.innerHTML = htmlContent
