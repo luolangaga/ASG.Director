@@ -2025,33 +2025,109 @@ function handleLocalPagesRequest(req, res) {
 let localPagesServer = null
 let localPagesServerPort = null
 let localPagesServerHost = null
+const LOCAL_PAGES_MIN_PORT = 1024
+const LOCAL_PAGES_MAX_PORT = 65535
+const LOCAL_PAGES_MAX_PORT_SWITCHES = 8
+
+function getNextLocalPagesPort(port) {
+  let nextPort = Number.isFinite(Number(port)) ? Number(port) + 1 : 9529
+  if (nextPort > LOCAL_PAGES_MAX_PORT) {
+    nextPort = LOCAL_PAGES_MIN_PORT
+  }
+  return nextPort
+}
+
+function persistLocalPagesPort(port) {
+  const nextPort = Number(port)
+  if (!Number.isFinite(nextPort)) return readLocalPagesConfig()
+  const config = readLocalPagesConfig()
+  if (config.port === nextPort) return config
+  config.port = nextPort
+  writeJsonFileSafe(localPagesConfigPath, config)
+  return config
+}
+
+function buildLocalPagesStartupFailureBody(error, initialPort, attemptedPort, switchCount) {
+  if (error && error.code === 'EADDRINUSE' && switchCount >= LOCAL_PAGES_MAX_PORT_SWITCHES) {
+    return `OBS 本地页面服务器启动失败：端口 ${initialPort} 起已自动切换 ${LOCAL_PAGES_MAX_PORT_SWITCHES} 次，最后尝试 ${attemptedPort}，但端口仍被占用。`
+  }
+  const message = error && error.message ? error.message : '未知错误'
+  return `OBS 本地页面服务器启动失败：${message}`
+}
 
 function startLocalPagesServer(options = {}) {
   const opts = options && typeof options === 'object' ? options : {}
   const notifyReason = typeof opts.reason === 'string' ? opts.reason : 'start'
   ensureLocalPagesStorage()
   const config = readLocalPagesConfig()
-  const port = config.port
+  const initialPort = config.port
   const host = config.host || '127.0.0.1'
-  if (localPagesServer && localPagesServerPort === port && localPagesServerHost === host) {
-    return Promise.resolve({ success: true, port, running: true })
+  if (localPagesServer && localPagesServerPort === initialPort && localPagesServerHost === host) {
+    return Promise.resolve({ success: true, port: initialPort, running: true })
   }
   if (localPagesServer) {
     return stopLocalPagesServer().then(() => startLocalPagesServer(opts))
   }
-  return new Promise(resolve => {
+  const tryStartServer = (port, switchCount = 0) => new Promise(resolve => {
     const server = http.createServer(handleLocalPagesRequest)
-    server.on('error', err => {
-      resolve({ success: false, error: err.message })
-    })
+    let settled = false
+
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      resolve(result)
+    }
+
+    const onStartupError = err => {
+      try {
+        server.close()
+      } catch {
+        // ignore
+      }
+
+      if (err && err.code === 'EADDRINUSE' && switchCount < LOCAL_PAGES_MAX_PORT_SWITCHES) {
+        const nextPort = getNextLocalPagesPort(port)
+        showWindowsNativeNotification({
+          title: 'ASG Director',
+          body: `OBS 本地页面端口 ${port} 已被占用，已自动切换到 ${nextPort} 并重试（${switchCount + 1}/${LOCAL_PAGES_MAX_PORT_SWITCHES}）。`
+        })
+        finish({ retry: true, nextPort, switchCount: switchCount + 1 })
+        return
+      }
+
+      const body = buildLocalPagesStartupFailureBody(err, initialPort, port, switchCount)
+      showWindowsNativeNotification({
+        title: 'ASG Director',
+        body
+      })
+      finish({
+        success: false,
+        running: false,
+        port,
+        error: err && err.message ? err.message : '启动失败',
+        code: err && err.code ? err.code : null
+      })
+    }
+
+    server.once('error', onStartupError)
     server.listen(port, host, () => {
+      server.removeListener('error', onStartupError)
+      server.on('error', err => {
+        console.error('[LocalPages] 本地页面服务器运行异常:', err?.message || err)
+      })
+
+      if (port !== initialPort) {
+        persistLocalPagesPort(port)
+      }
       localPagesServer = server
       localPagesServerPort = port
       localPagesServerHost = host
       const endpoint = getLocalPagesNotificationUrl(host, port)
+      const switchedPortNote = port !== initialPort ? `（端口已从 ${initialPort} 自动切换到 ${port}）` : ''
+      const endpointNote = endpoint.note ? `（${endpoint.note}）` : ''
       const body = notifyReason === 'host-change'
-        ? `OBS 本地页面服务器监听地址已更新：${endpoint.url}${endpoint.note ? `（${endpoint.note}）` : ''}`
-        : `OBS 本地页面服务器已启动：${endpoint.url}${endpoint.note ? `（${endpoint.note}）` : ''}`
+        ? `OBS 本地页面服务器监听地址已更新：${endpoint.url}${endpointNote}${switchedPortNote}`
+        : `OBS 本地页面服务器已启动：${endpoint.url}${endpointNote}${switchedPortNote}`
       showWindowsNativeNotification({
         title: 'ASG Director',
         body
@@ -2088,9 +2164,20 @@ function startLocalPagesServer(options = {}) {
       global.__localPageServerHooks.onLocalBpBlink = index => {
         localPagesBroadcastSse('local-bp-blink', { index })
       }
-      resolve({ success: true, port, running: true })
+      finish({ success: true, port, running: true })
     })
   })
+
+  const attemptStart = (port, switchCount = 0) => {
+    return tryStartServer(port, switchCount).then(result => {
+      if (result && result.retry) {
+        return attemptStart(result.nextPort, result.switchCount)
+      }
+      return result
+    })
+  }
+
+  return attemptStart(initialPort, 0)
 }
 
 function stopLocalPagesServer() {
@@ -5277,85 +5364,19 @@ ipcMain.handle('store-upload-pack', async (event, metadata) => {
       }
       console.log('[Store] 使用手动选择的布局包文件:', packFilePath)
     } else {
-      // 未选择文件时，导出当前布局包到临时文件后上传（兼容旧流程）
-      tempDir = path.join(os.tmpdir(), 'bppack-upload-' + Date.now())
-      fs.mkdirSync(tempDir, { recursive: true })
+      // 未选择文件时，复用 packManager 的导出准备逻辑，避免上传和本地导出行为分叉。
+      const windowRefs = {
+        frontendWindow,
+        scoreboardWindowA,
+        scoreboardWindowB,
+        scoreboardOverviewWindow,
+        postMatchWindow
+      }
+      const prepared = await packManager.prepareExportDir({ windowRefs })
+      tempDir = prepared.tempDir
       console.log('[Store] Temp dir created:', tempDir)
-
-      // 创建临时布局包
-      if (fs.existsSync(layoutPath)) {
-        console.log('[Store] 复制布局文件:', layoutPath)
-        fs.copyFileSync(layoutPath, path.join(tempDir, 'layout.json'))
-
-        // 验证复制
-        const copiedLayoutPath = path.join(tempDir, 'layout.json')
-        if (fs.existsSync(copiedLayoutPath)) {
-          const content = fs.readFileSync(copiedLayoutPath, 'utf8')
-          console.log('[Store] 布局文件已复制，大小:', content.length, '字节')
-        } else {
-          console.error('[Store] 布局文件复制失败!')
-        }
-      } else {
-        console.warn('[Store] 布局文件不存在:', layoutPath)
-      }
-
-      // 收集窗口配置数据
-      const packData = {}
-      if (frontendWindow && !frontendWindow.isDestroyed()) {
-        packData.frontendBounds = frontendWindow.getBounds()
-      }
-      if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
-        packData.scoreboardABounds = scoreboardWindowA.getBounds()
-        packData.scoreboardLayoutA = packData.scoreboardABounds
-      }
-      if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
-        packData.scoreboardBBounds = scoreboardWindowB.getBounds()
-        packData.scoreboardLayoutB = packData.scoreboardBBounds
-      }
-      if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
-        packData.scoreboardOverviewBounds = scoreboardOverviewWindow.getBounds()
-      }
-      if (postMatchWindow && !postMatchWindow.isDestroyed()) {
-        packData.postMatchBounds = postMatchWindow.getBounds()
-      }
-
-      if (Object.keys(packData).length > 0) {
-        fs.writeFileSync(
-          path.join(tempDir, 'pack-config.json'),
-          JSON.stringify(packData, null, 2)
-        )
-      }
-
-      // 复制所有图片文件
-      if (fs.existsSync(bgImagePath)) {
-        const files = fs.readdirSync(bgImagePath)
-        console.log('[Store] 背景图片目录文件数:', files.length)
-        files.forEach(file => {
-          const srcPath = path.join(bgImagePath, file)
-          const destPath = path.join(tempDir, file)
-          if (fs.statSync(srcPath).isFile()) {
-            fs.copyFileSync(srcPath, destPath)
-            console.log('[Store] 复制图片:', file)
-          }
-        })
-      } else {
-        console.warn('[Store] 背景图片目录不存在:', bgImagePath)
-      }
-
-      // 复制用户自定义模型目录（用于角色模型3D页）
-      if (fs.existsSync(userModelsPath)) {
-        const modelEntries = fs.readdirSync(userModelsPath)
-        if (modelEntries.length > 0) {
-          const destUserModels = path.join(tempDir, 'user-models')
-          copyDirRecursive(userModelsPath, destUserModels)
-          console.log('[Store] 已复制 user-models 目录，条目数:', modelEntries.length)
-        }
-      }
-
-      // 列出临时目录中的所有文件
-      const tempFiles = fs.readdirSync(tempDir)
-      console.log('[Store] 临时目录文件列表:', tempFiles)
-      console.log('[Store] 临时目录文件数:', tempFiles.length)
+      console.log('[Store] 临时目录文件列表:', prepared.files)
+      console.log('[Store] 临时目录文件数:', prepared.files.length)
 
       // 打包成zip
       const packFileName = `${metadata.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_v${metadata.version}.bppack`
@@ -6225,7 +6246,11 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.shadowStrength = Math.max(0, Math.min(1, Number.isFinite(Number(m3d.shadowStrength))
     ? Number(m3d.shadowStrength)
     : 0.45))
-  m3d.entranceEffect = (m3d.entranceEffect === 'none' || m3d.entranceEffect === 'flameDissolve')
+  m3d.entranceEffect = (m3d.entranceEffect === 'none'
+    || m3d.entranceEffect === 'flameDissolve'
+    || m3d.entranceEffect === 'cardStorm'
+    || m3d.entranceEffect === 'spotlightRush'
+    || m3d.entranceEffect === 'prismBloom')
     ? m3d.entranceEffect
     : 'fade'
   if (!m3d.entranceParticle || typeof m3d.entranceParticle !== 'object') m3d.entranceParticle = {}
@@ -8215,11 +8240,23 @@ function normalizeCharacterModel3DLayoutInput(input) {
       || base.environmentPreset === 'sunnyDaylight'
       || base.environmentPreset === 'studioHighKey'
       || base.environmentPreset === 'goldenNoon')
+      || base.environmentPreset === 'cloudyStage'
+      || base.environmentPreset === 'moonlitBlue'
+      || base.environmentPreset === 'sunsetRose'
+      || base.environmentPreset === 'mistyMorning'
       ? base.environmentPreset
       : 'duskCinema',
     qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic' || base.qualityPreset === 'ultra')
       ? base.qualityPreset
       : 'high',
+    weatherPreset: (base.weatherPreset === 'thunderstorm' || base.weatherPreset === 'windy' || base.weatherPreset === 'stormWindy')
+      ? base.weatherPreset
+      : 'clear',
+    weather: {
+      windIntensity: Math.max(0, Math.min(3, Number.isFinite(Number(base?.weather?.windIntensity)) ? Number(base.weather.windIntensity) : 1.35)),
+      audioEnabled: base?.weather?.audioEnabled !== false,
+      audioVolume: Math.max(0, Math.min(1, Number.isFinite(Number(base?.weather?.audioVolume)) ? Number(base.weather.audioVolume) : 0.65))
+    },
     maxFps: Math.max(10, Math.min(240, Number.isFinite(Number(base.maxFps)) ? Number(base.maxFps) : 60)),
     droneMode: !!base.droneMode,
     fogEnabled: base.fogEnabled !== false,
@@ -8229,7 +8266,11 @@ function normalizeCharacterModel3DLayoutInput(input) {
     shadowStrength: Math.max(0, Math.min(1, Number.isFinite(Number(base.shadowStrength))
       ? Number(base.shadowStrength)
       : 0.45)),
-    entranceEffect: (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
+    entranceEffect: (base.entranceEffect === 'none'
+      || base.entranceEffect === 'flameDissolve'
+      || base.entranceEffect === 'cardStorm'
+      || base.entranceEffect === 'spotlightRush'
+      || base.entranceEffect === 'prismBloom')
       ? base.entranceEffect
       : 'fade',
     entranceParticle: {
@@ -8304,7 +8345,8 @@ function normalizeCharacterModel3DLayoutInput(input) {
       survivor2: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor2),
       survivor3: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor3),
       survivor4: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor4),
-      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected)
+      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected),
+      banUpdated: normalizeCameraKeyframe(base?.cameraKeyframes?.banUpdated)
     }
   }
 

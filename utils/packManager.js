@@ -33,6 +33,8 @@ const LAYOUT_JSON_AUTHORITATIVE_KEYS = [
   'fontConfig',
   'transparentBackground',
   'characterDisplayLayout',
+  'characterModel3DLayout',
+  'localBpCharacterModel3DLayout',
   'localBpConsoleBackground',
   'localBpCharacterDisplayLayout',
   'localBpGameRecord',
@@ -72,6 +74,69 @@ function copyDirectoryRecursive(srcDir, destDir) {
       fs.copyFileSync(srcPath, destPath)
     }
   }
+}
+
+function toSystemPathFromFileUrl(value) {
+  const raw = String(value || '').trim()
+  if (!/^file:/i.test(raw)) return raw
+  try {
+    return require('url').fileURLToPath(raw)
+  } catch {
+    return raw
+  }
+}
+
+function getUserModelRelativeSegments(assetPath) {
+  const raw = String(assetPath || '').trim()
+  if (!raw || /^(https?:|data:)/i.test(raw)) return []
+
+  const normalized = toSystemPathFromFileUrl(raw).replace(/\\/g, '/')
+  const segments = normalized.split('/').filter(Boolean)
+  const markerIndex = segments.findIndex(seg => seg.toLowerCase() === 'user-models')
+  if (markerIndex >= 0) {
+    return segments
+      .slice(markerIndex + 1)
+      .filter(seg => seg && seg !== '.' && seg !== '..')
+  }
+
+  const fallbackSegments = normalized
+    .replace(/^[.][/]+/, '')
+    .split('/')
+    .filter(seg => seg && seg !== '.' && seg !== '..')
+  if (!fallbackSegments.length) return []
+
+  const fallbackPath = path.join(userModelsPath, ...fallbackSegments)
+  if (fs.existsSync(fallbackPath)) return fallbackSegments
+  return []
+}
+
+function addReferencedUserModelEntry(assetPath, entries) {
+  if (!(entries instanceof Set)) return
+  const segments = getUserModelRelativeSegments(assetPath)
+  if (!segments.length) return
+  const topLevelEntry = segments[0]
+  if (!topLevelEntry) return
+  const sourcePath = path.join(userModelsPath, topLevelEntry)
+  if (fs.existsSync(sourcePath)) {
+    entries.add(topLevelEntry)
+  }
+}
+
+function collectReferencedUserModelEntries(layout) {
+  const entries = new Set()
+  if (!layout || typeof layout !== 'object') return []
+
+  const collectFromModelLayout = (modelLayout) => {
+    if (!modelLayout || typeof modelLayout !== 'object') return
+    addReferencedUserModelEntry(modelLayout.customModelPath, entries)
+    addReferencedUserModelEntry(modelLayout?.scene?.modelPath, entries)
+    addReferencedUserModelEntry(modelLayout?.videoScreen?.path, entries)
+    addReferencedUserModelEntry(modelLayout?.entranceParticle?.path, entries)
+  }
+
+  collectFromModelLayout(layout.characterModel3DLayout)
+  collectFromModelLayout(layout.localBpCharacterModel3DLayout)
+  return Array.from(entries)
 }
 
 /**
@@ -190,13 +255,7 @@ function remapLayoutAssetPaths(layout) {
     const raw = assetPath.trim()
     if (!raw) return raw
     if (/^(https?:|data:)/i.test(raw)) return raw
-    const normalized = raw.replace(/\\/g, '/')
-    const marker = '/user-models/'
-    const idx = normalized.toLowerCase().indexOf(marker)
-    if (idx < 0) return raw
-    const rel = normalized.slice(idx + marker.length).replace(/^\/+/, '')
-    if (!rel) return raw
-    const safeSegments = rel.split('/').filter(seg => seg && seg !== '.' && seg !== '..')
+    const safeSegments = getUserModelRelativeSegments(raw)
     if (!safeSegments.length) return raw
     return path.join(userModelsPath, ...safeSegments)
   }
@@ -307,6 +366,7 @@ async function prepareExportDir(options = {}) {
   const files = []
   let hasValidLayout = false
   let layoutRoot = null
+  let assetLayoutRoot = null
 
   // 复制布局文件
   if (fs.existsSync(layoutPath)) {
@@ -316,6 +376,7 @@ async function prepareExportDir(options = {}) {
         const layout = JSON.parse(content)
         if (layout && typeof layout === 'object' && Object.keys(layout).length > 0) {
           layoutRoot = layout
+          assetLayoutRoot = layout
           const destLayoutPath = path.join(tempDir, 'layout.json')
           fs.copyFileSync(layoutPath, destLayoutPath)
           files.push('layout.json')
@@ -338,6 +399,7 @@ async function prepareExportDir(options = {}) {
           // 防止 layout-v2 中旧字段覆盖 layout.json 最新值（例如 postMatchLayout）
           v2Layout = mergeAuthoritativeLayoutFields(v2Layout, layoutRoot)
         }
+        assetLayoutRoot = v2Layout
         const destLayoutV2Path = path.join(tempDir, 'layout-v2.json')
         fs.writeFileSync(destLayoutV2Path, JSON.stringify(v2Layout, null, 2))
         files.push('layout-v2.json')
@@ -409,12 +471,25 @@ async function prepareExportDir(options = {}) {
 
   // 复制用户自定义 3D 模型目录到 user-models 子目录
   if (fs.existsSync(userModelsPath)) {
-    const modelEntries = fs.readdirSync(userModelsPath)
+    const modelEntries = collectReferencedUserModelEntries(assetLayoutRoot)
     if (modelEntries.length > 0) {
       const modelsTempDir = path.join(tempDir, 'user-models')
-      copyDirectoryRecursive(userModelsPath, modelsTempDir)
-      files.push('user-models/')
-      console.log('[PackManager] 已打包 user-models 目录，条目数:', modelEntries.length)
+      fs.mkdirSync(modelsTempDir, { recursive: true })
+      for (const entry of modelEntries) {
+        const srcPath = path.join(userModelsPath, entry)
+        const destPath = path.join(modelsTempDir, entry)
+        const stat = fs.statSync(srcPath)
+        if (stat.isDirectory()) {
+          copyDirectoryRecursive(srcPath, destPath)
+          files.push(`user-models/${entry}/`)
+        } else if (stat.isFile()) {
+          fs.copyFileSync(srcPath, destPath)
+          files.push(`user-models/${entry}`)
+        }
+      }
+      console.log('[PackManager] 已按引用打包 user-models 资源，条目数:', modelEntries.length)
+    } else {
+      console.log('[PackManager] 当前布局未引用 user-models 资源，跳过打包 user-models')
     }
   }
 
@@ -963,6 +1038,7 @@ async function resetLayout(windowRefs = {}) {
 
 module.exports = {
   ensureDirectories,
+  prepareExportDir,
   exportPack,
   importPack,
   installFromStore,

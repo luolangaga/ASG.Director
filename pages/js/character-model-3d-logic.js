@@ -16,134 +16,219 @@
     { key: 'survivor2', label: '求生者选了2个' },
     { key: 'survivor3', label: '求生者选了3个' },
     { key: 'survivor4', label: '求生者选了4个' },
-    { key: 'hunterSelected', label: '监管者选了' }
+    { key: 'hunterSelected', label: '监管者选了' },
+    { key: 'banUpdated', label: '新增ban位/全局ban' }
   ]
   const ENVIRONMENT_PRESETS = {
     duskCinema: {
       label: '电影感黄昏',
-      skyTop: '#ff9e5e',
-      skyBottom: '#2a1630',
-      fogColor: '#2a1a26',
-      fogDensity: 0.0105,
-      fogNear: 22,
-      fogFar: 210,
-      ambientColor: '#ffd9b3',
-      ambientIntensity: 0.58,
-      hemiSkyColor: '#ffbc8a',
-      hemiGroundColor: '#2a1a2f',
-      hemiIntensity: 0.32,
-      keyColor: '#ffd29e',
-      keyIntensity: 1.55,
-      keyPos: { x: 10, y: 18, z: 7 },
-      fillColor: '#7aa8ff',
-      fillIntensity: 0.42,
+      skyTop: '#ffaf73',
+      skyBottom: '#463053',
+      fogColor: '#403042',
+      fogDensity: 0.0084,
+      fogNear: 28,
+      fogFar: 240,
+      ambientColor: '#ffd8b6',
+      ambientIntensity: 0.66,
+      hemiSkyColor: '#ffc694',
+      hemiGroundColor: '#3f3148',
+      hemiIntensity: 0.4,
+      keyColor: '#ffd5aa',
+      keyIntensity: 1.72,
+      keyPos: { x: 10, y: 18, z: 8 },
+      fillColor: '#91b6ff',
+      fillIntensity: 0.54,
       fillPos: { x: -12, y: 7, z: -9 },
-      shadowOpacity: 0.38
+      shadowOpacity: 0.34
     },
     cyberpunkNight: {
       label: '赛博朋克夜景',
-      skyTop: '#1f2d7d',
-      skyBottom: '#1a0431',
-      fogColor: '#150624',
-      fogDensity: 0.014,
-      fogNear: 16,
-      fogFar: 165,
-      ambientColor: '#7aa9ff',
-      ambientIntensity: 0.36,
-      hemiSkyColor: '#37d9ff',
-      hemiGroundColor: '#1b0031',
-      hemiIntensity: 0.44,
-      keyColor: '#ff56d8',
-      keyIntensity: 1.36,
+      skyTop: '#3245a1',
+      skyBottom: '#27133d',
+      fogColor: '#21122f',
+      fogDensity: 0.0108,
+      fogNear: 20,
+      fogFar: 196,
+      ambientColor: '#8eb2ff',
+      ambientIntensity: 0.48,
+      hemiSkyColor: '#58d5ff',
+      hemiGroundColor: '#271438',
+      hemiIntensity: 0.5,
+      keyColor: '#ff73d8',
+      keyIntensity: 1.48,
       keyPos: { x: 8, y: 13, z: 9 },
-      fillColor: '#45e8ff',
-      fillIntensity: 0.68,
+      fillColor: '#6ee8ff',
+      fillIntensity: 0.78,
       fillPos: { x: -10, y: 6, z: -7 },
-      shadowOpacity: 0.32
+      shadowOpacity: 0.3
     },
     horrorNight: {
       label: '恐怖风夜晚',
-      skyTop: '#11232b',
-      skyBottom: '#000000',
-      fogColor: '#020507',
-      fogDensity: 0.018,
-      fogNear: 10,
-      fogFar: 108,
-      ambientColor: '#5f7d73',
-      ambientIntensity: 0.22,
-      hemiSkyColor: '#37555d',
-      hemiGroundColor: '#020304',
-      hemiIntensity: 0.26,
-      keyColor: '#9ed4c2',
-      keyIntensity: 0.88,
+      skyTop: '#1d3440',
+      skyBottom: '#0d1117',
+      fogColor: '#0f171d',
+      fogDensity: 0.0135,
+      fogNear: 16,
+      fogFar: 132,
+      ambientColor: '#748f88',
+      ambientIntensity: 0.34,
+      hemiSkyColor: '#4d6770',
+      hemiGroundColor: '#0f1417',
+      hemiIntensity: 0.34,
+      keyColor: '#afd5c9',
+      keyIntensity: 1.02,
       keyPos: { x: 4, y: 10, z: 5 },
-      fillColor: '#2f4350',
-      fillIntensity: 0.25,
+      fillColor: '#415969',
+      fillIntensity: 0.34,
       fillPos: { x: -6, y: 4, z: -6 },
-      shadowOpacity: 0.45
+      shadowOpacity: 0.4
     },
     sunnyDaylight: {
       label: '晴空日光',
-      skyTop: '#7ec8ff',
-      skyBottom: '#e6f4ff',
-      fogColor: '#d7ebff',
-      fogDensity: 0.004,
-      fogNear: 38,
-      fogFar: 320,
+      skyTop: '#88cdfd',
+      skyBottom: '#edf7ff',
+      fogColor: '#ddeeff',
+      fogDensity: 0.0038,
+      fogNear: 42,
+      fogFar: 340,
       ambientColor: '#ffffff',
-      ambientIntensity: 0.9,
-      hemiSkyColor: '#a6d9ff',
-      hemiGroundColor: '#d7d0c4',
-      hemiIntensity: 0.58,
-      keyColor: '#fff2d9',
-      keyIntensity: 2.05,
+      ambientIntensity: 0.82,
+      hemiSkyColor: '#b2ddff',
+      hemiGroundColor: '#ddd5c7',
+      hemiIntensity: 0.54,
+      keyColor: '#fff2de',
+      keyIntensity: 1.86,
       keyPos: { x: 12, y: 22, z: 10 },
-      fillColor: '#cfe4ff',
-      fillIntensity: 0.9,
+      fillColor: '#d8e9ff',
+      fillIntensity: 0.78,
       fillPos: { x: -13, y: 9, z: -8 },
-      shadowOpacity: 0.26
+      shadowOpacity: 0.24
     },
     studioHighKey: {
       label: '棚拍高调光',
-      skyTop: '#f5f8ff',
-      skyBottom: '#fcfdff',
-      fogColor: '#f1f5ff',
+      skyTop: '#eef3ff',
+      skyBottom: '#fbfcff',
+      fogColor: '#edf2ff',
       fogDensity: 0.0035,
       fogNear: 44,
       fogFar: 360,
       ambientColor: '#ffffff',
-      ambientIntensity: 1.08,
+      ambientIntensity: 0.9,
       hemiSkyColor: '#ffffff',
       hemiGroundColor: '#eceff7',
-      hemiIntensity: 0.72,
+      hemiIntensity: 0.62,
       keyColor: '#fff8ed',
-      keyIntensity: 2.35,
+      keyIntensity: 1.92,
       keyPos: { x: 11, y: 19, z: 8 },
       fillColor: '#edf4ff',
-      fillIntensity: 1.16,
+      fillIntensity: 0.92,
       fillPos: { x: -11, y: 8, z: -8 },
-      shadowOpacity: 0.2
+      shadowOpacity: 0.18
     },
     goldenNoon: {
       label: '暖阳正午',
-      skyTop: '#9dd4ff',
-      skyBottom: '#fff0c7',
-      fogColor: '#ffecb5',
+      skyTop: '#9fd0ff',
+      skyBottom: '#ffe8ba',
+      fogColor: '#fde7b0',
       fogDensity: 0.0048,
       fogNear: 34,
       fogFar: 300,
-      ambientColor: '#ffe9b0',
-      ambientIntensity: 0.96,
+      ambientColor: '#ffe2ac',
+      ambientIntensity: 0.86,
       hemiSkyColor: '#a9d9ff',
       hemiGroundColor: '#f3db9f',
-      hemiIntensity: 0.62,
+      hemiIntensity: 0.56,
       keyColor: '#ffe4a3',
-      keyIntensity: 2.2,
+      keyIntensity: 1.94,
       keyPos: { x: 10, y: 21, z: 9 },
-      fillColor: '#ffd7a0',
-      fillIntensity: 0.98,
+      fillColor: '#ffd6ab',
+      fillIntensity: 0.82,
       fillPos: { x: -12, y: 8, z: -7 },
       shadowOpacity: 0.24
+    },
+    cloudyStage: {
+      label: '柔光阴天',
+      skyTop: '#aebccc',
+      skyBottom: '#dce5ee',
+      fogColor: '#cbd5df',
+      fogDensity: 0.0056,
+      fogNear: 32,
+      fogFar: 250,
+      ambientColor: '#f2f6fb',
+      ambientIntensity: 0.72,
+      hemiSkyColor: '#cad7e3',
+      hemiGroundColor: '#b7b7ae',
+      hemiIntensity: 0.5,
+      keyColor: '#f5f5f0',
+      keyIntensity: 1.42,
+      keyPos: { x: 9, y: 17, z: 8 },
+      fillColor: '#d7e1ea',
+      fillIntensity: 0.74,
+      fillPos: { x: -10, y: 7, z: -7 },
+      shadowOpacity: 0.22
+    },
+    moonlitBlue: {
+      label: '月夜蓝调',
+      skyTop: '#5f7bb3',
+      skyBottom: '#1e2941',
+      fogColor: '#253248',
+      fogDensity: 0.0088,
+      fogNear: 24,
+      fogFar: 220,
+      ambientColor: '#b2c5e8',
+      ambientIntensity: 0.46,
+      hemiSkyColor: '#7f99ca',
+      hemiGroundColor: '#202633',
+      hemiIntensity: 0.4,
+      keyColor: '#d3e2ff',
+      keyIntensity: 1.28,
+      keyPos: { x: 7, y: 15, z: 9 },
+      fillColor: '#6f8fb9',
+      fillIntensity: 0.5,
+      fillPos: { x: -9, y: 6, z: -8 },
+      shadowOpacity: 0.3
+    },
+    sunsetRose: {
+      label: '玫瑰晚霞',
+      skyTop: '#ff9eb2',
+      skyBottom: '#5a3558',
+      fogColor: '#5e4056',
+      fogDensity: 0.0078,
+      fogNear: 26,
+      fogFar: 236,
+      ambientColor: '#ffd6d7',
+      ambientIntensity: 0.64,
+      hemiSkyColor: '#ffb3bf',
+      hemiGroundColor: '#5a3d51',
+      hemiIntensity: 0.42,
+      keyColor: '#ffd8c6',
+      keyIntensity: 1.66,
+      keyPos: { x: 10, y: 18, z: 6 },
+      fillColor: '#a5b7ff',
+      fillIntensity: 0.48,
+      fillPos: { x: -12, y: 6, z: -8 },
+      shadowOpacity: 0.31
+    },
+    mistyMorning: {
+      label: '薄雾清晨',
+      skyTop: '#b8d3df',
+      skyBottom: '#f2ede2',
+      fogColor: '#d9e1dc',
+      fogDensity: 0.0068,
+      fogNear: 22,
+      fogFar: 210,
+      ambientColor: '#f7f3ea',
+      ambientIntensity: 0.74,
+      hemiSkyColor: '#c6dce7',
+      hemiGroundColor: '#d9d0c2',
+      hemiIntensity: 0.52,
+      keyColor: '#fff2da',
+      keyIntensity: 1.58,
+      keyPos: { x: 9, y: 18, z: 7 },
+      fillColor: '#dce7ef',
+      fillIntensity: 0.62,
+      fillPos: { x: -11, y: 7, z: -7 },
+      shadowOpacity: 0.2
     }
   }
   const QUALITY_PRESETS = {
@@ -152,6 +237,104 @@
     high: { label: '高', pixelRatio: 1.6, shadowMap: 2048, shadowRadius: 1.15, exposure: 1.02, contrast: 1.06, cinemaOverlay: 0.0, rim: 0.12, bounce: 0.08 },
     cinematic: { label: '电影级', pixelRatio: 1.9, shadowMap: 3072, shadowRadius: 1.5, exposure: 1.06, contrast: 1.12, cinemaOverlay: 0.5, rim: 0.22, bounce: 0.14 },
     ultra: { label: '超清细节', pixelRatio: 2.2, shadowMap: 4096, shadowRadius: 1.85, exposure: 1.08, contrast: 1.15, cinemaOverlay: 0.28, rim: 0.28, bounce: 0.18 }
+  }
+  const WEATHER_PRESETS = {
+    clear: {
+      label: '关闭',
+      rain: false,
+      wind: false,
+      lightning: false,
+      rainCount: 0,
+      rainSpeed: 0,
+      rainLength: 0.9,
+      rainDriftX: 0,
+      rainDriftZ: 0,
+      overlayOpacity: 0,
+      windOverlayOpacity: 0,
+      ambientMultiplier: 1,
+      hemiMultiplier: 1,
+      keyMultiplier: 1,
+      fillMultiplier: 1,
+      exposureMultiplier: 1,
+      swayAmplitude: 0,
+      swayPitch: 0,
+      swayYaw: 0,
+      windScrollSpeed: 0,
+      windParticleCount: 0,
+      windParticleSpeed: 0
+    },
+    thunderstorm: {
+      label: '雷雨天',
+      rain: true,
+      wind: false,
+      lightning: true,
+      rainCount: 760,
+      rainSpeed: 22,
+      rainLength: 1.3,
+      rainDriftX: 0.1,
+      rainDriftZ: 0.02,
+      overlayOpacity: 0.24,
+      windOverlayOpacity: 0.04,
+      ambientMultiplier: 0.76,
+      hemiMultiplier: 0.72,
+      keyMultiplier: 0.84,
+      fillMultiplier: 0.82,
+      exposureMultiplier: 0.92,
+      swayAmplitude: 0,
+      swayPitch: 0,
+      swayYaw: 0,
+      windScrollSpeed: 0.12,
+      windParticleCount: 0,
+      windParticleSpeed: 0
+    },
+    windy: {
+      label: '刮风天',
+      rain: false,
+      wind: true,
+      lightning: false,
+      rainCount: 0,
+      rainSpeed: 0,
+      rainLength: 0.9,
+      rainDriftX: 0,
+      rainDriftZ: 0,
+      overlayOpacity: 0.1,
+      windOverlayOpacity: 0.24,
+      ambientMultiplier: 0.94,
+      hemiMultiplier: 0.92,
+      keyMultiplier: 0.96,
+      fillMultiplier: 0.94,
+      exposureMultiplier: 0.97,
+      swayAmplitude: 0.042,
+      swayPitch: 0.012,
+      swayYaw: 0.018,
+      windScrollSpeed: 0.88,
+      windParticleCount: 180,
+      windParticleSpeed: 5.6
+    },
+    stormWindy: {
+      label: '刮风雷雨天',
+      rain: true,
+      wind: true,
+      lightning: true,
+      rainCount: 1100,
+      rainSpeed: 28,
+      rainLength: 1.55,
+      rainDriftX: 0.42,
+      rainDriftZ: 0.08,
+      overlayOpacity: 0.3,
+      windOverlayOpacity: 0.32,
+      ambientMultiplier: 0.68,
+      hemiMultiplier: 0.64,
+      keyMultiplier: 0.78,
+      fillMultiplier: 0.76,
+      exposureMultiplier: 0.88,
+      swayAmplitude: 0.06,
+      swayPitch: 0.018,
+      swayYaw: 0.026,
+      windScrollSpeed: 1.22,
+      windParticleCount: 260,
+      windParticleSpeed: 8.2
+    }
   }
 
   const ADVANCED_RENDER_DEFAULT = {
@@ -180,6 +363,12 @@
     transparentBackground: true,
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
+    weatherPreset: 'clear',
+    weather: {
+      windIntensity: 1.35,
+      audioEnabled: true,
+      audioVolume: 0.65
+    },
     maxFps: 60,
     droneMode: false,
     fogEnabled: true,
@@ -252,14 +441,19 @@
       survivor2: null,
       survivor3: null,
       survivor4: null,
-      hunterSelected: null
+      hunterSelected: null,
+      banUpdated: null
     }
   }
 
   const state = {
     bp: {
       survivors: [null, null, null, null],
-      hunter: null
+      hunter: null,
+      hunterBannedSurvivors: [],
+      survivorBannedHunters: [],
+      globalBannedSurvivors: [],
+      globalBannedHunters: []
     },
     officialModelMap: {},
     layout: deepClone(DEFAULT_LAYOUT),
@@ -269,7 +463,9 @@
     roleModelPathCache: {},
     bpSelectionState: {
       survivorCount: 0,
-      hunterSelected: false
+      hunterSelected: false,
+      roundBanCount: 0,
+      globalBanCount: 0
     },
     cameraDevices: [],
     virtualCameraMode: {
@@ -331,6 +527,41 @@
     animations: [],
     loadingPromise: null
   }
+  const weatherRuntime = {
+    group: null,
+    rain: null,
+    rainCount: 0,
+    rainPositions: null,
+    rainSeed: null,
+    windDust: null,
+    windDustCount: 0,
+    windDustPositions: null,
+    windDustSeed: null,
+    configKey: 'clear',
+    time: 0,
+    flashStrength: 0,
+    lightningCooldown: 2.8,
+    lightningPulseTimer: 0,
+    pendingFlash: 0,
+    windScroll: 0
+  }
+  const weatherAudio = {
+    context: null,
+    masterGain: null,
+    windGain: null,
+    rainGain: null,
+    noiseBuffer: null,
+    rainNoiseBuffer: null,
+    windSource: null,
+    rainSource: null,
+    windLowpass: null,
+    windHighpass: null,
+    windBodyGain: null,
+    rainHighpass: null,
+    rainLowpass: null,
+    unlocked: false,
+    unlockBound: false
+  }
 
   const orbit = {
     target: { x: 0, y: 1, z: 0 },
@@ -363,6 +594,9 @@
     renderRoot: document.getElementById('renderRoot'),
     fogOverlay: document.getElementById('fogOverlay'),
     cinemaOverlay: document.getElementById('cinemaOverlay'),
+    weatherOverlay: document.getElementById('weatherOverlay'),
+    weatherWindOverlay: document.getElementById('weatherWindOverlay'),
+    weatherFlashOverlay: document.getElementById('weatherFlashOverlay'),
     fpsBadge: document.getElementById('fpsBadge'),
     statusBar: document.getElementById('statusBar'),
     modeToggleBtn: document.getElementById('modeToggleBtn'),
@@ -425,6 +659,13 @@
     , shadowStrength: document.getElementById('shadowStrength')
     , droneModeEnabled: document.getElementById('droneModeEnabled')
     , maxFps: document.getElementById('maxFps')
+    , weatherPresetSelect: document.getElementById('weatherPresetSelect')
+    , applyWeatherPresetBtn: document.getElementById('applyWeatherPresetBtn')
+    , weatherPresetInfo: document.getElementById('weatherPresetInfo')
+    , weatherWindIntensity: document.getElementById('weatherWindIntensity')
+    , weatherAudioEnabled: document.getElementById('weatherAudioEnabled')
+    , weatherAudioVolume: document.getElementById('weatherAudioVolume')
+    , applyWeatherSettingsBtn: document.getElementById('applyWeatherSettingsBtn')
     , entranceEffectSelect: document.getElementById('entranceEffectSelect')
     , particleImportBtn: document.getElementById('particleImportBtn')
     , particleClearBtn: document.getElementById('particleClearBtn')
@@ -621,12 +862,24 @@
     out.qualityPreset = (typeof base.qualityPreset === 'string' && QUALITY_PRESETS[base.qualityPreset])
       ? base.qualityPreset
       : 'high'
+    out.weatherPreset = (typeof base.weatherPreset === 'string' && WEATHER_PRESETS[base.weatherPreset])
+      ? base.weatherPreset
+      : 'clear'
+    out.weather = {
+      windIntensity: Math.max(0, Math.min(3, asNumber(base?.weather?.windIntensity, DEFAULT_LAYOUT.weather.windIntensity))),
+      audioEnabled: base?.weather?.audioEnabled !== false,
+      audioVolume: Math.max(0, Math.min(1, asNumber(base?.weather?.audioVolume, DEFAULT_LAYOUT.weather.audioVolume)))
+    }
     out.maxFps = Math.max(10, Math.min(240, Math.round(asNumber(base.maxFps, 60))))
     out.droneMode = !!base.droneMode
     out.fogEnabled = base.fogEnabled !== false
     out.fogStrength = Math.max(0, Math.min(3, asNumber(base.fogStrength, 1)))
     out.shadowStrength = Math.max(0, Math.min(1, asNumber(base.shadowStrength, 0.45)))
-    out.entranceEffect = (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
+    out.entranceEffect = (base.entranceEffect === 'none'
+      || base.entranceEffect === 'flameDissolve'
+      || base.entranceEffect === 'cardStorm'
+      || base.entranceEffect === 'spotlightRush'
+      || base.entranceEffect === 'prismBloom')
       ? base.entranceEffect
       : 'fade'
     out.entranceParticle = {
@@ -882,6 +1135,10 @@
 
     root = new THREE.Group()
     scene.add(root)
+
+    weatherRuntime.group = new THREE.Group()
+    weatherRuntime.group.name = 'weather'
+    scene.add(weatherRuntime.group)
 
     // 阴影接收地面：无场景地面时也能看到角色落影
     shadowGround = new THREE.Mesh(
@@ -1213,6 +1470,677 @@
     if (shouldSave) scheduleSaveLayout()
   }
 
+  function getWeatherPresetConfig(presetKey = state.layout?.weatherPreset) {
+    const key = (typeof presetKey === 'string' && WEATHER_PRESETS[presetKey]) ? presetKey : 'clear'
+    return WEATHER_PRESETS[key]
+  }
+
+  function getWeatherSettings() {
+    const src = (state.layout?.weather && typeof state.layout.weather === 'object') ? state.layout.weather : {}
+    return {
+      windIntensity: Math.max(0, Math.min(3, asNumber(src.windIntensity, DEFAULT_LAYOUT.weather.windIntensity))),
+      audioEnabled: src.audioEnabled !== false,
+      audioVolume: Math.max(0, Math.min(1, asNumber(src.audioVolume, DEFAULT_LAYOUT.weather.audioVolume)))
+    }
+  }
+
+  function ensureWeatherSettings() {
+    const normalized = getWeatherSettings()
+    state.layout.weather = {
+      windIntensity: normalized.windIntensity,
+      audioEnabled: normalized.audioEnabled,
+      audioVolume: normalized.audioVolume
+    }
+    return state.layout.weather
+  }
+
+  function getWeatherEffectiveConfig(presetKey = state.layout?.weatherPreset) {
+    const base = getWeatherPresetConfig(presetKey)
+    const settings = getWeatherSettings()
+    const windFactor = Math.max(0, settings.windIntensity)
+    return {
+      ...base,
+      windIntensity: windFactor,
+      overlayOpacity: base.overlayOpacity,
+      windOverlayOpacity: base.wind ? Math.min(0.6, base.windOverlayOpacity * (0.6 + windFactor * 0.52)) : 0,
+      swayAmplitude: base.swayAmplitude * (0.55 + windFactor * 0.8),
+      swayPitch: base.swayPitch * (0.55 + windFactor * 0.8),
+      swayYaw: base.swayYaw * (0.55 + windFactor * 0.8),
+      windScrollSpeed: base.windScrollSpeed * (0.5 + windFactor * 0.7),
+      windParticleCount: Math.round(base.windParticleCount * (0.45 + windFactor * 0.78)),
+      windParticleSpeed: base.windParticleSpeed * (0.5 + windFactor * 0.75),
+      rainDriftX: base.rainDriftX * (base.wind ? (0.72 + windFactor * 0.62) : 1),
+      rainDriftZ: base.rainDriftZ * (base.wind ? (0.72 + windFactor * 0.62) : 1)
+    }
+  }
+
+  function syncWeatherInputs() {
+    const config = getWeatherPresetConfig(state.layout?.weatherPreset)
+    const settings = ensureWeatherSettings()
+    if (dom.weatherPresetSelect) dom.weatherPresetSelect.value = state.layout?.weatherPreset || 'clear'
+    if (dom.weatherWindIntensity) dom.weatherWindIntensity.value = String(settings.windIntensity.toFixed(2))
+    if (dom.weatherAudioEnabled) dom.weatherAudioEnabled.checked = settings.audioEnabled !== false
+    if (dom.weatherAudioVolume) dom.weatherAudioVolume.value = String(settings.audioVolume.toFixed(2))
+    if (dom.weatherPresetInfo) dom.weatherPresetInfo.textContent = `天气: ${config.label}`
+  }
+
+  function applyWeatherSettingsFromInputs(shouldSave = true) {
+    const next = ensureWeatherSettings()
+    next.windIntensity = Math.max(0, Math.min(3, asNumber(dom.weatherWindIntensity?.value, next.windIntensity)))
+    next.audioEnabled = dom.weatherAudioEnabled ? !!dom.weatherAudioEnabled.checked : next.audioEnabled !== false
+    next.audioVolume = Math.max(0, Math.min(1, asNumber(dom.weatherAudioVolume?.value, next.audioVolume)))
+    syncWeatherInputs()
+    applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
+    if (shouldSave) scheduleSaveLayout()
+  }
+
+  function createWeatherNoiseBuffer(ctx, mode = 'wind') {
+    const duration = 2.4
+    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate)
+    const channel = buffer.getChannelData(0)
+    if (mode === 'rain') {
+      let previous = 0
+      for (let i = 0; i < channel.length; i++) {
+        const white = Math.random() * 2 - 1
+        const bright = previous * 0.18 + white * 0.82
+        previous = bright
+        channel[i] = Math.max(-1, Math.min(1, bright * 0.75))
+      }
+      return buffer
+    }
+
+    let brown = 0
+    for (let i = 0; i < channel.length; i++) {
+      const white = Math.random() * 2 - 1
+      brown = (brown + white * 0.14) / 1.02
+      const pinkish = brown * 0.82 + white * 0.12
+      channel[i] = Math.max(-1, Math.min(1, pinkish))
+    }
+    return buffer
+  }
+
+  function ensureWeatherAudioContext() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return null
+    if (weatherAudio.context) return weatherAudio.context
+    try {
+      const ctx = new AudioCtx()
+      const masterGain = ctx.createGain()
+      const windGain = ctx.createGain()
+      const rainGain = ctx.createGain()
+      masterGain.gain.value = 0
+      windGain.gain.value = 0
+      rainGain.gain.value = 0
+      windGain.connect(masterGain)
+      rainGain.connect(masterGain)
+      masterGain.connect(ctx.destination)
+
+      weatherAudio.context = ctx
+      weatherAudio.masterGain = masterGain
+      weatherAudio.windGain = windGain
+      weatherAudio.rainGain = rainGain
+      weatherAudio.noiseBuffer = createWeatherNoiseBuffer(ctx, 'wind')
+      weatherAudio.rainNoiseBuffer = createWeatherNoiseBuffer(ctx, 'rain')
+      return ctx
+    } catch (error) {
+      console.warn('[CharacterModel3D] 创建天气音效上下文失败:', error)
+      return null
+    }
+  }
+
+  function createLoopingWeatherNoise(kind) {
+    const ctx = ensureWeatherAudioContext()
+    if (!ctx || !weatherAudio.noiseBuffer) return null
+
+    const source = ctx.createBufferSource()
+    source.buffer = kind === 'rain' ? (weatherAudio.rainNoiseBuffer || weatherAudio.noiseBuffer) : weatherAudio.noiseBuffer
+    source.loop = true
+
+    if (kind === 'wind') {
+      const highpass = ctx.createBiquadFilter()
+      const lowpass = ctx.createBiquadFilter()
+      const bodyGain = ctx.createGain()
+      highpass.type = 'highpass'
+      highpass.frequency.value = 42
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = 260
+      lowpass.Q.value = 0.2
+      bodyGain.gain.value = 0.82
+      source.playbackRate.value = 0.48
+      source.connect(highpass)
+      highpass.connect(lowpass)
+      lowpass.connect(bodyGain)
+      bodyGain.connect(weatherAudio.windGain)
+      weatherAudio.windHighpass = highpass
+      weatherAudio.windLowpass = lowpass
+      weatherAudio.windBodyGain = bodyGain
+    } else {
+      const highpass = ctx.createBiquadFilter()
+      const lowpass = ctx.createBiquadFilter()
+      highpass.type = 'highpass'
+      highpass.frequency.value = 980
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = 5200
+      lowpass.Q.value = 0.18
+      source.playbackRate.value = 1.08
+      source.connect(highpass)
+      highpass.connect(lowpass)
+      lowpass.connect(weatherAudio.rainGain)
+      weatherAudio.rainHighpass = highpass
+      weatherAudio.rainLowpass = lowpass
+    }
+
+    source.start()
+    return source
+  }
+
+  function ensureWeatherAudioSources() {
+    const ctx = ensureWeatherAudioContext()
+    if (!ctx) return
+    if (!weatherAudio.windSource) weatherAudio.windSource = createLoopingWeatherNoise('wind')
+    if (!weatherAudio.rainSource) weatherAudio.rainSource = createLoopingWeatherNoise('rain')
+  }
+
+  function resumeWeatherAudio() {
+    const ctx = ensureWeatherAudioContext()
+    if (!ctx) return
+    ensureWeatherAudioSources()
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
+    weatherAudio.unlocked = true
+  }
+
+  function primeWeatherAudioUnlock() {
+    if (weatherAudio.unlockBound) return
+    const unlock = () => {
+      resumeWeatherAudio()
+      window.removeEventListener('pointerdown', unlock, true)
+      window.removeEventListener('keydown', unlock, true)
+      weatherAudio.unlockBound = false
+    }
+    weatherAudio.unlockBound = true
+    window.addEventListener('pointerdown', unlock, true)
+    window.addEventListener('keydown', unlock, true)
+  }
+
+  function updateWeatherAudioState(immediate = false) {
+    const ctx = ensureWeatherAudioContext()
+    if (!ctx || !weatherAudio.masterGain || !weatherAudio.windGain || !weatherAudio.rainGain) return
+
+    const config = getWeatherEffectiveConfig(state.layout?.weatherPreset)
+    const settings = ensureWeatherSettings()
+    const enabled = settings.audioEnabled !== false && state.layout?.weatherPreset !== 'clear'
+    const masterTarget = enabled ? settings.audioVolume : 0
+    const windTarget = enabled && config.wind ? Math.min(0.2, 0.014 + settings.audioVolume * (0.042 + config.windIntensity * 0.03)) : 0
+    const rainTarget = enabled && config.rain ? Math.min(0.38, 0.06 + settings.audioVolume * (config.wind ? 0.18 : 0.22)) : 0
+    const now = ctx.currentTime
+    const ramp = immediate ? 0.01 : 0.22
+
+    ensureWeatherAudioSources()
+    if (enabled) resumeWeatherAudio()
+    else primeWeatherAudioUnlock()
+
+    weatherAudio.masterGain.gain.cancelScheduledValues(now)
+    weatherAudio.windGain.gain.cancelScheduledValues(now)
+    weatherAudio.rainGain.gain.cancelScheduledValues(now)
+    weatherAudio.masterGain.gain.linearRampToValueAtTime(masterTarget, now + ramp)
+    weatherAudio.windGain.gain.linearRampToValueAtTime(windTarget, now + ramp)
+    weatherAudio.rainGain.gain.linearRampToValueAtTime(rainTarget, now + ramp)
+
+    const gust = 0.86 + Math.sin(weatherRuntime.time * 0.46) * 0.16 + Math.sin(weatherRuntime.time * 0.19 + 1.2) * 0.08
+    if (weatherAudio.windLowpass) {
+      weatherAudio.windLowpass.frequency.setTargetAtTime(
+        enabled && config.wind ? (180 + config.windIntensity * 70 + gust * 35) : 220,
+        now,
+        immediate ? 0.01 : 0.28
+      )
+    }
+    if (weatherAudio.windHighpass) {
+      weatherAudio.windHighpass.frequency.setTargetAtTime(
+        enabled && config.wind ? (34 + config.windIntensity * 8) : 42,
+        now,
+        immediate ? 0.01 : 0.32
+      )
+    }
+    if (weatherAudio.windBodyGain) {
+      weatherAudio.windBodyGain.gain.setTargetAtTime(
+        enabled && config.wind ? (0.78 + gust * 0.12) : 0.8,
+        now,
+        immediate ? 0.01 : 0.25
+      )
+    }
+    if (weatherAudio.rainHighpass) {
+      weatherAudio.rainHighpass.frequency.setTargetAtTime(
+        enabled && config.rain ? (860 + Math.min(180, config.windIntensity * 70)) : 980,
+        now,
+        immediate ? 0.01 : 0.24
+      )
+    }
+    if (weatherAudio.rainLowpass) {
+      weatherAudio.rainLowpass.frequency.setTargetAtTime(
+        enabled && config.rain ? 4600 : 5200,
+        now,
+        immediate ? 0.01 : 0.24
+      )
+    }
+  }
+
+  function playWeatherThunderSound(intensity = 1) {
+    const ctx = ensureWeatherAudioContext()
+    const settings = ensureWeatherSettings()
+    if (!ctx || !settings.audioEnabled || state.layout?.weatherPreset === 'clear') return
+    ensureWeatherAudioSources()
+    resumeWeatherAudio()
+
+    const startAt = ctx.currentTime + 0.09 + Math.random() * 0.16
+    const peak = Math.max(0.045, Math.min(0.22, settings.audioVolume * 0.28 * intensity))
+
+    const sourceA = ctx.createBufferSource()
+    const sourceB = ctx.createBufferSource()
+    sourceA.buffer = weatherAudio.noiseBuffer
+    sourceB.buffer = weatherAudio.noiseBuffer
+
+    const lowpassA = ctx.createBiquadFilter()
+    const lowpassB = ctx.createBiquadFilter()
+    const gainA = ctx.createGain()
+    const gainB = ctx.createGain()
+
+    lowpassA.type = 'lowpass'
+    lowpassA.frequency.value = 190
+    lowpassB.type = 'lowpass'
+    lowpassB.frequency.value = 110
+
+    gainA.gain.value = 0.0001
+    gainB.gain.value = 0.0001
+
+    sourceA.playbackRate.value = 0.31 + Math.random() * 0.04
+    sourceB.playbackRate.value = 0.18 + Math.random() * 0.03
+
+    sourceA.connect(lowpassA)
+    lowpassA.connect(gainA)
+    gainA.connect(weatherAudio.masterGain)
+
+    sourceB.connect(lowpassB)
+    lowpassB.connect(gainB)
+    gainB.connect(weatherAudio.masterGain)
+
+    gainA.gain.setValueAtTime(0.0001, startAt)
+    gainA.gain.exponentialRampToValueAtTime(peak, startAt + 0.07)
+    gainA.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.42), startAt + 0.75)
+    gainA.gain.exponentialRampToValueAtTime(0.0001, startAt + 2.8)
+
+    gainB.gain.setValueAtTime(0.0001, startAt + 0.18)
+    gainB.gain.exponentialRampToValueAtTime(peak * 0.52, startAt + 0.34)
+    gainB.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.18), startAt + 1.6)
+    gainB.gain.exponentialRampToValueAtTime(0.0001, startAt + 3.8)
+
+    sourceA.start(startAt)
+    sourceB.start(startAt + 0.08)
+    sourceA.stop(startAt + 3.1)
+    sourceB.stop(startAt + 4.0)
+  }
+
+  function disposeWeatherRain() {
+    if (weatherRuntime.rain && weatherRuntime.group) {
+      weatherRuntime.group.remove(weatherRuntime.rain)
+    }
+    if (weatherRuntime.rain?.geometry) {
+      try { weatherRuntime.rain.geometry.dispose() } catch { }
+    }
+    if (weatherRuntime.rain?.material) {
+      try { weatherRuntime.rain.material.dispose() } catch { }
+    }
+    weatherRuntime.rain = null
+    weatherRuntime.rainCount = 0
+    weatherRuntime.rainPositions = null
+    weatherRuntime.rainSeed = null
+  }
+
+  function disposeWeatherWind() {
+    if (weatherRuntime.windDust && weatherRuntime.group) {
+      weatherRuntime.group.remove(weatherRuntime.windDust)
+    }
+    if (weatherRuntime.windDust?.geometry) {
+      try { weatherRuntime.windDust.geometry.dispose() } catch { }
+    }
+    if (weatherRuntime.windDust?.material) {
+      try { weatherRuntime.windDust.material.dispose() } catch { }
+    }
+    weatherRuntime.windDust = null
+    weatherRuntime.windDustCount = 0
+    weatherRuntime.windDustPositions = null
+    weatherRuntime.windDustSeed = null
+  }
+
+  function writeWeatherRainSegment(positions, index, x, y, z, config) {
+    const base = index * 6
+    positions[base] = x
+    positions[base + 1] = y
+    positions[base + 2] = z
+    positions[base + 3] = x - config.rainDriftX * config.rainLength
+    positions[base + 4] = y - config.rainLength
+    positions[base + 5] = z - config.rainDriftZ * config.rainLength
+  }
+
+  function rebuildWeatherRain(config) {
+    if (!weatherRuntime.group || !THREE) return
+    if (!config.rain || config.rainCount <= 0) {
+      disposeWeatherRain()
+      weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
+      return
+    }
+    if (weatherRuntime.rain && weatherRuntime.rainCount === config.rainCount && weatherRuntime.configKey === (state.layout?.weatherPreset || 'clear')) {
+      if (weatherRuntime.rain.material) {
+        weatherRuntime.rain.material.opacity = config.wind ? 0.32 : 0.26
+      }
+      return
+    }
+
+    disposeWeatherRain()
+
+    const count = Math.max(64, Math.min(2400, Math.round(asNumber(config.rainCount, 0))))
+    const positions = new Float32Array(count * 6)
+    const seed = new Float32Array(count * 4)
+    for (let i = 0; i < count; i++) {
+      const base = i * 4
+      const x = (Math.random() - 0.5) * 28
+      const y = 0.6 + Math.random() * 18
+      const z = (Math.random() - 0.5) * 28
+      seed[base] = x
+      seed[base + 1] = y
+      seed[base + 2] = z
+      seed[base + 3] = 0.82 + Math.random() * 0.36
+      writeWeatherRainSegment(positions, i, x, y, z, config)
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+
+    const material = new THREE.LineBasicMaterial({
+      color: 0xbfdcff,
+      transparent: true,
+      opacity: config.wind ? 0.32 : 0.26,
+      depthWrite: false
+    })
+
+    const rain = new THREE.LineSegments(geometry, material)
+    rain.frustumCulled = false
+    rain.renderOrder = 2
+    weatherRuntime.group.add(rain)
+    weatherRuntime.rain = rain
+    weatherRuntime.rainCount = count
+    weatherRuntime.rainPositions = positions
+    weatherRuntime.rainSeed = seed
+    weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
+  }
+
+  function rebuildWeatherWind(config) {
+    if (!weatherRuntime.group || !THREE) return
+    if (!config.wind || config.windParticleCount <= 0) {
+      disposeWeatherWind()
+      return
+    }
+    if (weatherRuntime.windDust && weatherRuntime.windDustCount === config.windParticleCount && weatherRuntime.configKey === (state.layout?.weatherPreset || 'clear')) {
+      return
+    }
+
+    disposeWeatherWind()
+
+    const count = Math.max(40, Math.min(800, Math.round(asNumber(config.windParticleCount, 0))))
+    const positions = new Float32Array(count * 3)
+    const seed = new Float32Array(count * 5)
+    for (let i = 0; i < count; i++) {
+      const p = i * 3
+      const s = i * 5
+      const x = (Math.random() - 0.5) * 28
+      const y = 0.35 + Math.random() * 7.5
+      const z = (Math.random() - 0.5) * 22
+      positions[p] = x
+      positions[p + 1] = y
+      positions[p + 2] = z
+      seed[s] = x
+      seed[s + 1] = y
+      seed[s + 2] = z
+      seed[s + 3] = 0.8 + Math.random() * 0.7
+      seed[s + 4] = Math.random() * Math.PI * 2
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+
+    const material = new THREE.PointsMaterial({
+      color: 0xdfeaf3,
+      size: config.windParticleSpeed > 7 ? 0.18 : 0.14,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: config.windParticleSpeed > 7 ? 0.22 : 0.16,
+      depthWrite: false
+    })
+
+    const windDust = new THREE.Points(geometry, material)
+    windDust.frustumCulled = false
+    windDust.renderOrder = 3
+    weatherRuntime.group.add(windDust)
+    weatherRuntime.windDust = windDust
+    weatherRuntime.windDustCount = count
+    weatherRuntime.windDustPositions = positions
+    weatherRuntime.windDustSeed = seed
+  }
+
+  function applyWeatherLightingState(flashStrength = weatherRuntime.flashStrength) {
+    const config = getWeatherEffectiveConfig(state.layout?.weatherPreset)
+    const adv = state.layout?.advancedRender || ADVANCED_RENDER_DEFAULT
+    const q = QUALITY_PRESETS[state.layout?.qualityPreset || 'high'] || QUALITY_PRESETS.high
+    const flash = Math.max(0, Math.min(1, asNumber(flashStrength, 0)))
+    const useStylizedLightTexture = adv.lightTextureEnabled !== false
+
+    if (renderer) {
+      renderer.toneMappingExposure = q.exposure * adv.exposure * config.exposureMultiplier * (1 + flash * 0.72)
+    }
+    if (sceneLights.ambient) {
+      const base = asNumber(sceneLights.ambient.userData?.__asgBaseIntensity, sceneLights.ambient.intensity)
+      sceneLights.ambient.intensity = Math.max(0, base * adv.ambientBoost * config.ambientMultiplier * (1 + flash * 0.34))
+    }
+    if (sceneLights.hemi) {
+      const base = asNumber(sceneLights.hemi.userData?.__asgBaseIntensity, sceneLights.hemi.intensity)
+      sceneLights.hemi.intensity = Math.max(0, base * adv.hemiBoost * config.hemiMultiplier * (1 + flash * 0.26))
+    }
+    if (sceneLights.key) {
+      const base = asNumber(sceneLights.key.userData?.__asgBaseIntensity, sceneLights.key.intensity)
+      sceneLights.key.intensity = Math.max(0, base * adv.keyBoost * config.keyMultiplier * (1 + flash * 0.84))
+    }
+    if (sceneLights.fill) {
+      const base = asNumber(sceneLights.fill.userData?.__asgBaseIntensity, sceneLights.fill.intensity)
+      sceneLights.fill.intensity = Math.max(0, base * adv.fillBoost * config.fillMultiplier * (1 + flash * 0.45))
+    }
+    if (sceneLights.rim) {
+      const base = asNumber(sceneLights.rim.userData?.__asgBaseIntensity, sceneLights.rim.intensity)
+      sceneLights.rim.intensity = useStylizedLightTexture
+        ? Math.max(0, base * adv.rimBoost * config.keyMultiplier * (1 + flash * 0.18))
+        : 0
+    }
+    if (sceneLights.bounce) {
+      const base = asNumber(sceneLights.bounce.userData?.__asgBaseIntensity, sceneLights.bounce.intensity)
+      sceneLights.bounce.intensity = useStylizedLightTexture
+        ? Math.max(0, base * adv.bounceBoost * config.fillMultiplier * (1 + flash * 0.12))
+        : 0
+    }
+  }
+
+  function updateWeatherOverlays(config, time = 0) {
+    const gustPulse = config.wind ? (0.86 + Math.sin(time * 2.1) * 0.12 + Math.sin(time * 0.63 + 1.4) * 0.08) : 0
+    if (dom.weatherOverlay) {
+      dom.weatherOverlay.style.opacity = String(Math.max(0, config.overlayOpacity).toFixed(3))
+    }
+    if (dom.weatherWindOverlay) {
+      dom.weatherWindOverlay.style.opacity = String(Math.max(0, config.windOverlayOpacity * Math.max(0.18, gustPulse)).toFixed(3))
+      dom.weatherWindOverlay.style.backgroundPosition = `${(-weatherRuntime.windScroll * 84).toFixed(1)}px ${(-weatherRuntime.windScroll * 10).toFixed(1)}px, ${(-weatherRuntime.windScroll * 52).toFixed(1)}px ${(weatherRuntime.windScroll * 8).toFixed(1)}px, ${(-weatherRuntime.windScroll * 66).toFixed(1)}px ${(weatherRuntime.windScroll * 5).toFixed(1)}px, 0px 0px`
+    }
+    if (dom.weatherFlashOverlay) {
+      dom.weatherFlashOverlay.style.opacity = String(Math.max(0, Math.pow(weatherRuntime.flashStrength, 1.15) * 0.88).toFixed(3))
+    }
+  }
+
+  function updateWeatherRain(config, dt) {
+    if (!weatherRuntime.rain || !weatherRuntime.rainPositions || !weatherRuntime.rainSeed) return
+    const positions = weatherRuntime.rainPositions
+    const seed = weatherRuntime.rainSeed
+    const count = weatherRuntime.rainCount
+    const minY = 0.25
+    const maxY = 18.5
+    const halfX = 15
+    const halfZ = 15
+    const xDrift = config.rainDriftX * dt * 3.2
+    const zDrift = config.rainDriftZ * dt * 3.2
+
+    for (let i = 0; i < count; i++) {
+      const base = i * 4
+      let x = seed[base]
+      let y = seed[base + 1]
+      let z = seed[base + 2]
+      const speedMul = seed[base + 3]
+
+      x += xDrift * speedMul
+      y -= config.rainSpeed * dt * speedMul
+      z += zDrift * speedMul
+
+      if (y < minY || x < -halfX - 2 || x > halfX + 2 || z < -halfZ - 2 || z > halfZ + 2) {
+        x = (Math.random() - 0.5) * halfX * 2
+        y = maxY + Math.random() * 4
+        z = (Math.random() - 0.5) * halfZ * 2
+        seed[base + 3] = 0.82 + Math.random() * 0.36
+      }
+
+      seed[base] = x
+      seed[base + 1] = y
+      seed[base + 2] = z
+      writeWeatherRainSegment(positions, i, x, y, z, config)
+    }
+
+    weatherRuntime.rain.geometry.attributes.position.needsUpdate = true
+  }
+
+  function updateWeatherWind(config, dt, time = weatherRuntime.time) {
+    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed) return
+    const positions = weatherRuntime.windDustPositions
+    const seed = weatherRuntime.windDustSeed
+    const count = weatherRuntime.windDustCount
+    const halfX = 16
+    const halfZ = 12
+    const speed = Math.max(0, asNumber(config.windParticleSpeed, 0))
+
+    for (let i = 0; i < count; i++) {
+      const p = i * 3
+      const s = i * 5
+      let x = positions[p]
+      let y = positions[p + 1]
+      let z = positions[p + 2]
+      const speedMul = seed[s + 3]
+      const phase = seed[s + 4]
+
+      x += dt * speed * speedMul
+      y = seed[s + 1] + Math.sin(time * 1.8 + phase) * 0.18
+      z = seed[s + 2] + Math.cos(time * 1.35 + phase) * 0.45
+
+      if (x > halfX + 3) {
+        x = -halfX - Math.random() * 3
+        seed[s + 1] = 0.35 + Math.random() * 7.5
+        seed[s + 2] = (Math.random() - 0.5) * halfZ * 2
+        seed[s + 3] = 0.8 + Math.random() * 0.7
+        y = seed[s + 1]
+        z = seed[s + 2]
+      }
+
+      positions[p] = x
+      positions[p + 1] = y
+      positions[p + 2] = z
+    }
+
+    weatherRuntime.windDust.geometry.attributes.position.needsUpdate = true
+  }
+
+  function updateWeatherAffectedGroups(config, time = 0) {
+    const keys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter', 'custom1']
+    for (let i = 0; i < keys.length; i++) {
+      const runtime = slotRuntime.get(keys[i])
+      if (!runtime || !runtime.group) continue
+      const base = runtime.weatherBaseRotation || {
+        x: runtime.group.rotation.x,
+        y: runtime.group.rotation.y,
+        z: runtime.group.rotation.z
+      }
+      runtime.group.rotation.x = base.x
+      runtime.group.rotation.y = base.y
+      runtime.group.rotation.z = base.z
+    }
+  }
+
+  function triggerLightningFlash() {
+    weatherRuntime.flashStrength = 1
+    weatherRuntime.pendingFlash = Math.random() < 0.52 ? (0.28 + Math.random() * 0.26) : 0
+    weatherRuntime.lightningPulseTimer = weatherRuntime.pendingFlash > 0 ? (0.07 + Math.random() * 0.08) : 0
+    weatherRuntime.lightningCooldown = 2.8 + Math.random() * 5.4
+    playWeatherThunderSound(0.9 + Math.random() * 0.3)
+  }
+
+  function applyWeatherPreset(presetKey, shouldSave = true) {
+    const key = (typeof presetKey === 'string' && WEATHER_PRESETS[presetKey]) ? presetKey : 'clear'
+    state.layout.weatherPreset = key
+    const baseConfig = WEATHER_PRESETS[key]
+    const config = getWeatherEffectiveConfig(key)
+    if (!baseConfig.lightning) {
+      weatherRuntime.flashStrength = 0
+      weatherRuntime.pendingFlash = 0
+      weatherRuntime.lightningPulseTimer = 0
+      weatherRuntime.lightningCooldown = 2.8
+    }
+    rebuildWeatherRain(config)
+    rebuildWeatherWind(config)
+    syncWeatherInputs()
+    applyWeatherLightingState(0)
+    updateWeatherAffectedGroups(config, weatherRuntime.time)
+    updateWeatherOverlays(config, weatherRuntime.time)
+    updateWeatherAudioState(true)
+    if (shouldSave) scheduleSaveLayout()
+  }
+
+  function updateWeatherEffects(dt) {
+    const config = getWeatherEffectiveConfig(state.layout?.weatherPreset)
+    weatherRuntime.time += dt
+    weatherRuntime.windScroll += dt * config.windScrollSpeed
+
+    if (config.lightning) {
+      weatherRuntime.lightningCooldown -= dt
+      if (weatherRuntime.lightningPulseTimer > 0) {
+        weatherRuntime.lightningPulseTimer -= dt
+        if (weatherRuntime.lightningPulseTimer <= 0 && weatherRuntime.pendingFlash > 0) {
+          weatherRuntime.flashStrength = Math.max(weatherRuntime.flashStrength, weatherRuntime.pendingFlash)
+          weatherRuntime.pendingFlash = 0
+        }
+      }
+      if (weatherRuntime.lightningCooldown <= 0) {
+        triggerLightningFlash()
+      }
+    } else {
+      weatherRuntime.lightningCooldown = 2.8
+      weatherRuntime.lightningPulseTimer = 0
+      weatherRuntime.pendingFlash = 0
+      weatherRuntime.flashStrength = 0
+    }
+
+    if (weatherRuntime.flashStrength > 0) {
+      weatherRuntime.flashStrength = Math.max(0, weatherRuntime.flashStrength - dt * 4.4)
+    }
+
+    updateWeatherRain(config, dt)
+    updateWeatherWind(config, dt, weatherRuntime.time)
+    updateWeatherAffectedGroups(config, weatherRuntime.time)
+    applyWeatherLightingState(weatherRuntime.flashStrength)
+    updateWeatherOverlays(config, weatherRuntime.time)
+    updateWeatherAudioState(false)
+  }
+
   function getToonGradientMap(steps = 3) {
     const n = Math.max(2, Math.min(5, Math.round(asNumber(steps, 3))))
     if (toonGradientMapCache.has(n)) return toonGradientMapCache.get(n)
@@ -1433,6 +2361,7 @@
     if (dom.droneModeEnabled) dom.droneModeEnabled.checked = !!state.layout.droneMode
     if (dom.renderQualitySelect) dom.renderQualitySelect.value = state.layout.qualityPreset || 'high'
     applyAdvancedRenderSettings(false, false)
+    applyWeatherLightingState(weatherRuntime.flashStrength)
     if (shouldSave) scheduleSaveLayout()
   }
 
@@ -1623,8 +2552,57 @@
     return list.filter(v => typeof v === 'string' && v.trim()).length
   }
 
+  function countNamedEntries(list) {
+    if (!Array.isArray(list)) return 0
+    return list.filter(v => typeof v === 'string' && v.trim()).length
+  }
+
   function isHunterSelected(value) {
     return typeof value === 'string' && value.trim().length > 0
+  }
+
+  function readBpSnapshot(input) {
+    const source = (input && typeof input === 'object') ? input : {}
+    const round = (source.currentRoundData && typeof source.currentRoundData === 'object') ? source.currentRoundData : {}
+    const survivors = Array.isArray(source.survivors)
+      ? source.survivors
+      : (Array.isArray(round.selectedSurvivors) ? round.selectedSurvivors : [null, null, null, null])
+    const hunter = (typeof source.hunter === 'string' && source.hunter)
+      ? source.hunter
+      : (round.selectedHunter || null)
+    const hunterBannedSurvivors = Array.isArray(source.hunterBannedSurvivors)
+      ? source.hunterBannedSurvivors
+      : (Array.isArray(round.hunterBannedSurvivors) ? round.hunterBannedSurvivors : [])
+    const survivorBannedHunters = Array.isArray(source.survivorBannedHunters)
+      ? source.survivorBannedHunters
+      : (Array.isArray(round.survivorBannedHunters) ? round.survivorBannedHunters : [])
+    const globalBannedSurvivors = Array.isArray(source.globalBannedSurvivors) ? source.globalBannedSurvivors : []
+    const globalBannedHunters = Array.isArray(source.globalBannedHunters) ? source.globalBannedHunters : []
+    return {
+      survivors: Array.isArray(survivors) ? survivors.slice(0, 4) : [null, null, null, null],
+      hunter: hunter || null,
+      hunterBannedSurvivors: hunterBannedSurvivors.slice(),
+      survivorBannedHunters: survivorBannedHunters.slice(),
+      globalBannedSurvivors: globalBannedSurvivors.slice(),
+      globalBannedHunters: globalBannedHunters.slice()
+    }
+  }
+
+  function applyBpSnapshotToState(snapshot) {
+    const next = snapshot && typeof snapshot === 'object' ? snapshot : readBpSnapshot(null)
+    state.bp.survivors = Array.isArray(next.survivors) ? next.survivors.slice(0, 4) : [null, null, null, null]
+    while (state.bp.survivors.length < 4) state.bp.survivors.push(null)
+    state.bp.hunter = next.hunter || null
+    state.bp.hunterBannedSurvivors = Array.isArray(next.hunterBannedSurvivors) ? next.hunterBannedSurvivors.slice() : []
+    state.bp.survivorBannedHunters = Array.isArray(next.survivorBannedHunters) ? next.survivorBannedHunters.slice() : []
+    state.bp.globalBannedSurvivors = Array.isArray(next.globalBannedSurvivors) ? next.globalBannedSurvivors.slice() : []
+    state.bp.globalBannedHunters = Array.isArray(next.globalBannedHunters) ? next.globalBannedHunters.slice() : []
+    return {
+      survivorCount: countSelectedSurvivors(state.bp.survivors),
+      hunterSelected: isHunterSelected(state.bp.hunter),
+      roundBanCount: countNamedEntries(state.bp.hunterBannedSurvivors) + countNamedEntries(state.bp.survivorBannedHunters),
+      globalBanCount: countNamedEntries(state.bp.globalBannedSurvivors) + countNamedEntries(state.bp.globalBannedHunters)
+    }
   }
 
   function cancelCameraTransition() {
@@ -1857,6 +2835,11 @@
     const s = ensureVec3(t.scale, { x: 1, y: 1, z: 1 })
     runtime.group.position.set(p.x, p.y, p.z)
     runtime.group.rotation.set(toRadians(r.x), toRadians(r.y), toRadians(r.z))
+    runtime.weatherBaseRotation = {
+      x: toRadians(r.x),
+      y: toRadians(r.y),
+      z: toRadians(r.z)
+    }
     if (key === 'scene') {
       runtime.group.scale.set(s.x, s.y, s.z)
     } else if (key === 'light1') {
@@ -2152,6 +3135,11 @@
     for (let i = activeEntranceEffects.length - 1; i >= 0; i--) {
       const fx = activeEntranceEffects[i]
       if (fx.modelRoot !== modelRoot) continue
+      restoreEntranceTransform(fx)
+      if (fx.transientGroup) {
+        disposeTransientObject(fx.transientGroup)
+        fx.transientGroup = null
+      }
       if (Array.isArray(fx.entries)) {
         fx.entries.forEach((entry) => {
           entry.materials.forEach((mat) => {
@@ -2159,6 +3147,11 @@
             if (fx.type === 'flameDissolve') {
               if (mat.userData?.__asgDissolveUniforms) {
                 mat.userData.__asgDissolveUniforms.uProgress.value = 1
+              }
+              if ('emissiveIntensity' in mat && Number.isFinite(mat.emissiveIntensity)) {
+                mat.emissiveIntensity = Number.isFinite(mat.userData?.__entranceOriginalEmissiveIntensity)
+                  ? mat.userData.__entranceOriginalEmissiveIntensity
+                  : 1
               }
             }
             if (Number.isFinite(mat.userData?.__entranceOriginalOpacity)) {
@@ -2222,6 +3215,213 @@
     })
 
     return entranceParticleAsset.loadingPromise
+  }
+
+  function disposeTransientObject(node) {
+    if (!node) return
+    if (node.parent) node.parent.remove(node)
+    node.traverse?.((child) => {
+      if (child && child.geometry && typeof child.geometry.dispose === 'function') {
+        try { child.geometry.dispose() } catch { }
+      }
+      const material = child?.material
+      if (Array.isArray(material)) {
+        material.forEach((mat) => {
+          if (mat && typeof mat.dispose === 'function') {
+            try { mat.dispose() } catch { }
+          }
+        })
+      } else if (material && typeof material.dispose === 'function') {
+        try { material.dispose() } catch { }
+      }
+    })
+  }
+
+  function restoreEntranceTransform(fx) {
+    if (!fx?.modelRoot || !fx?.modelTransformBase) return
+    const base = fx.modelTransformBase
+    fx.modelRoot.position.copy(base.position)
+    fx.modelRoot.scale.copy(base.scale)
+    fx.modelRoot.rotation.copy(base.rotation)
+  }
+
+  function getEntranceEffectBounds(modelRoot) {
+    const box = new THREE.Box3().setFromObject(modelRoot)
+    const centerWorld = new THREE.Vector3()
+    const size = new THREE.Vector3()
+    if (!Number.isFinite(box.min.x) || !Number.isFinite(box.max.x)) {
+      return {
+        centerLocal: new THREE.Vector3(0, 1, 0),
+        width: 1.4,
+        height: 2.2,
+        depth: 1.2,
+        radius: 1.2
+      }
+    }
+    box.getCenter(centerWorld)
+    box.getSize(size)
+    const centerLocal = modelRoot.worldToLocal(centerWorld.clone())
+    return {
+      centerLocal,
+      width: Math.max(0.8, size.x),
+      height: Math.max(1.2, size.y),
+      depth: Math.max(0.8, size.z),
+      radius: Math.max(0.8, size.length() * 0.22)
+    }
+  }
+
+  function createEntranceTransientGroup(modelRoot, boundsInfo) {
+    const group = new THREE.Group()
+    group.position.copy(boundsInfo.centerLocal)
+    modelRoot.add(group)
+    return group
+  }
+
+  function createCardStormTransient(modelRoot, boundsInfo) {
+    const group = createEntranceTransientGroup(modelRoot, boundsInfo)
+    const cards = []
+    const colors = ['#fef3c7', '#dbeafe', '#fbcfe8', '#e9d5ff', '#ffffff']
+    for (let i = 0; i < 26; i++) {
+      const w = 0.15 + Math.random() * 0.08
+      const h = w * (1.35 + Math.random() * 0.35)
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({
+          color: colors[i % colors.length],
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      )
+      mesh.renderOrder = 5
+      group.add(mesh)
+      const angle = (i / 26) * Math.PI * 2 + Math.random() * 0.25
+      const radius = boundsInfo.radius * (1.6 + Math.random() * 1.2)
+      cards.push({
+        mesh,
+        start: new THREE.Vector3(
+          Math.cos(angle) * radius,
+          (Math.random() - 0.2) * boundsInfo.height * 1.1,
+          Math.sin(angle) * radius * 0.6
+        ),
+        end: new THREE.Vector3(
+          (Math.random() - 0.5) * boundsInfo.width * 0.36,
+          (Math.random() - 0.05) * boundsInfo.height * 0.42,
+          (Math.random() - 0.5) * boundsInfo.depth * 0.36
+        ),
+        spin: new THREE.Vector3(
+          (Math.random() - 0.5) * 18,
+          (Math.random() - 0.5) * 22,
+          (Math.random() - 0.5) * 20
+        ),
+        offset: Math.random() * 0.22
+      })
+    }
+    return { group, cards }
+  }
+
+  function createSpotlightRushTransient(modelRoot, boundsInfo) {
+    const group = createEntranceTransientGroup(modelRoot, boundsInfo)
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(boundsInfo.radius * 0.08, boundsInfo.radius * 0.72, boundsInfo.height * 1.9, 20, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: '#fff5cf',
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    )
+    beam.position.y = boundsInfo.height * 0.48
+    group.add(beam)
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(boundsInfo.radius * 0.95, Math.max(0.03, boundsInfo.radius * 0.08), 16, 48),
+      new THREE.MeshBasicMaterial({
+        color: '#fdf2b8',
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    )
+    ring.rotation.x = Math.PI / 2
+    group.add(ring)
+
+    const streaks = []
+    for (let i = 0; i < 4; i++) {
+      const streak = new THREE.Mesh(
+        new THREE.PlaneGeometry(boundsInfo.radius * 0.34, boundsInfo.height * 1.75),
+        new THREE.MeshBasicMaterial({
+          color: i % 2 === 0 ? '#fff9dd' : '#d8e8ff',
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        })
+      )
+      streak.position.y = boundsInfo.height * 0.44
+      streak.rotation.y = (Math.PI / 4) * i
+      group.add(streak)
+      streaks.push(streak)
+    }
+    return { group, beam, ring, streaks }
+  }
+
+  function createPrismBloomTransient(modelRoot, boundsInfo) {
+    const group = createEntranceTransientGroup(modelRoot, boundsInfo)
+    const shards = []
+    const colors = ['#9bd6ff', '#ffe3a8', '#ffc7f2']
+    for (let i = 0; i < 18; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.12 + Math.random() * 0.14, 0.42 + Math.random() * 0.2),
+        new THREE.MeshBasicMaterial({
+          color: colors[i % colors.length],
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        })
+      )
+      group.add(mesh)
+      const angle = (i / 18) * Math.PI * 2
+      shards.push({
+        mesh,
+        start: new THREE.Vector3(
+          Math.cos(angle) * boundsInfo.radius * (0.18 + Math.random() * 0.24),
+          (Math.random() - 0.5) * boundsInfo.height * 0.3,
+          Math.sin(angle) * boundsInfo.radius * (0.18 + Math.random() * 0.24)
+        ),
+        end: new THREE.Vector3(
+          Math.cos(angle) * boundsInfo.radius * (1.25 + Math.random() * 0.7),
+          (Math.random() - 0.1) * boundsInfo.height * 1.05,
+          Math.sin(angle) * boundsInfo.radius * (0.9 + Math.random() * 0.55)
+        ),
+        spin: new THREE.Vector3(
+          (Math.random() - 0.5) * 14,
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 16
+        )
+      })
+    }
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(boundsInfo.radius * 0.36, boundsInfo.radius * 0.66, 48),
+      new THREE.MeshBasicMaterial({
+        color: '#d8f1ff',
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    )
+    ring.rotation.x = Math.PI / 2
+    group.add(ring)
+    return { group, shards, ring }
   }
 
   function stopParticleEffectsForRoot(modelRoot) {
@@ -2382,6 +3582,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     const materialEntries = []
     let fx = null
     let box = null
+    const modelTransformBase = {
+      position: modelRoot.position.clone(),
+      scale: modelRoot.scale.clone(),
+      rotation: modelRoot.rotation.clone()
+    }
 
     if (effectType === 'flameDissolve') {
       box = new THREE.Box3().setFromObject(modelRoot)
@@ -2392,15 +3597,29 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         minY: box.min.y - 0.18,
         maxY: box.max.y + 0.18,
         startedAt: performance.now(),
-        durationMs: 2200
+        durationMs: 2200,
+        modelTransformBase
       }
     } else {
+      const boundsInfo = getEntranceEffectBounds(modelRoot)
+      let transientData = null
+      if (effectType === 'cardStorm') {
+        transientData = createCardStormTransient(modelRoot, boundsInfo)
+      } else if (effectType === 'spotlightRush') {
+        transientData = createSpotlightRushTransient(modelRoot, boundsInfo)
+      } else if (effectType === 'prismBloom') {
+        transientData = createPrismBloomTransient(modelRoot, boundsInfo)
+      }
       fx = {
         type: effectType,
         entries: materialEntries,
         modelRoot,
         startedAt: performance.now(),
-        durationMs: 1500
+        durationMs: effectType === 'spotlightRush' ? 1450 : effectType === 'cardStorm' ? 1850 : effectType === 'prismBloom' ? 1700 : 1500,
+        modelTransformBase,
+        boundsInfo,
+        transientGroup: transientData?.group || null,
+        transientData
       }
     }
 
@@ -2434,7 +3653,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       })
       materialEntries.push({ node, materials })
     })
-    if (!materialEntries.length) return
+    if (!materialEntries.length) {
+      restoreEntranceTransform(fx)
+      if (fx.transientGroup) disposeTransientObject(fx.transientGroup)
+      return
+    }
     fx.entries = materialEntries
     activeEntranceEffects.push(fx)
   }
@@ -2456,17 +3679,113 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
           })
         })
       } else {
+        const baseScaleValue = getUniformScaleValue(fx.modelTransformBase?.scale || fx.modelRoot.scale)
+        const pulse = Math.sin(Math.min(1, t) * Math.PI) * 0.045
+        let introScale = 0.86 + eased * 0.14
+        let lift = 0
+        if (fx.type === 'cardStorm') {
+          introScale = 0.8 + eased * 0.2 + pulse * 0.35
+          lift = (1 - eased) * (fx.boundsInfo?.height || 1.8) * 0.12
+        } else if (fx.type === 'spotlightRush') {
+          introScale = 0.74 + eased * 0.26 + pulse * 0.22
+          lift = (1 - eased) * (fx.boundsInfo?.height || 1.8) * 0.18
+        } else if (fx.type === 'prismBloom') {
+          introScale = 0.82 + eased * 0.18 + pulse * 0.28
+          lift = (1 - eased) * (fx.boundsInfo?.height || 1.8) * 0.08
+        }
+        if (fx.modelTransformBase) {
+          fx.modelRoot.scale.copy(fx.modelTransformBase.scale)
+          fx.modelRoot.scale.multiplyScalar(baseScaleValue > 1e-6 ? introScale : 1)
+          fx.modelRoot.position.copy(fx.modelTransformBase.position)
+          fx.modelRoot.position.y += lift
+          fx.modelRoot.rotation.copy(fx.modelTransformBase.rotation)
+        }
+
+        if (fx.type === 'cardStorm' && fx.transientData?.cards) {
+          fx.transientData.cards.forEach((card) => {
+            const localT = THREE.MathUtils.clamp((t - card.offset) / Math.max(0.18, 1 - card.offset * 0.7), 0, 1)
+            const softT = localT * localT * (3 - 2 * localT)
+            card.mesh.position.lerpVectors(card.start, card.end, softT)
+            card.mesh.rotation.x = card.spin.x * localT
+            card.mesh.rotation.y = card.spin.y * localT + softT * Math.PI * 1.2
+            card.mesh.rotation.z = card.spin.z * localT
+            const opacity = Math.sin(localT * Math.PI) * 0.95
+            card.mesh.material.opacity = opacity
+            const scale = 0.72 + (1 - softT) * 0.6
+            card.mesh.scale.setScalar(scale)
+          })
+          if (fx.transientGroup) {
+            fx.transientGroup.rotation.y = (1 - eased) * 0.55
+          }
+        } else if (fx.type === 'spotlightRush' && fx.transientData) {
+          const beamEase = THREE.MathUtils.clamp(t / 0.42, 0, 1)
+          const beamFade = 1 - THREE.MathUtils.clamp((t - 0.45) / 0.55, 0, 1)
+          if (fx.transientData.beam) {
+            fx.transientData.beam.material.opacity = beamEase * beamFade * 0.55
+            fx.transientData.beam.scale.setScalar(0.78 + beamEase * 0.45)
+          }
+          if (fx.transientData.ring) {
+            const ringScale = 0.4 + eased * 1.2
+            fx.transientData.ring.material.opacity = Math.sin(Math.min(1, t) * Math.PI) * 0.8
+            fx.transientData.ring.scale.setScalar(ringScale)
+            fx.transientData.ring.rotation.z = eased * 1.8
+          }
+          if (Array.isArray(fx.transientData.streaks)) {
+            fx.transientData.streaks.forEach((streak, index) => {
+              const streakWave = Math.sin(t * Math.PI * 2 + index * 0.85)
+              streak.material.opacity = beamFade * 0.28 + Math.max(0, streakWave) * 0.08
+              streak.scale.x = 0.9 + eased * 0.75
+              streak.scale.y = 0.68 + beamEase * 0.42
+            })
+          }
+        } else if (fx.type === 'prismBloom' && fx.transientData) {
+          if (Array.isArray(fx.transientData.shards)) {
+            fx.transientData.shards.forEach((shard, index) => {
+              const shardDelay = index * 0.015
+              const localT = THREE.MathUtils.clamp((t - shardDelay) / 0.84, 0, 1)
+              const softT = localT * localT * (3 - 2 * localT)
+              shard.mesh.position.lerpVectors(shard.start, shard.end, softT)
+              shard.mesh.rotation.x = shard.spin.x * localT
+              shard.mesh.rotation.y = shard.spin.y * localT
+              shard.mesh.rotation.z = shard.spin.z * localT
+              shard.mesh.material.opacity = Math.sin(localT * Math.PI) * 0.72
+              const scale = 0.8 + Math.sin(localT * Math.PI) * 0.36
+              shard.mesh.scale.setScalar(scale)
+            })
+          }
+          if (fx.transientData.ring) {
+            fx.transientData.ring.material.opacity = Math.sin(Math.min(1, t) * Math.PI) * 0.65
+            fx.transientData.ring.scale.setScalar(0.55 + eased * 1.35)
+          }
+          if (fx.transientGroup) {
+            fx.transientGroup.rotation.y = eased * 0.9
+          }
+        }
+
         fx.entries.forEach((entry) => {
           entry.materials.forEach((mat) => {
             if (!mat) return
             const baseOpacity = Number.isFinite(mat.userData?.__entranceOriginalOpacity)
               ? mat.userData.__entranceOriginalOpacity
               : 1
-            mat.opacity = Math.max(0.01, eased * baseOpacity)
+            const reveal = fx.type === 'spotlightRush'
+              ? THREE.MathUtils.clamp((t - 0.1) / 0.72, 0, 1)
+              : fx.type === 'cardStorm'
+                ? THREE.MathUtils.clamp((t - 0.06) / 0.68, 0, 1)
+                : fx.type === 'prismBloom'
+                  ? THREE.MathUtils.clamp((t - 0.04) / 0.7, 0, 1)
+                  : eased
+            const revealEase = reveal * reveal * (3 - 2 * reveal)
+            mat.opacity = Math.max(0.01, revealEase * baseOpacity)
           })
         })
       }
       if (t >= 1) {
+        restoreEntranceTransform(fx)
+        if (fx.transientGroup) {
+          disposeTransientObject(fx.transientGroup)
+          fx.transientGroup = null
+        }
         fx.entries.forEach((entry) => {
           entry.materials.forEach((mat) => {
             if (!mat) return
@@ -2483,9 +3802,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
               mat.opacity = Number.isFinite(mat.userData?.__entranceOriginalOpacity)
                 ? mat.userData.__entranceOriginalOpacity
                 : 1
-              mat.transparent = !!mat.userData?.__entranceOriginalTransparent
-              mat.depthWrite = mat.userData?.__entranceOriginalDepthWrite !== false
             }
+            mat.transparent = !!mat.userData?.__entranceOriginalTransparent
+            mat.depthWrite = mat.userData?.__entranceOriginalDepthWrite !== false
             mat.needsUpdate = true
           })
         })
@@ -2792,6 +4111,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     const runtime = slotRuntime.get(key)
     if (!runtime || !runtime.group) return
     const g = runtime.group
+    const baseRotation = runtime.weatherBaseRotation || { x: g.rotation.x, y: g.rotation.y, z: g.rotation.z }
     if (key === 'scene') {
       state.layout.scene.position = { x: g.position.x, y: g.position.y, z: g.position.z }
       state.layout.scene.rotation = { x: toDegrees(g.rotation.x), y: toDegrees(g.rotation.y), z: toDegrees(g.rotation.z) }
@@ -2815,7 +4135,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       state.layout.hunterScale = uniform
     }
     state.layout.slots[key].position = { x: g.position.x, y: g.position.y, z: g.position.z }
-    state.layout.slots[key].rotation = { x: toDegrees(g.rotation.x), y: toDegrees(g.rotation.y), z: toDegrees(g.rotation.z) }
+    state.layout.slots[key].rotation = { x: toDegrees(baseRotation.x), y: toDegrees(baseRotation.y), z: toDegrees(baseRotation.z) }
     state.layout.slots[key].scale = { x: uniform, y: uniform, z: uniform }
   }
 
@@ -3154,6 +4474,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     applyLightSettings('light1')
     applyEnvironmentPreset(state.layout.environmentPreset, false)
     applyRenderQualityPreset(state.layout.qualityPreset || 'high', false)
+    applyWeatherPreset(state.layout.weatherPreset || 'clear', false)
     updateKeyLightShadowFrustum()
     applyMode(state.layout.mode)
     applyToolbarCollapsed(state.layout.toolbarCollapsed, false)
@@ -3167,6 +4488,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncCameraInputs()
     syncCameraEditorInputs()
     syncEntranceParticleUi()
+    syncWeatherInputs()
     syncStylizedRenderInputs()
     syncAdvancedRenderInputs()
     if (dom.maxFps) dom.maxFps.value = String(Math.max(10, Math.min(240, asNumber(state.layout.maxFps, 60))))
@@ -3902,6 +5224,40 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         applyEnvironmentPreset(dom.environmentPresetSelect.value, true)
       })
     }
+    if (dom.applyWeatherPresetBtn) {
+      dom.applyWeatherPresetBtn.addEventListener('click', () => {
+        const next = dom.weatherPresetSelect ? dom.weatherPresetSelect.value : state.layout.weatherPreset
+        applyWeatherPreset(next, true)
+        setStatus(`天气已切换: ${WEATHER_PRESETS[state.layout.weatherPreset || 'clear']?.label || state.layout.weatherPreset}`)
+      })
+    }
+    if (dom.weatherPresetSelect) {
+      dom.weatherPresetSelect.addEventListener('change', () => {
+        applyWeatherPreset(dom.weatherPresetSelect.value, true)
+        setStatus(`天气已切换: ${WEATHER_PRESETS[state.layout.weatherPreset || 'clear']?.label || state.layout.weatherPreset}`)
+      })
+    }
+    if (dom.applyWeatherSettingsBtn) {
+      dom.applyWeatherSettingsBtn.addEventListener('click', () => {
+        applyWeatherSettingsFromInputs(true)
+        setStatus('已应用天气强度与音效参数')
+      })
+    }
+    if (dom.weatherWindIntensity) {
+      dom.weatherWindIntensity.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherAudioEnabled) {
+      dom.weatherAudioEnabled.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherAudioVolume) {
+      dom.weatherAudioVolume.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
     if (dom.renderQualitySelect) {
       dom.renderQualitySelect.addEventListener('change', () => {
         applyRenderQualityPreset(dom.renderQualitySelect.value, true)
@@ -4232,6 +5588,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     updateEntranceEffects()
     updateParticleBursts(dt)
+    updateWeatherEffects(dt)
     if (cameraMoveState.dir && !cameraTransition) {
       moveCameraByDirection(cameraMoveState.dir, dt * 5.2, false, false)
     }
@@ -4270,25 +5627,19 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (!nextState || typeof nextState !== 'object') return
     const prevSurvivorCount = state.bpSelectionState.survivorCount || 0
     const prevHunterSelected = !!state.bpSelectionState.hunterSelected
-    const incomingSurvivors = Array.isArray(nextState.survivors)
-      ? nextState.survivors
-      : (Array.isArray(nextState?.currentRoundData?.selectedSurvivors) ? nextState.currentRoundData.selectedSurvivors : [null, null, null, null])
-    const incomingHunter = (typeof nextState.hunter === 'string' && nextState.hunter)
-      ? nextState.hunter
-      : (nextState?.currentRoundData?.selectedHunter || null)
+    const prevRoundBanCount = state.bpSelectionState.roundBanCount || 0
+    const prevGlobalBanCount = state.bpSelectionState.globalBanCount || 0
+    const snapshot = readBpSnapshot(nextState)
+    const nextSelectionState = applyBpSnapshotToState(snapshot)
+    const nextSurvivorCount = nextSelectionState.survivorCount
+    const nextHunterSelected = nextSelectionState.hunterSelected
+    const nextRoundBanCount = nextSelectionState.roundBanCount
+    const nextGlobalBanCount = nextSelectionState.globalBanCount
+    state.bpSelectionState = nextSelectionState
 
-    state.bp.survivors = Array.isArray(incomingSurvivors) ? incomingSurvivors.slice(0, 4) : [null, null, null, null]
-    while (state.bp.survivors.length < 4) state.bp.survivors.push(null)
-    state.bp.hunter = incomingHunter || null
+    const hasAnyBpCameraSignal = nextSurvivorCount > 0 || nextHunterSelected || nextRoundBanCount > 0 || nextGlobalBanCount > 0
 
-    const nextSurvivorCount = countSelectedSurvivors(state.bp.survivors)
-    const nextHunterSelected = isHunterSelected(state.bp.hunter)
-    state.bpSelectionState = {
-      survivorCount: nextSurvivorCount,
-      hunterSelected: nextHunterSelected
-    }
-
-    if (nextSurvivorCount === 0 && !nextHunterSelected) {
+    if (!hasAnyBpCameraSignal) {
       // 布局保存也会触发本地 BP 状态广播；这里不能粗暴打断手动镜头过渡，
       // 否则像“虚拟摄像机主镜头”这种非 BP 驱动切镜会在 0.1~0.2s 后被取消。
       pendingCameraEventKey = ''
@@ -4300,9 +5651,12 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (!prevHunterSelected && nextHunterSelected) {
         cameraEventKey = 'hunterSelected'
       }
+      if (nextRoundBanCount > prevRoundBanCount || nextGlobalBanCount > prevGlobalBanCount) {
+        cameraEventKey = 'banUpdated'
+      }
       if (cameraEventKey) {
         if (state.virtualCameraMode?.enabled) {
-          exitVirtualCameraModeForAutoCut('检测到 BP 选人，已自动退出虚拟摄像机主镜头')
+          exitVirtualCameraModeForAutoCut('检测到 BP 选人/ban 事件，已自动退出虚拟摄像机主镜头')
         }
         requestCameraEvent(cameraEventKey)
       }
@@ -4323,13 +5677,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (result && result.success && result.data) {
         const data = result.data
         state.layout = normalizeLayout(data.characterModel3DLayout)
-        state.bp.survivors = Array.isArray(data.survivors) ? data.survivors.slice(0, 4) : [null, null, null, null]
-        while (state.bp.survivors.length < 4) state.bp.survivors.push(null)
-        state.bp.hunter = data.hunter || null
-        state.bpSelectionState = {
-          survivorCount: countSelectedSurvivors(state.bp.survivors),
-          hunterSelected: isHunterSelected(state.bp.hunter)
-        }
+        state.bpSelectionState = applyBpSnapshotToState(readBpSnapshot(data))
       }
     } catch (error) {
       console.error('[CharacterModel3D] 读取初始状态失败:', error)
@@ -4378,6 +5726,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     createSceneGraph()
     bindUiEvents()
+    primeWeatherAudioUnlock()
     await refreshCameraDevices(false)
     await loadOfficialModelMap()
     await loadInitialState()

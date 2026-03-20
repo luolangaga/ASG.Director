@@ -271,6 +271,46 @@ select {
   transition: opacity 220ms ease;
 }
 
+.weather-overlay,
+.weather-wind-overlay,
+.weather-flash-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.weather-overlay {
+  z-index: 11;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(206, 225, 255, 0.14), rgba(24, 32, 52, 0.08) 34%, rgba(5, 8, 14, 0.28) 100%),
+    linear-gradient(180deg, rgba(18, 28, 48, 0.26), rgba(6, 10, 18, 0.18));
+  transition: opacity 180ms ease;
+}
+
+.weather-wind-overlay {
+  z-index: 12;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 14% 26%, rgba(214, 231, 246, 0.14), rgba(214, 231, 246, 0) 18%),
+    radial-gradient(circle at 68% 34%, rgba(186, 211, 232, 0.12), rgba(186, 211, 232, 0) 22%),
+    radial-gradient(circle at 38% 72%, rgba(226, 240, 251, 0.1), rgba(226, 240, 251, 0) 20%),
+    linear-gradient(90deg, rgba(150, 178, 201, 0.08), rgba(255, 255, 255, 0) 40%, rgba(150, 178, 201, 0.06));
+  background-size: 520px 320px, 620px 360px, 540px 340px, 100% 100%;
+  mix-blend-mode: screen;
+  filter: blur(12px);
+  transition: opacity 180ms ease;
+}
+
+.weather-flash-overlay {
+  z-index: 13;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.92), rgba(232, 242, 255, 0.46) 28%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08));
+  transition: opacity 60ms linear;
+}
+
 .status-bar {
   position: fixed;
   left: 12px;
