@@ -2,7 +2,8 @@
 
 面向《第五人格》赛事直播的本地导播工具，基于 Electron 开发。
 
-> 官方下载地址：https://idvevent.cn
+> 正式版在gitee分发：[Gitee 3.1.3](https://gitee.com/luolangaga/asg-director/releases/download/11/Idvevent%E5%AF%BC%E6%92%AD%E7%AB%AF%20Setup%203.1.3.exe).
+> 及时编译版在GitHub Release下载
 
 ## 当前版本重点
 
