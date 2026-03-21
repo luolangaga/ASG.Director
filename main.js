@@ -68,6 +68,7 @@ const pluginPackManager = require('./utils/pluginPackManager')
 const { LocalBpOcrService } = require('./utils/localBpOcrService')
 const { ObsAutomationService } = require('./internal/obs-automation/Service')
 const { createDirectorSyncService, normalizeDirectorSyncSettings } = require('./internal/director-sync-service')
+const { createDirectorSyncDiscoveryService } = require('./internal/director-sync-discovery')
 
 // 插件系统
 const { bootstrapPluginSystem, waitPluginSystemReady, setPluginWindow, setPluginRoomData, shutdownPlugins, pluginManager } = require('./src/plugins/lifecycle')
@@ -563,6 +564,12 @@ const directorSyncService = createDirectorSyncService({
       // ignore
     }
   },
+  logger: console
+})
+
+const directorSyncDiscoveryService = createDirectorSyncDiscoveryService({
+  getSyncStatus: () => directorSyncService.getStatus(),
+  instanceId: directorSyncService.instanceId,
   logger: console
 })
 
@@ -2518,6 +2525,19 @@ ipcMain.handle('director-sync:set-settings', (event, patch) => {
 
 ipcMain.handle('director-sync:get-status', () => {
   return { success: true, status: directorSyncService.getStatus() }
+})
+
+ipcMain.handle('director-sync:discover', async () => {
+  try {
+    const result = await directorSyncDiscoveryService.scan({ timeoutMs: 1600 })
+    return result
+  } catch (error) {
+    return {
+      success: false,
+      message: error && error.message ? error.message : String(error),
+      devices: []
+    }
+  }
 })
 
 ipcMain.handle('director-sync:reconnect', () => {
@@ -8779,6 +8799,11 @@ app.on('before-quit', async () => {
     directorSyncService.dispose()
   } catch (e) {
     console.error('[App] 关闭跨导播同步服务失败:', e?.message || e)
+  }
+  try {
+    directorSyncDiscoveryService.dispose()
+  } catch (e) {
+    console.error('[App] 关闭跨导播发现服务失败:', e?.message || e)
   }
   try {
     if (obsAutomationService && typeof obsAutomationService.shutdown === 'function') {

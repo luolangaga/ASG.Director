@@ -9,6 +9,9 @@
     autoConnect: true
   })
 
+  let discoveredDevices = []
+  let discoveryBusy = false
+
   function $id(id) {
     return document.getElementById(id)
   }
@@ -46,6 +49,7 @@
     if (remoteHost) remoteHost.value = next.remoteHost || ''
     if (remotePort) remotePort.value = String(next.remotePort || DEFAULTS.remotePort)
     if (autoConnect) autoConnect.checked = next.autoConnect !== false
+    renderDiscoveryList(next.remoteHost || '', next.remotePort || DEFAULTS.remotePort)
   }
 
   function collectSettingsFromUI() {
@@ -90,11 +94,128 @@
     const parts = [
       `主端: ${serverEnabled ? (listening ? '监听中' : '未监听') : '已关闭'}`,
       `连接端: ${clientEnabled ? (outboundConnected ? '已连接' : '未连接') : '已关闭'}`,
+      `目标: ${status?.remoteHost ? `${status.remoteHost}:${status.remotePort || DEFAULTS.remotePort}` : '未选择'}`,
       `入站: ${inboundConnections}`,
       `自动重连: ${status?.autoConnect === false ? 'OFF' : 'ON'}`
     ]
     if (status?.lastError) parts.push(`错误: ${status.lastError}`)
     statusMeta.textContent = parts.join(' | ')
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (char) => {
+      const table = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }
+      return table[char] || char
+    })
+  }
+
+  function renderDiscoveryList(selectedHost, selectedPort) {
+    const list = $id('directorSyncDiscoveryList')
+    const hint = $id('directorSyncDiscoveryHint')
+    if (!list || !hint) return
+
+    const host = String(selectedHost || '').trim()
+    const port = normalizePort(selectedPort, DEFAULTS.remotePort)
+
+    if (discoveryBusy) {
+      hint.textContent = '正在扫描局域网内的 ASG.Director 设备...'
+    } else if (discoveredDevices.length > 0) {
+      hint.textContent = `发现 ${discoveredDevices.length} 台可连接设备。`
+    } else {
+      hint.textContent = '暂未发现设备。请确认对方已开启“主端（被连接端）”，且处于同一局域网。'
+    }
+
+    if (discoveredDevices.length === 0) {
+      list.innerHTML = `
+        <div style="padding:10px 12px; border:1px dashed var(--border-color); border-radius:8px; font-size:12px; color:var(--text-secondary);">
+          ${discoveryBusy ? '扫描中...' : '暂无设备'}
+        </div>
+      `
+      return
+    }
+
+    list.innerHTML = discoveredDevices.map((device) => {
+      const deviceHost = String(device.address || '').trim()
+      const devicePort = normalizePort(device.remotePort, DEFAULTS.remotePort)
+      const isSelected = host && host === deviceHost && port === devicePort
+      const addresses = Array.isArray(device.addresses) ? device.addresses.filter(Boolean) : []
+      const subline = addresses.length > 1 ? `可达地址：${addresses.join(' / ')}` : `${deviceHost}:${devicePort}`
+      return `
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-role="director-sync-device"
+          data-host="${escapeHtml(deviceHost)}"
+          data-port="${escapeHtml(String(devicePort))}"
+          style="text-align:left; justify-content:flex-start; padding:10px 12px; border:${isSelected ? '1px solid rgba(129,199,132,0.9)' : '1px solid var(--border-color)'}; background:${isSelected ? 'rgba(129,199,132,0.12)' : 'rgba(255,255,255,0.02)'};"
+        >
+          <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+            <div style="font-size:13px; font-weight:600;">${escapeHtml(device.displayName || device.hostname || deviceHost)}</div>
+            <div style="font-size:12px; color:var(--text-secondary);">${escapeHtml(subline)}</div>
+          </div>
+        </button>
+      `
+    }).join('')
+
+    Array.from(list.querySelectorAll('[data-role="director-sync-device"]')).forEach((button) => {
+      button.addEventListener('click', () => {
+        const remoteHost = $id('directorSyncRemoteHost')
+        const remotePort = $id('directorSyncRemotePort')
+        if (remoteHost) remoteHost.value = button.dataset.host || ''
+        if (remotePort) remotePort.value = button.dataset.port || String(DEFAULTS.remotePort)
+        renderDiscoveryList(button.dataset.host || '', button.dataset.port || DEFAULTS.remotePort)
+        toast(`已选择设备 ${button.dataset.host}:${button.dataset.port}`, 'info')
+      })
+    })
+  }
+
+  async function refreshDirectorSyncDiscovery() {
+    if (!hasApi() || !window.electronAPI.directorSyncDiscover) return
+    if (discoveryBusy) return
+
+    discoveryBusy = true
+    renderDiscoveryList(
+      $id('directorSyncRemoteHost') ? $id('directorSyncRemoteHost').value : '',
+      $id('directorSyncRemotePort') ? $id('directorSyncRemotePort').value : DEFAULTS.remotePort
+    )
+
+    try {
+      const result = await window.electronAPI.directorSyncDiscover()
+      if (!result || !result.success) {
+        discoveredDevices = []
+        renderDiscoveryList(
+          $id('directorSyncRemoteHost') ? $id('directorSyncRemoteHost').value : '',
+          $id('directorSyncRemotePort') ? $id('directorSyncRemotePort').value : DEFAULTS.remotePort
+        )
+        toast(result?.message || '局域网扫描失败', 'error')
+        return
+      }
+
+      discoveredDevices = Array.isArray(result.devices) ? result.devices : []
+      renderDiscoveryList(
+        $id('directorSyncRemoteHost') ? $id('directorSyncRemoteHost').value : '',
+        $id('directorSyncRemotePort') ? $id('directorSyncRemotePort').value : DEFAULTS.remotePort
+      )
+    } catch (e) {
+      discoveredDevices = []
+      renderDiscoveryList(
+        $id('directorSyncRemoteHost') ? $id('directorSyncRemoteHost').value : '',
+        $id('directorSyncRemotePort') ? $id('directorSyncRemotePort').value : DEFAULTS.remotePort
+      )
+      toast(e && e.message ? e.message : '局域网扫描失败', 'error')
+    } finally {
+      discoveryBusy = false
+      renderDiscoveryList(
+        $id('directorSyncRemoteHost') ? $id('directorSyncRemoteHost').value : '',
+        $id('directorSyncRemotePort') ? $id('directorSyncRemotePort').value : DEFAULTS.remotePort
+      )
+    }
   }
 
   async function loadDirectorSyncSettings() {
@@ -160,6 +281,21 @@
     loadDirectorSyncSettings().catch((e) => {
       console.warn('[DirectorSync] load settings failed:', e)
     })
+    renderDiscoveryList('', DEFAULTS.remotePort)
+    refreshDirectorSyncDiscovery().catch((e) => {
+      console.warn('[DirectorSync] discovery failed:', e)
+    })
+
+    const remoteHost = $id('directorSyncRemoteHost')
+    const remotePort = $id('directorSyncRemotePort')
+    const syncSelection = () => {
+      renderDiscoveryList(
+        remoteHost ? remoteHost.value : '',
+        remotePort ? remotePort.value : DEFAULTS.remotePort
+      )
+    }
+    if (remoteHost) remoteHost.addEventListener('input', syncSelection)
+    if (remotePort) remotePort.addEventListener('input', syncSelection)
 
     if (window.electronAPI.onDirectorSyncStatus) {
       window.electronAPI.onDirectorSyncStatus((status) => {
@@ -169,6 +305,7 @@
   }
 
   window.directorSyncApplySettings = directorSyncApplySettings
+  window.refreshDirectorSyncDiscovery = refreshDirectorSyncDiscovery
   window.directorSyncReconnectNow = directorSyncReconnectNow
   window.directorSyncDisconnectNow = directorSyncDisconnectNow
   window.refreshDirectorSyncStatus = refreshDirectorSyncStatus

@@ -113,6 +113,7 @@ const electronAPI = {
   directorSyncGetSettings: () => ipcRenderer.invoke('director-sync:get-settings'),
   directorSyncSetSettings: (patch) => ipcRenderer.invoke('director-sync:set-settings', patch),
   directorSyncGetStatus: () => ipcRenderer.invoke('director-sync:get-status'),
+  directorSyncDiscover: () => ipcRenderer.invoke('director-sync:discover'),
   directorSyncReconnect: () => ipcRenderer.invoke('director-sync:reconnect'),
   directorSyncDisconnect: () => ipcRenderer.invoke('director-sync:disconnect'),
   onDirectorSyncStatus: (callback) => ipcRenderer.on('director-sync-status', (event, status) => callback(status)),
