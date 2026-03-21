@@ -15,10 +15,14 @@
   </div>
   <div id="toolbar" class="toolbar">
     <div class="toolbar-head">
-      <div class="toolbar-title">角色模型3D控制面板</div>
+      <div>
+        <div class="toolbar-title">角色模型3D控制面板</div>
+        <div class="toolbar-subtitle">常用参数常驻，高级参数默认折叠。</div>
+      </div>
       <button id="toolbarCollapseBtn" class="btn btn-collapse" type="button">收起面板</button>
     </div>
     <div id="toolbarBody" class="toolbar-body">
+      <div class="toolbar-layout">
       <section class="toolbar-section">
         <h3 class="section-title">场景与资源</h3>
         <div class="toolbar-row">
@@ -111,61 +115,67 @@
             <option value="cardStorm">卡片纷飞</option>
             <option value="spotlightRush">聚光冲击</option>
             <option value="prismBloom">棱镜绽放</option>
+            <option value="mistReveal">雾显登场</option>
             <option value="none">关闭</option>
           </select>
           <button id="particleImportBtn" class="btn">导入粒子特效(GLTF/GLB)</button>
           <button id="particleClearBtn" class="btn">清除粒子特效</button>
           <span id="particleFileInfo" class="label">粒子: 未配置</span>
         </div>
-        <div class="toolbar-row">
-          <span class="label">风格化渲染</span>
-          <label><input id="stylizedToonEnabled" type="checkbox"> 三渲二</label>
-          <label>阶数
-            <select id="stylizedToonSteps">
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </label>
-          <label><input id="stylizedOutlineEnabled" type="checkbox" checked> 描边</label>
-          <label>粗细<input id="stylizedOutlineThickness" type="number" step="0.0005" min="0.0005" max="0.03" value="0.004"></label>
-          <label>颜色<input id="stylizedOutlineColor" type="color" value="#000000"></label>
-          <label>透明<input id="stylizedOutlineAlpha" type="number" step="0.05" min="0" max="1" value="1"></label>
-        </div>
-        <div class="toolbar-row">
-          <span class="label">高级光效与精度</span>
-          <label><input id="advAntialiasEnabled" type="checkbox" checked> 抗锯齿</label>
-          <label>曝光<input id="advExposure" type="number" step="0.01" min="0.6" max="2.2" value="1"></label>
-          <label>对比<input id="advContrast" type="number" step="0.01" min="0.8" max="1.6" value="1"></label>
-          <label>饱和<input id="advSaturation" type="number" step="0.01" min="0.7" max="1.8" value="1"></label>
-          <label>渲染分辨率
-            <select id="advRenderScale">
-              <option value="0.75">75%</option>
-              <option value="1" selected>100%</option>
-              <option value="1.25">125%</option>
-              <option value="1.5">150%</option>
-              <option value="1.75">175%</option>
-              <option value="2">200%</option>
-            </select>
-          </label>
-          <label>阴影贴图倍率<input id="advShadowMapBoost" type="number" step="0.25" min="0.5" max="2" value="1"></label>
-          <label>阴影柔和倍率<input id="advShadowRadius" type="number" step="0.1" min="0.5" max="2.5" value="1"></label>
-          <label>Shadow Bias<input id="advShadowBias" type="number" step="0.00001" min="-0.001" max="0.001" value="-0.00012"></label>
-          <label>Normal Bias<input id="advShadowNormalBias" type="number" step="0.001" min="0" max="0.1" value="0.01"></label>
-        </div>
-        <div class="toolbar-row">
-          <span class="label">高级灯光倍率</span>
-          <label><input id="advLightTextureEnabled" type="checkbox" checked> 启用风格化光影贴图</label>
-          <label>环境光<input id="advAmbientBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
-          <label>半球光<input id="advHemiBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
-          <label>主光<input id="advKeyBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
-          <label>补光<input id="advFillBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
-          <label>轮廓光<input id="advRimBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
-          <label>反弹光<input id="advBounceBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
-          <button id="applyAdvancedRenderBtn" class="btn">应用高级参数</button>
-          <button id="resetAdvancedRenderBtn" class="btn">恢复高级默认</button>
-        </div>
+        <details class="advanced-panel">
+          <summary class="advanced-summary">高级选项：风格化渲染 / 光效精度</summary>
+          <div class="advanced-panel-body">
+            <div class="toolbar-row">
+              <span class="label">风格化渲染</span>
+              <label><input id="stylizedToonEnabled" type="checkbox"> 三渲二</label>
+              <label>阶数
+                <select id="stylizedToonSteps">
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </label>
+              <label><input id="stylizedOutlineEnabled" type="checkbox" checked> 描边</label>
+              <label>粗细<input id="stylizedOutlineThickness" type="number" step="0.0005" min="0.0005" max="0.03" value="0.004"></label>
+              <label>颜色<input id="stylizedOutlineColor" type="color" value="#000000"></label>
+              <label>透明<input id="stylizedOutlineAlpha" type="number" step="0.05" min="0" max="1" value="1"></label>
+            </div>
+            <div class="toolbar-row">
+              <span class="label">高级光效与精度</span>
+              <label><input id="advAntialiasEnabled" type="checkbox" checked> 抗锯齿</label>
+              <label>曝光<input id="advExposure" type="number" step="0.01" min="0.6" max="2.2" value="1"></label>
+              <label>对比<input id="advContrast" type="number" step="0.01" min="0.8" max="1.6" value="1"></label>
+              <label>饱和<input id="advSaturation" type="number" step="0.01" min="0.7" max="1.8" value="1"></label>
+              <label>渲染分辨率
+                <select id="advRenderScale">
+                  <option value="0.75">75%</option>
+                  <option value="1" selected>100%</option>
+                  <option value="1.25">125%</option>
+                  <option value="1.5">150%</option>
+                  <option value="1.75">175%</option>
+                  <option value="2">200%</option>
+                </select>
+              </label>
+              <label>阴影贴图倍率<input id="advShadowMapBoost" type="number" step="0.25" min="0.5" max="2" value="1"></label>
+              <label>阴影柔和倍率<input id="advShadowRadius" type="number" step="0.1" min="0.5" max="2.5" value="1"></label>
+              <label>Shadow Bias<input id="advShadowBias" type="number" step="0.00001" min="-0.001" max="0.001" value="-0.00012"></label>
+              <label>Normal Bias<input id="advShadowNormalBias" type="number" step="0.001" min="0" max="0.1" value="0.01"></label>
+            </div>
+            <div class="toolbar-row">
+              <span class="label">高级灯光倍率</span>
+              <label><input id="advLightTextureEnabled" type="checkbox" checked> 启用风格化光影贴图</label>
+              <label>环境光<input id="advAmbientBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
+              <label>半球光<input id="advHemiBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
+              <label>主光<input id="advKeyBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
+              <label>补光<input id="advFillBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
+              <label>轮廓光<input id="advRimBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
+              <label>反弹光<input id="advBounceBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
+              <button id="applyAdvancedRenderBtn" class="btn">应用高级参数</button>
+              <button id="resetAdvancedRenderBtn" class="btn">恢复高级默认</button>
+            </div>
+          </div>
+        </details>
       </section>
 
       <section class="toolbar-section">
@@ -209,7 +219,22 @@
           <button id="previewCameraKeyframeBtn" class="btn">预览关键帧</button>
           <button id="clearCameraKeyframeBtn" class="btn">清除关键帧</button>
           <label>切换时长ms<input id="cameraTransitionMs" type="number" step="50" min="50" max="10000" value="900"></label>
+          <label>变速曲线
+            <select id="cameraEasingPreset">
+              <option value="smooth" selected>平滑默认</option>
+              <option value="easeIn">慢入</option>
+              <option value="easeOut">快出</option>
+              <option value="easeInOut">慢入慢出</option>
+              <option value="sharpInOut">强烈加减速</option>
+              <option value="custom">自定义贝塞尔</option>
+            </select>
+          </label>
+          <button id="openCameraCurveModalBtn" class="btn" type="button">打开曲线编辑器</button>
           <span id="cameraEventInfo" class="label"></span>
+        </div>
+        <div class="toolbar-row">
+          <span class="label">曲线摘要</span>
+          <span id="cameraCurveSummary" class="label">默认平滑</span>
         </div>
         <div class="toolbar-row camera-move-row">
           <span class="label">摄像机六向移动</span>
@@ -234,6 +259,7 @@
 
       <div class="toolbar-row hint">
         左键拖拽旋转，右键拖拽(或 Shift+左键)平移视角，滚轮缩放。WASD前后左右，QE上下；按住 Shift + WASD 调整摄像机朝向。F2 切换编辑/渲染，F6 切换虚拟摄像机主镜头。
+      </div>
       </div>
     </div>
   </div>
@@ -276,6 +302,45 @@
           <div class="toolbar-row hint">
             实际展示缩放 = 槽位基础 Scale × 角色倍率。角色倍率按角色名保存，不绑定到某个槽位。
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cameraCurveModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card camera-curve-modal" role="dialog" aria-modal="true" aria-labelledby="cameraCurveModalTitle">
+      <div class="modal-header">
+        <div id="cameraCurveModalTitle" class="modal-title">镜头切换曲线编辑器</div>
+        <button id="closeCameraCurveModalBtn" class="btn" type="button">关闭</button>
+      </div>
+      <div class="modal-body">
+        <div class="toolbar-row">
+          <label>曲线预设
+            <select id="cameraCurveModalPreset">
+              <option value="smooth">平滑默认</option>
+              <option value="easeIn">慢入</option>
+              <option value="easeOut">快出</option>
+              <option value="easeInOut">慢入慢出</option>
+              <option value="sharpInOut">强烈加减速</option>
+              <option value="custom">自定义贝塞尔</option>
+            </select>
+          </label>
+          <button id="cameraCurveResetBtn" class="btn" type="button">重置自定义点</button>
+          <span class="label">拖动画布中的两个控制点即可编辑。</span>
+        </div>
+        <div class="curve-editor-shell">
+          <canvas id="cameraCurveCanvas" width="420" height="300"></canvas>
+          <div class="curve-editor-values">
+            <label>X1<input id="cameraBezierX1" type="number" step="0.05" min="0" max="1" value="0.2"></label>
+            <label>Y1<input id="cameraBezierY1" type="number" step="0.05" min="0" max="1" value="0"></label>
+            <label>X2<input id="cameraBezierX2" type="number" step="0.05" min="0" max="1" value="0.2"></label>
+            <label>Y2<input id="cameraBezierY2" type="number" step="0.05" min="0" max="1" value="1"></label>
+            <div id="cameraCurveHint" class="role-scale-info">当前不是“自定义贝塞尔”时，控制点只读。</div>
+          </div>
+        </div>
+        <div class="toolbar-row">
+          <button id="applyCameraCurveBtn" class="btn" type="button">应用曲线</button>
+          <button id="previewCameraCurveBtn" class="btn" type="button">预览当前关键帧</button>
         </div>
       </div>
     </div>

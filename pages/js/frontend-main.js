@@ -188,6 +188,13 @@ var timerInterval = null
 let characterAssetOverrides = null
 let characterAssetOverridesLoadedAt = 0
 const FRONTEND_MAIN_WINDOW_ID = 'frontend-main'
+const CHARACTER_NAME_LAYOUT_LINKS = [
+  { boxId: 'survivor1', nameId: 'survivor1Name', textId: 'survivor1NameText' },
+  { boxId: 'survivor2', nameId: 'survivor2Name', textId: 'survivor2NameText' },
+  { boxId: 'survivor3', nameId: 'survivor3Name', textId: 'survivor3NameText' },
+  { boxId: 'survivor4', nameId: 'survivor4Name', textId: 'survivor4NameText' },
+  { boxId: 'hunter', nameId: 'hunterName', textId: 'hunterNameText' }
+]
 const currentFrontendWindowId = (() => {
   try {
     const params = new URLSearchParams(window.location.search || '')
@@ -245,11 +252,16 @@ async function ensureCharacterAssetOverrides(force = false) {
 const defaultLayout = {
   // 左侧两列两行求生者
   survivor1: { x: 40, y: 120, width: 220, height: 260 },
+  survivor1Name: { x: 40, y: 388, width: 220, height: 34 },
   survivor2: { x: 280, y: 120, width: 220, height: 260 },
+  survivor2Name: { x: 280, y: 388, width: 220, height: 34 },
   survivor3: { x: 40, y: 400, width: 220, height: 260 },
+  survivor3Name: { x: 40, y: 668, width: 220, height: 34 },
   survivor4: { x: 280, y: 400, width: 220, height: 260 },
+  survivor4Name: { x: 280, y: 668, width: 220, height: 34 },
   // 监管者放右侧居中
   hunter: { x: 820, y: 200, width: 340, height: 420 },
+  hunterName: { x: 820, y: 628, width: 340, height: 38 },
   // Ban位靠近求生者/监管者下面
   survivorBans: { x: 40, y: 680, width: 360, height: 60 },
   hunterBans: { x: 820, y: 640, width: 340, height: 60 },
@@ -742,26 +754,20 @@ if (window.electronAPI && window.electronAPI.onCustomFontsChanged) {
 async function init() {
   console.log('[Frontend] 前台页面初始化开始')
   await ensureCharacterAssetOverrides(true)
+  if (window.ASGAnimations && typeof window.ASGAnimations.init === 'function') {
+    await window.ASGAnimations.init()
+  }
 
-  // 注入样式修复：强制角色名字显示在底部
+  // 注入样式修复：确保独立名字组件的文字样式稳定
   const styleFix = document.createElement('style');
   styleFix.textContent = `
-    .character-box .name, .hunter-box .name {
-      position: absolute !important;
-      bottom: 10px !important;
-      left: 0 !important;
-      width: 100% !important;
-      text-align: center !important;
-      top: auto !important;
-      transform: none !important;
-      z-index: 10;
-      pointer-events: none;
+    .character-name-value {
+      display: block;
+      color: #ffffff !important;
       text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
-      display: block; /* Ensure it is not hidden */
-      color: #ffffff !important; /* Ensure text is white */
     }
     .placeholder {
-        z-index: 1; /* Ensure placeholder is behind name if overlapped, though usually name hides placeholder */
+        z-index: 1;
     }
   `;
   document.head.appendChild(styleFix);
@@ -782,8 +788,10 @@ async function init() {
   console.log('[Frontend] 初始化时加载布局结果:', result)
   if (result.success && result.layout) {
     currentLayout = { ...defaultLayout, ...result.layout }
+    ensureCharacterNameLayoutDefaults(currentLayout, result.layout)
   } else {
     currentLayout = { ...defaultLayout }
+    ensureCharacterNameLayoutDefaults(currentLayout)
   }
   console.log('[Frontend] 当前布局:', currentLayout)
   updateSnapToggleButton()
@@ -964,6 +972,10 @@ async function init() {
     const result = await window.electronAPI.loadLayout()
     if (result.success && result.layout) {
       currentLayout = { ...defaultLayout, ...result.layout }
+      ensureCharacterNameLayoutDefaults(currentLayout, result.layout)
+      if (window.ASGAnimations && typeof window.ASGAnimations.reload === 'function') {
+        await window.ASGAnimations.reload()
+      }
       updateSnapToggleButton()
       applyLayout()
       applyGlobalBanLayoutConfig()
@@ -1375,6 +1387,69 @@ function buildTemplateEventDataFromState(state, rawData = {}) {
     round: asTemplateInt(data.round, asTemplateInt(st.currentRound || data.currentRound, 0)),
     currentRound: asTemplateInt(data.currentRound, asTemplateInt(st.currentRound || data.round, 0)),
     scoreData: data.scoreData || latestScoreDataForTemplate || undefined
+  }
+}
+
+function createCharacterNameLayoutFromBox(boxLayout = {}, fallbackLayout = {}) {
+  const boxX = Number.isFinite(Number(boxLayout.x)) ? Number(boxLayout.x) : Number(fallbackLayout.x) || 0
+  const boxY = Number.isFinite(Number(boxLayout.y)) ? Number(boxLayout.y) : Number(fallbackLayout.y) || 0
+  const boxWidth = Number.isFinite(Number(boxLayout.width)) ? Number(boxLayout.width) : Number(fallbackLayout.width) || 220
+  const boxHeight = Number.isFinite(Number(boxLayout.height)) ? Number(boxLayout.height) : Number(fallbackLayout.height) || 260
+  return {
+    x: boxX,
+    y: Math.round(boxY + boxHeight + 8),
+    width: boxWidth,
+    height: Number.isFinite(Number(fallbackLayout.height)) ? Number(fallbackLayout.height) : 34,
+    hidden: false
+  }
+}
+
+function ensureCharacterNameLayoutDefaults(layout, rawLayout = null) {
+  if (!layout || typeof layout !== 'object') return layout
+  CHARACTER_NAME_LAYOUT_LINKS.forEach(({ boxId, nameId }) => {
+    const hasRawNameLayout = !!(rawLayout && rawLayout[nameId])
+    if (hasRawNameLayout && layout[nameId]) return
+    if (!layout[nameId] || !hasRawNameLayout) {
+      layout[nameId] = Object.assign(
+        {},
+        defaultLayout[nameId] || {},
+        createCharacterNameLayoutFromBox(layout[boxId], defaultLayout[nameId] || {})
+      )
+    }
+  })
+  return layout
+}
+
+function setCharacterNameDisplay(boxId, text) {
+  const link = CHARACTER_NAME_LAYOUT_LINKS.find(item => item.boxId === boxId)
+  const normalizedText = text || ''
+  if (!link) return
+
+  const boxEl = document.getElementById(boxId)
+  const inlineNameEl = boxEl ? boxEl.querySelector('.name') : null
+  if (inlineNameEl) inlineNameEl.textContent = normalizedText
+
+  const nameTextEl = document.getElementById(link.textId)
+  if (nameTextEl) nameTextEl.textContent = normalizedText
+}
+
+function setCharacterSlotEmptyState(el, isEmpty) {
+  if (!el) return
+  el.classList.toggle('empty-slot', !!isEmpty)
+}
+
+function clampRectToViewport(x, y, width, height) {
+  const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1)
+  const viewportHeight = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1)
+  const safeWidth = Math.max(1, Number(width) || 1)
+  const safeHeight = Math.max(1, Number(height) || 1)
+  const maxX = Math.max(0, viewportWidth - safeWidth)
+  const maxY = Math.max(0, viewportHeight - safeHeight)
+  return {
+    x: Math.min(maxX, Math.max(0, Number(x) || 0)),
+    y: Math.min(maxY, Math.max(0, Number(y) || 0)),
+    width: safeWidth,
+    height: safeHeight
   }
 }
 
@@ -2407,16 +2482,21 @@ function updateTimerProgressBar(remaining, total, indeterminate) {
 function applyElementLayout(el, layout) {
   if (!el || !layout) return;
 
-  const { x, y, width, height, hidden, fontFamily, textColor, zIndex } = layout;
+  const { hidden, fontFamily, textColor, zIndex } = layout;
+  const clamped = clampRectToViewport(layout.x, layout.y, layout.width, layout.height)
+  layout.x = clamped.x
+  layout.y = clamped.y
+  layout.width = clamped.width
+  layout.height = clamped.height
 
   // 清除可能存在的 transform
   el.style.transform = '';
 
   // 使用 setProperty 确保样式被应用
-  el.style.setProperty('left', `${x}px`, 'important');
-  el.style.setProperty('top', `${y}px`, 'important');
-  el.style.setProperty('width', `${width}px`, 'important');
-  el.style.setProperty('height', `${height}px`, 'important');
+  el.style.setProperty('left', `${clamped.x}px`, 'important');
+  el.style.setProperty('top', `${clamped.y}px`, 'important');
+  el.style.setProperty('width', `${clamped.width}px`, 'important');
+  el.style.setProperty('height', `${clamped.height}px`, 'important');
   el.style.setProperty('position', 'absolute', 'important');
   if (zIndex !== undefined && zIndex !== null) {
     el.style.setProperty('z-index', zIndex, 'important');
@@ -2537,6 +2617,15 @@ function applyLayout() {
   console.log(`[Frontend] 布局应用完成 - 成功: ${appliedCount}, 未找到: ${notFoundCount}`)
   syncBanEditPreviewSlots()
 }
+
+let viewportClampApplyTimer = null
+window.addEventListener('resize', () => {
+  if (!currentLayout) return
+  if (viewportClampApplyTimer) clearTimeout(viewportClampApplyTimer)
+  viewportClampApplyTimer = setTimeout(() => {
+    applyLayout()
+  }, 80)
+})
 
 function isSnapEnabled() {
   return !(currentLayout && currentLayout.snapEnabled === false)
@@ -3180,6 +3269,9 @@ function initDraggable() {
     lastDy = dy
 
     if (isDragging) {
+      const clamped = clampRectToViewport(newLeft, newTop, startWidth, startHeight)
+      newLeft = clamped.x
+      newTop = clamped.y
       // 使用 direct updates 代替 transform，避免 GPU 崩溃导致的显示问题
       // activeContainer.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
       activeContainer.style.setProperty('left', `${newLeft}px`, 'important')
@@ -3203,6 +3295,27 @@ function initDraggable() {
         tempHeight = startHeight - dy
         tempTop = startTop + dy
       }
+
+      const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1)
+      const viewportHeight = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1)
+
+      if (resizeDir.includes('w') && tempLeft < 0) {
+        tempWidth += tempLeft
+        tempLeft = 0
+      }
+      if (resizeDir.includes('n') && tempTop < 0) {
+        tempHeight += tempTop
+        tempTop = 0
+      }
+      if (resizeDir.includes('e')) {
+        tempWidth = Math.min(tempWidth, viewportWidth - tempLeft)
+      }
+      if (resizeDir.includes('s')) {
+        tempHeight = Math.min(tempHeight, viewportHeight - tempTop)
+      }
+
+      tempLeft = Math.max(0, tempLeft)
+      tempTop = Math.max(0, tempTop)
 
       if (tempWidth > 10) { // Reduced min width
         activeContainer.style.width = `${tempWidth}px`
@@ -3931,9 +4044,10 @@ function updateDisplay(state) {
       const hasChanged = currentCharacter !== previousCharacter
 
       if (currentCharacter) {
+        setCharacterSlotEmptyState(el, false)
         // 只有在角色改变时才更新文本和显示逻辑
         if (hasChanged) {
-          nameEl.textContent = currentCharacter
+          setCharacterNameDisplay(el.id, currentCharacter)
           placeholder.style.display = 'none'
           el.classList.remove('pending') // 移除闪烁
           if (!isFirstDisplayUpdate && window.ASGAnimations && window.ASGAnimations.playSelectAnimation) {
@@ -3956,6 +4070,7 @@ function updateDisplay(state) {
           el.classList.remove('pending')
         }
       } else {
+        setCharacterSlotEmptyState(el, true)
         // 位置清空 - 检查是否有默认图片
         const defaultImage = state.defaultImages?.[`slot${i}`]
 
@@ -3965,7 +4080,7 @@ function updateDisplay(state) {
           const playerName = (state.playerNames && state.playerNames[i]) || ''
 
           if (hasChanged || !imgEl || imgEl.src !== defaultImage || nameEl.textContent !== playerName) {
-            nameEl.textContent = playerName
+            setCharacterNameDisplay(el.id, playerName)
             placeholder.style.display = 'none'
             dispose3DForBox(el.id)
 
@@ -3987,7 +4102,7 @@ function updateDisplay(state) {
           const playerName = (state.playerNames && state.playerNames[i]) || ''
 
           if (hasChanged || nameEl.textContent !== playerName) {
-            nameEl.textContent = playerName
+            setCharacterNameDisplay(el.id, playerName)
             // 只有当没有名字且没有角色时才显示问号 placeholder (Align with Hunter logic)
             placeholder.style.display = playerName ? 'none' : 'block'
             if (imgEl) {
@@ -4019,8 +4134,9 @@ function updateDisplay(state) {
     const hunterChanged = currentHunter !== previousHunter
 
     if (currentHunter) {
+      setCharacterSlotEmptyState(hunterEl, false)
       if (hunterChanged) {
-        hunterName.textContent = currentHunter
+        setCharacterNameDisplay(hunterEl.id, currentHunter)
         hunterPlaceholder.style.display = 'none'
         hunterEl.classList.remove('pending') // 移除闪烁
         if (!isFirstDisplayUpdate && window.ASGAnimations && window.ASGAnimations.playSelectAnimation) {
@@ -4043,6 +4159,7 @@ function updateDisplay(state) {
         hunterEl.classList.remove('pending')
       }
     } else {
+      setCharacterSlotEmptyState(hunterEl, true)
       // 监管者位置清空 - 检查是否有默认图片
       const hunterDefaultImage = state.defaultImages?.hunter
 
@@ -4055,7 +4172,7 @@ function updateDisplay(state) {
       if (hunterDefaultImage) {
         // 有默认图片：显示默认图片
         if (hunterChanged || !hunterImgEl || hunterImgEl.src !== hunterDefaultImage || hunterName.textContent !== playerName) {
-          hunterName.textContent = playerName
+          setCharacterNameDisplay(hunterEl.id, playerName)
           hunterPlaceholder.style.display = 'none'
           dispose3DForBox(hunterEl.id)
 
@@ -4074,7 +4191,7 @@ function updateDisplay(state) {
       } else {
         // 无默认图片：显示问号或选手名字
         if (hunterChanged || hunterName.textContent !== playerName) {
-          hunterName.textContent = playerName
+          setCharacterNameDisplay(hunterEl.id, playerName)
           // 只有当没有名字且没有角色时才显示问号 placeholder
           hunterPlaceholder.style.display = playerName ? 'none' : 'block'
 

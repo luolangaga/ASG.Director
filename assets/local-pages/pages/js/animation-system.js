@@ -117,12 +117,41 @@
             fillMode: 'both',
             keyframes: `@keyframes asg-blink-pending {
   0% {
-    box-shadow: none;
-    border-color: transparent;
+    filter: drop-shadow(0 0 0 rgba(255, 232, 163, 0));
+    transform: scale(1);
+  }
+  35% {
+    filter: drop-shadow(0 0 10px rgba(255, 230, 140, 0.45)) drop-shadow(0 0 24px rgba(255, 215, 64, 0.28));
+    transform: scale(1.012);
   }
   100% {
-    box-shadow: none;
-    border-color: transparent;
+    filter: drop-shadow(0 0 18px rgba(255, 234, 166, 0.98)) drop-shadow(0 0 42px rgba(255, 210, 72, 0.72)) drop-shadow(0 0 68px rgba(255, 196, 0, 0.48));
+    transform: scale(1.028);
+  }
+}`,
+            targets: ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+        },
+
+        'default-blink-empty': {
+            id: 'default-blink-empty',
+            name: '空槽位边框闪烁',
+            category: 'blink',
+            duration: 1.05,
+            delay: 0,
+            easing: 'ease-in-out',
+            iterationCount: 'infinite',
+            direction: 'alternate',
+            fillMode: 'both',
+            keyframes: `@keyframes asg-blink-empty {
+  0% {
+    outline: 1px solid rgba(255, 214, 102, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 214, 102, 0.12), 0 0 0 rgba(255, 214, 102, 0);
+    filter: none;
+  }
+  100% {
+    outline: 2px solid rgba(255, 227, 148, 0.96);
+    box-shadow: inset 0 0 0 1px rgba(255, 227, 148, 0.55), 0 0 18px rgba(255, 214, 102, 0.5), 0 0 36px rgba(255, 187, 0, 0.28);
+    filter: none;
   }
 }`,
             targets: ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
@@ -502,6 +531,7 @@
         specificAnims.forEach(anim => {
             if (anim.targets) {
                 anim.targets.forEach(t => {
+                    if (t === targetId) return
                     if (t === 'customComponents') {
                         document.querySelectorAll('.custom-component').forEach(c => applyAnimation(c, anim.id))
                     } else {
@@ -517,10 +547,13 @@
      */
     function playBlinkAnimation(target) {
         const targetId = typeof target === 'string' ? target : target.id
+        const element = typeof target === 'string' ? document.getElementById(target) : target
 
         let animation = findAnimationForTarget(targetId, 'blink')
         if (!animation) {
-            animation = DEFAULT_ANIMATIONS['default-blink-pending']
+            animation = element && element.classList.contains('empty-slot')
+                ? DEFAULT_ANIMATIONS['default-blink-empty']
+                : DEFAULT_ANIMATIONS['default-blink-pending']
         }
 
         if (animation) {
@@ -551,6 +584,7 @@
         specificAnims.forEach(anim => {
             if (anim.targets) {
                 anim.targets.forEach(t => {
+                    if (t === targetId) return
                     if (t === 'customComponents') {
                         document.querySelectorAll('.custom-component').forEach(c => applyAnimation(c, anim.id))
                     } else {
@@ -590,6 +624,7 @@
         specificAnims.forEach(anim => {
             if (anim.targets) {
                 anim.targets.forEach(t => {
+                    if (t === targetId) return
                     if (t === 'customComponents') {
                         document.querySelectorAll('.custom-component').forEach(c => stopAnimation(c))
                     } else {
@@ -607,11 +642,27 @@
         // 在自定义动画中查找针对该目标的动画
         const el = document.getElementById(targetId)
         const isCustom = el && el.classList.contains('custom-component')
+        const specificCategory = `${category}-${targetId}`
+
+        const specificAnimation = AnimationSystem.animations.find(a =>
+            a.category === specificCategory &&
+            (
+                !Array.isArray(a.targets) ||
+                a.targets.length === 0 ||
+                a.targets.includes(targetId) ||
+                (isCustom && a.targets.includes('customComponents'))
+            )
+        )
+        if (specificAnimation) return specificAnimation
 
         return AnimationSystem.animations.find(a =>
             a.category === category &&
-            a.targets &&
-            (a.targets.includes(targetId) || (isCustom && a.targets.includes('customComponents')))
+            (
+                !Array.isArray(a.targets) ||
+                a.targets.length === 0 ||
+                a.targets.includes(targetId) ||
+                (isCustom && a.targets.includes('customComponents'))
+            )
         )
     }
 

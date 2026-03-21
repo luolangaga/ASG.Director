@@ -356,6 +356,20 @@
     bounceBoost: 1
   }
 
+  const CAMERA_EASING_PRESETS = {
+    smooth: { label: '平滑默认', type: 'smooth' },
+    easeIn: { label: '慢入', type: 'cubic-bezier', bezier: { x1: 0.42, y1: 0, x2: 1, y2: 1 } },
+    easeOut: { label: '快出', type: 'cubic-bezier', bezier: { x1: 0, y1: 0, x2: 0.58, y2: 1 } },
+    easeInOut: { label: '慢入慢出', type: 'cubic-bezier', bezier: { x1: 0.42, y1: 0, x2: 0.58, y2: 1 } },
+    sharpInOut: { label: '强烈加减速', type: 'cubic-bezier', bezier: { x1: 0.7, y1: 0, x2: 0.3, y2: 1 } },
+    custom: { label: '自定义贝塞尔', type: 'custom' }
+  }
+
+  const DEFAULT_CAMERA_EASING = {
+    preset: 'smooth',
+    bezier: { x1: 0.2, y1: 0, x2: 0.2, y2: 1 }
+  }
+
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     toolbarCollapsed: false,
@@ -436,6 +450,7 @@
       fov: 45
     },
     cameraTransitionMs: 900,
+    cameraEasing: deepClone(DEFAULT_CAMERA_EASING),
     cameraKeyframes: {
       survivor1: null,
       survivor2: null,
@@ -485,6 +500,7 @@
   let axes = null
   let skyDome = null
   let shadowGround = null
+  let blobShadowTexture = null
   const sceneLights = {
     ambient: null,
     key: null,
@@ -503,6 +519,7 @@
   let clock = null
   let outlineEffect = null
   let saveTimer = null
+  let cameraCurveDragHandle = ''
   let cameraTransition = null
   let fpsAccum = 0
   let fpsFrames = 0
@@ -650,6 +667,21 @@
     previewCameraKeyframeBtn: document.getElementById('previewCameraKeyframeBtn'),
     clearCameraKeyframeBtn: document.getElementById('clearCameraKeyframeBtn'),
     cameraTransitionMs: document.getElementById('cameraTransitionMs'),
+    cameraEasingPreset: document.getElementById('cameraEasingPreset'),
+    openCameraCurveModalBtn: document.getElementById('openCameraCurveModalBtn'),
+    cameraBezierX1: document.getElementById('cameraBezierX1'),
+    cameraBezierY1: document.getElementById('cameraBezierY1'),
+    cameraBezierX2: document.getElementById('cameraBezierX2'),
+    cameraBezierY2: document.getElementById('cameraBezierY2'),
+    cameraCurveSummary: document.getElementById('cameraCurveSummary'),
+    cameraCurveModal: document.getElementById('cameraCurveModal'),
+    closeCameraCurveModalBtn: document.getElementById('closeCameraCurveModalBtn'),
+    cameraCurveModalPreset: document.getElementById('cameraCurveModalPreset'),
+    cameraCurveCanvas: document.getElementById('cameraCurveCanvas'),
+    cameraCurveResetBtn: document.getElementById('cameraCurveResetBtn'),
+    cameraCurveHint: document.getElementById('cameraCurveHint'),
+    applyCameraCurveBtn: document.getElementById('applyCameraCurveBtn'),
+    previewCameraCurveBtn: document.getElementById('previewCameraCurveBtn'),
     cameraEventInfo: document.getElementById('cameraEventInfo')
     , environmentPresetSelect: document.getElementById('environmentPresetSelect')
     , renderQualitySelect: document.getElementById('renderQualitySelect')
@@ -802,6 +834,23 @@
     return out
   }
 
+  function normalizeCameraEasing(input) {
+    const source = (input && typeof input === 'object') ? input : {}
+    const preset = typeof source.preset === 'string' && Object.prototype.hasOwnProperty.call(CAMERA_EASING_PRESETS, source.preset)
+      ? source.preset
+      : DEFAULT_CAMERA_EASING.preset
+    const bezierInput = (source.bezier && typeof source.bezier === 'object') ? source.bezier : {}
+    return {
+      preset,
+      bezier: {
+        x1: Math.max(0, Math.min(1, asNumber(bezierInput.x1, DEFAULT_CAMERA_EASING.bezier.x1))),
+        y1: Math.max(0, Math.min(1, asNumber(bezierInput.y1, DEFAULT_CAMERA_EASING.bezier.y1))),
+        x2: Math.max(0, Math.min(1, asNumber(bezierInput.x2, DEFAULT_CAMERA_EASING.bezier.x2))),
+        y2: Math.max(0, Math.min(1, asNumber(bezierInput.y2, DEFAULT_CAMERA_EASING.bezier.y2)))
+      }
+    }
+  }
+
   function isRoleSlotKey(key) {
     return key === 'hunter' || (typeof key === 'string' && key.startsWith('survivor'))
   }
@@ -879,7 +928,8 @@
       || base.entranceEffect === 'flameDissolve'
       || base.entranceEffect === 'cardStorm'
       || base.entranceEffect === 'spotlightRush'
-      || base.entranceEffect === 'prismBloom')
+      || base.entranceEffect === 'prismBloom'
+      || base.entranceEffect === 'mistReveal')
       ? base.entranceEffect
       : 'fade'
     out.entranceParticle = {
@@ -937,6 +987,7 @@
     out.camera.target = ensureVec3(base?.camera?.target, out.camera.target)
     out.camera.fov = clampCameraFov(base?.camera?.fov, out.camera.fov)
     out.cameraTransitionMs = Math.max(50, Math.min(10000, asNumber(base?.cameraTransitionMs, out.cameraTransitionMs)))
+    out.cameraEasing = normalizeCameraEasing(base?.cameraEasing)
     out.cameraKeyframes = deepClone(DEFAULT_LAYOUT.cameraKeyframes)
     for (const eventCfg of CAMERA_EVENT_OPTIONS) {
       out.cameraKeyframes[eventCfg.key] = normalizeCameraKeyframe(base?.cameraKeyframes?.[eventCfg.key], null)
@@ -1066,8 +1117,7 @@
     nextRenderer.physicallyCorrectLights = true
     nextRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8))
     nextRenderer.setSize(width, height)
-    nextRenderer.shadowMap.enabled = true
-    nextRenderer.shadowMap.type = THREE.PCFSoftShadowMap
+    nextRenderer.shadowMap.enabled = false
 
     const prevRenderer = renderer
     renderer = nextRenderer
@@ -1100,7 +1150,7 @@
 
     sceneLights.key = new THREE.DirectionalLight(0xffffff, 1.35)
     sceneLights.key.position.set(6, 14, 10)
-    sceneLights.key.castShadow = true
+    sceneLights.key.castShadow = false
     sceneLights.key.shadow.mapSize.set(3072, 3072)
     sceneLights.key.shadow.camera.near = 0.5
     sceneLights.key.shadow.camera.far = 160
@@ -1147,7 +1197,8 @@
     )
     shadowGround.rotation.x = -Math.PI / 2
     shadowGround.position.y = 0
-    shadowGround.receiveShadow = true
+    shadowGround.receiveShadow = false
+    shadowGround.visible = false
     scene.add(shadowGround)
 
     // 天空穹顶：通过渐变营造天空氛围
@@ -1194,6 +1245,7 @@
         cfg,
         group,
         model: null,
+        blobShadow: null,
         modelPath: '',
         loadingPath: '',
         loadSeq: 0,
@@ -1414,8 +1466,7 @@
       const h = dom.renderRoot?.clientHeight || window.innerHeight || 1080
       renderer.setSize(w, h)
       renderer.toneMappingExposure = q.exposure * adv.exposure
-      renderer.shadowMap.enabled = true
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap
+      renderer.shadowMap.enabled = false
     }
     if (sceneLights.key) {
       const mapSize = Math.max(1024, Math.min(8192, Math.round(q.shadowMap * adv.shadowMapBoost)))
@@ -1423,6 +1474,7 @@
       sceneLights.key.shadow.radius = Math.max(0.1, q.shadowRadius * adv.shadowRadiusBoost)
       sceneLights.key.shadow.bias = adv.shadowBias
       sceneLights.key.shadow.normalBias = adv.shadowNormalBias
+      sceneLights.key.castShadow = false
       sceneLights.key.shadow.needsUpdate = true
     }
     if (sceneLights.ambient) {
@@ -2354,6 +2406,11 @@
       const strength = Math.max(0, Math.min(1, asNumber(state.layout.shadowStrength, preset.shadowOpacity)))
       shadowGround.material.opacity = strength
     }
+    for (const cfg of SLOT_CONFIGS) {
+      if (cfg.roleType === 'survivor' || cfg.roleType === 'hunter') {
+        updateBlobShadowForSlot(cfg.key)
+      }
+    }
     if (dom.environmentPresetSelect) dom.environmentPresetSelect.value = key
     if (dom.fogEnabled) dom.fogEnabled.checked = !!state.layout.fogEnabled
     if (dom.fogStrength) dom.fogStrength.value = String(Math.max(0, Math.min(3, asNumber(state.layout.fogStrength, 1))).toFixed(2))
@@ -2621,9 +2678,245 @@
     return from + delta * t
   }
 
+  function cubicBezierCoord(t, a1, a2) {
+    const omt = 1 - t
+    return 3 * omt * omt * t * a1 + 3 * omt * t * t * a2 + t * t * t
+  }
+
+  function cubicBezierCoordDerivative(t, a1, a2) {
+    const omt = 1 - t
+    return 3 * omt * omt * a1 + 6 * omt * t * (a2 - a1) + 3 * t * t * (1 - a2)
+  }
+
+  function sampleUnitBezier(x1, y1, x2, y2, progress) {
+    const target = Math.max(0, Math.min(1, asNumber(progress, 0)))
+    let t = target
+    for (let i = 0; i < 6; i++) {
+      const x = cubicBezierCoord(t, x1, x2) - target
+      const d = cubicBezierCoordDerivative(t, x1, x2)
+      if (Math.abs(d) < 1e-6) break
+      t = Math.max(0, Math.min(1, t - x / d))
+    }
+    return Math.max(0, Math.min(1, cubicBezierCoord(t, y1, y2)))
+  }
+
   function easeInOutSmootherStep(t) {
     const x = Math.max(0, Math.min(1, asNumber(t, 0)))
     return x * x * x * (x * (x * 6 - 15) + 10)
+  }
+
+  function evaluateCameraEasing(progress, easingConfig = null) {
+    const x = Math.max(0, Math.min(1, asNumber(progress, 0)))
+    const cfg = normalizeCameraEasing(easingConfig || state.layout?.cameraEasing || DEFAULT_CAMERA_EASING)
+    if (cfg.preset === 'smooth') return easeInOutSmootherStep(x)
+    const presetCfg = CAMERA_EASING_PRESETS[cfg.preset] || CAMERA_EASING_PRESETS.smooth
+    const bezier = cfg.preset === 'custom'
+      ? cfg.bezier
+      : (presetCfg.bezier || DEFAULT_CAMERA_EASING.bezier)
+    return sampleUnitBezier(
+      Math.max(0, Math.min(1, asNumber(bezier.x1, DEFAULT_CAMERA_EASING.bezier.x1))),
+      asNumber(bezier.y1, DEFAULT_CAMERA_EASING.bezier.y1),
+      Math.max(0, Math.min(1, asNumber(bezier.x2, DEFAULT_CAMERA_EASING.bezier.x2))),
+      asNumber(bezier.y2, DEFAULT_CAMERA_EASING.bezier.y2),
+      x
+    )
+  }
+
+  function getCameraCurveSummaryText() {
+    const cfg = normalizeCameraEasing(state.layout?.cameraEasing)
+    const presetLabel = CAMERA_EASING_PRESETS[cfg.preset]?.label || '平滑默认'
+    if (cfg.preset !== 'custom') return presetLabel
+    return `${presetLabel} (${cfg.bezier.x1.toFixed(2)}, ${cfg.bezier.y1.toFixed(2)}, ${cfg.bezier.x2.toFixed(2)}, ${cfg.bezier.y2.toFixed(2)})`
+  }
+
+  function isCameraCurveModalOpen() {
+    return !!dom.cameraCurveModal?.classList.contains('open')
+  }
+
+  function drawCameraCurveEditor() {
+    const canvas = dom.cameraCurveCanvas
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const dpr = Math.max(1, window.devicePixelRatio || 1)
+    const nextWidth = Math.max(320, Math.round(rect.width * dpr))
+    const nextHeight = Math.max(220, Math.round(rect.height * dpr))
+    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+      canvas.width = nextWidth
+      canvas.height = nextHeight
+    }
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const width = canvas.width
+    const height = canvas.height
+    const pad = 34
+    const plotW = width - pad * 2
+    const plotH = height - pad * 2
+    const cfg = normalizeCameraEasing(state.layout?.cameraEasing)
+    const x1 = cfg.bezier.x1
+    const y1 = cfg.bezier.y1
+    const x2 = cfg.bezier.x2
+    const y2 = cfg.bezier.y2
+    const toPx = (x, y) => ({
+      x: pad + x * plotW,
+      y: pad + (1 - y) * plotH
+    })
+    const start = toPx(0, 0)
+    const end = toPx(1, 1)
+    const p1 = toPx(x1, y1)
+    const p2 = toPx(x2, y2)
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, width, height)
+    ctx.fillStyle = '#101827'
+    ctx.fillRect(0, 0, width, height)
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+    ctx.lineWidth = 1
+    for (let i = 0; i <= 4; i++) {
+      const gx = pad + (plotW / 4) * i
+      const gy = pad + (plotH / 4) * i
+      ctx.beginPath()
+      ctx.moveTo(gx, pad)
+      ctx.lineTo(gx, height - pad)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(pad, gy)
+      ctx.lineTo(width - pad, gy)
+      ctx.stroke()
+    }
+
+    ctx.strokeStyle = 'rgba(129,188,255,0.35)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(start.x, start.y)
+    ctx.lineTo(p1.x, p1.y)
+    ctx.lineTo(p2.x, p2.y)
+    ctx.lineTo(end.x, end.y)
+    ctx.stroke()
+
+    ctx.strokeStyle = '#8fd5ff'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    for (let i = 0; i <= 80; i++) {
+      const t = i / 80
+      const y = evaluateCameraEasing(t, cfg)
+      const pt = {
+        x: pad + t * plotW,
+        y: pad + (1 - y) * plotH
+      }
+      if (i === 0) ctx.moveTo(pt.x, pt.y)
+      else ctx.lineTo(pt.x, pt.y)
+    }
+    ctx.stroke()
+
+    const drawHandle = (pt, color, label) => {
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.arc(pt.x, pt.y, 7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#eaf6ff'
+      ctx.font = '12px "Microsoft YaHei UI", sans-serif'
+      ctx.fillText(label, pt.x + 10, pt.y - 10)
+    }
+    drawHandle(p1, '#ffd166', 'P1')
+    drawHandle(p2, '#ff8fab', 'P2')
+  }
+
+  function syncCameraCurveUi() {
+    const cameraEasing = normalizeCameraEasing(state.layout?.cameraEasing)
+    if (dom.cameraEasingPreset) dom.cameraEasingPreset.value = cameraEasing.preset
+    if (dom.cameraCurveModalPreset) dom.cameraCurveModalPreset.value = cameraEasing.preset
+    if (dom.cameraBezierX1) dom.cameraBezierX1.value = String(cameraEasing.bezier.x1.toFixed(2))
+    if (dom.cameraBezierY1) dom.cameraBezierY1.value = String(cameraEasing.bezier.y1.toFixed(2))
+    if (dom.cameraBezierX2) dom.cameraBezierX2.value = String(cameraEasing.bezier.x2.toFixed(2))
+    if (dom.cameraBezierY2) dom.cameraBezierY2.value = String(cameraEasing.bezier.y2.toFixed(2))
+    const bezierDisabled = cameraEasing.preset !== 'custom'
+    ;[dom.cameraBezierX1, dom.cameraBezierY1, dom.cameraBezierX2, dom.cameraBezierY2].forEach((input) => {
+      if (!input) return
+      input.disabled = bezierDisabled
+    })
+    if (dom.cameraCurveHint) {
+      dom.cameraCurveHint.textContent = bezierDisabled
+        ? '当前为预设曲线。直接拖动画布控制点会自动切换到“自定义贝塞尔”。'
+        : '拖动 P1 / P2 控制点，或直接修改右侧数值。'
+    }
+    if (dom.cameraCurveSummary) dom.cameraCurveSummary.textContent = getCameraCurveSummaryText()
+    if (isCameraCurveModalOpen()) drawCameraCurveEditor()
+  }
+
+  function openCameraCurveModal() {
+    if (!dom.cameraCurveModal) return
+    dom.cameraCurveModal.classList.add('open')
+    dom.cameraCurveModal.setAttribute('aria-hidden', 'false')
+    if (dom.cameraCurveCanvas) {
+      window.setTimeout(() => drawCameraCurveEditor(), 0)
+    }
+    syncCameraCurveUi()
+  }
+
+  function closeCameraCurveModal() {
+    if (!dom.cameraCurveModal) return
+    dom.cameraCurveModal.classList.remove('open')
+    dom.cameraCurveModal.setAttribute('aria-hidden', 'true')
+    cameraCurveDragHandle = ''
+  }
+
+  function resetCustomCameraCurve() {
+    state.layout.cameraEasing = normalizeCameraEasing({
+      preset: 'custom',
+      bezier: DEFAULT_CAMERA_EASING.bezier
+    })
+    syncCameraCurveUi()
+    scheduleSaveLayout()
+  }
+
+  function updateCameraCurveFromCanvasPointer(clientX, clientY) {
+    if (!cameraCurveDragHandle || !dom.cameraCurveCanvas) return
+    const rect = dom.cameraCurveCanvas.getBoundingClientRect()
+    const pad = 34
+    const plotW = rect.width - pad * 2
+    const plotH = rect.height - pad * 2
+    const px = Math.max(pad, Math.min(rect.width - pad, clientX - rect.left))
+    const py = Math.max(pad, Math.min(rect.height - pad, clientY - rect.top))
+    const x = (px - pad) / Math.max(1, plotW)
+    const y = 1 - ((py - pad) / Math.max(1, plotH))
+    const easing = normalizeCameraEasing(state.layout?.cameraEasing)
+    easing.preset = 'custom'
+    if (cameraCurveDragHandle === 'p1') {
+      easing.bezier.x1 = Math.max(0, Math.min(1, x))
+      easing.bezier.y1 = Math.max(0, Math.min(1, y))
+    } else if (cameraCurveDragHandle === 'p2') {
+      easing.bezier.x2 = Math.max(0, Math.min(1, x))
+      easing.bezier.y2 = Math.max(0, Math.min(1, y))
+    }
+    state.layout.cameraEasing = easing
+    syncCameraCurveUi()
+  }
+
+  function detectCameraCurveHandle(clientX, clientY) {
+    if (!dom.cameraCurveCanvas) return ''
+    const rect = dom.cameraCurveCanvas.getBoundingClientRect()
+    const pad = 34
+    const plotW = rect.width - pad * 2
+    const plotH = rect.height - pad * 2
+    const easing = normalizeCameraEasing(state.layout?.cameraEasing)
+    const toPx = (x, y) => ({
+      x: rect.left + pad + x * plotW,
+      y: rect.top + pad + (1 - y) * plotH
+    })
+    const points = {
+      p1: toPx(easing.bezier.x1, easing.bezier.y1),
+      p2: toPx(easing.bezier.x2, easing.bezier.y2)
+    }
+    const threshold = 22
+    for (const [key, point] of Object.entries(points)) {
+      const dx = clientX - point.x
+      const dy = clientY - point.y
+      if ((dx * dx + dy * dy) <= threshold * threshold) return key
+    }
+    const p1Dist = Math.hypot(clientX - points.p1.x, clientY - points.p1.y)
+    const p2Dist = Math.hypot(clientX - points.p2.x, clientY - points.p2.y)
+    return p1Dist <= p2Dist ? 'p1' : 'p2'
   }
 
   function captureCurrentCameraFrame() {
@@ -2655,6 +2948,7 @@
   function startCameraTransition(targetFrame, durationMs, reason = '') {
     if (!camera || !targetFrame) return
     const duration = Math.max(50, Math.min(10000, asNumber(durationMs, 900)))
+    const easing = normalizeCameraEasing(state.layout?.cameraEasing)
     camera.aspect = clampCameraAspect(getViewportAspect(), getViewportAspect())
     camera.updateProjectionMatrix()
     const fromFrame = captureCurrentCameraFrame()
@@ -2683,6 +2977,7 @@
       toPitch: toState.pitch,
       toRadius: toState.radius,
       toFov: toFrame.fov,
+      easing,
       reason
     }
   }
@@ -2691,7 +2986,7 @@
     if (!cameraTransition || !camera) return
     const now = performance.now()
     const t = Math.max(0, Math.min(1, (now - cameraTransition.startAt) / Math.max(1, cameraTransition.duration)))
-    const eased = easeInOutSmootherStep(t)
+    const eased = evaluateCameraEasing(t, cameraTransition.easing)
 
     orbit.target = {
       x: cameraTransition.fromTarget.x + (cameraTransition.toTarget.x - cameraTransition.fromTarget.x) * eased,
@@ -2750,6 +3045,7 @@
     if (dom.cameraTransitionMs) {
       dom.cameraTransitionMs.value = String(Math.max(50, Math.min(10000, asNumber(state.layout.cameraTransitionMs, 900))))
     }
+    syncCameraCurveUi()
     if (dom.entranceEffectSelect) {
       dom.entranceEffectSelect.value = state.layout?.entranceEffect || 'fade'
     }
@@ -2797,6 +3093,24 @@
     const duration = Math.max(50, Math.min(10000, asNumber(dom.cameraTransitionMs ? dom.cameraTransitionMs.value : state.layout.cameraTransitionMs, state.layout.cameraTransitionMs)))
     state.layout.cameraTransitionMs = duration
     startCameraTransition(frame, duration, `预览 ${CAMERA_EVENT_OPTIONS.find(item => item.key === eventKey)?.label || eventKey}`)
+  }
+
+  function applyCameraEasingFromInputs(shouldSave = true) {
+    const presetSource = (dom.cameraCurveModalPreset?.value || dom.cameraEasingPreset?.value || '')
+    const preset = Object.prototype.hasOwnProperty.call(CAMERA_EASING_PRESETS, presetSource)
+      ? presetSource
+      : DEFAULT_CAMERA_EASING.preset
+    state.layout.cameraEasing = normalizeCameraEasing({
+      preset,
+      bezier: {
+        x1: asNumber(dom.cameraBezierX1?.value, DEFAULT_CAMERA_EASING.bezier.x1),
+        y1: asNumber(dom.cameraBezierY1?.value, DEFAULT_CAMERA_EASING.bezier.y1),
+        x2: asNumber(dom.cameraBezierX2?.value, DEFAULT_CAMERA_EASING.bezier.x2),
+        y2: asNumber(dom.cameraBezierY2?.value, DEFAULT_CAMERA_EASING.bezier.y2)
+      }
+    })
+    syncCameraCurveUi()
+    if (shouldSave) scheduleSaveLayout()
   }
 
   function triggerCameraEvent(eventKey) {
@@ -2849,6 +3163,7 @@
       const effectiveUniform = uniform * getRoleScaleMultiplierForSlot(key)
       runtime.group.scale.set(effectiveUniform, effectiveUniform, effectiveUniform)
     }
+    if (runtime.blobShadow) updateBlobShadowForSlot(key)
   }
 
   function removeModelFromSlot(key) {
@@ -2877,6 +3192,7 @@
     runtime.videoElement = null
     runtime.videoTexture = null
     runtime.mediaStream = null
+    removeBlobShadowForSlot(key)
     while (runtime.group.children.length) {
       const child = runtime.group.children.pop()
       disposeObject(child)
@@ -2926,14 +3242,119 @@
     if (obj.parent) obj.parent.remove(obj)
   }
 
-  function prepareModelForShadows(obj) {
+  function materialAllowsShadow(mat) {
+    if (!mat) return false
+    const opacity = Number.isFinite(mat.opacity) ? mat.opacity : 1
+    if (mat.visible === false) return false
+    if (opacity <= 0.02) return false
+    if (mat.transparent && opacity < 0.35) return false
+    return true
+  }
+
+  function prepareModelForShadows(obj, roleType = '') {
     if (!obj) return
+    const isCharacterLike = roleType === 'survivor' || roleType === 'hunter' || roleType === 'custom'
     obj.traverse((node) => {
-      if (node && node.isMesh) {
-        node.castShadow = true
-        node.receiveShadow = true
+      if (!node || !node.isMesh) return
+      const materials = Array.isArray(node.material) ? node.material : [node.material]
+      const allowShadow = materials.some((mat) => materialAllowsShadow(mat))
+      if (!allowShadow) {
+        node.castShadow = false
+        node.receiveShadow = false
+        return
       }
+      node.castShadow = !isCharacterLike
+      node.receiveShadow = !isCharacterLike
     })
+  }
+
+  function getBlobShadowTexture() {
+    if (blobShadowTexture || !THREE) return blobShadowTexture
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 128
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const gradient = ctx.createRadialGradient(64, 64, 10, 64, 64, 64)
+    gradient.addColorStop(0, 'rgba(0,0,0,0.58)')
+    gradient.addColorStop(0.45, 'rgba(0,0,0,0.32)')
+    gradient.addColorStop(0.8, 'rgba(0,0,0,0.10)')
+    gradient.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.clearRect(0, 0, 128, 128)
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 128, 128)
+    blobShadowTexture = new THREE.CanvasTexture(canvas)
+    blobShadowTexture.needsUpdate = true
+    return blobShadowTexture
+  }
+
+  function isCharacterRoleType(roleType = '') {
+    return roleType === 'survivor' || roleType === 'hunter'
+  }
+
+  function removeBlobShadowForSlot(key) {
+    const runtime = slotRuntime.get(key)
+    if (!runtime?.blobShadow) return
+    const shadow = runtime.blobShadow
+    runtime.blobShadow = null
+    if (shadow.parent) shadow.parent.remove(shadow)
+    if (shadow.geometry && typeof shadow.geometry.dispose === 'function') {
+      try { shadow.geometry.dispose() } catch { }
+    }
+    if (shadow.material && typeof shadow.material.dispose === 'function') {
+      try { shadow.material.dispose() } catch { }
+    }
+  }
+
+  function updateBlobShadowForSlot(key) {
+    const runtime = slotRuntime.get(key)
+    if (!runtime || !runtime.group || !runtime.model || !isCharacterRoleType(runtime.cfg?.roleType || '')) {
+      removeBlobShadowForSlot(key)
+      return
+    }
+    const tex = getBlobShadowTexture()
+    if (!tex) return
+    let shadow = runtime.blobShadow
+    if (!shadow) {
+      shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity: Math.max(0.16, Math.min(0.42, asNumber(state.layout?.shadowStrength, 0.45) * 0.7)),
+          depthWrite: false,
+          toneMapped: false
+        })
+      )
+      shadow.rotation.x = -Math.PI / 2
+      shadow.renderOrder = 1
+      shadow.castShadow = false
+      shadow.receiveShadow = false
+      runtime.group.add(shadow)
+      runtime.blobShadow = shadow
+    }
+
+    runtime.model.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(runtime.model)
+    if (!Number.isFinite(box.min.x) || !Number.isFinite(box.max.x)) {
+      shadow.visible = false
+      return
+    }
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3())
+    const localCenter = runtime.group.worldToLocal(center.clone())
+    const groupScaleX = Math.max(0.001, Math.abs(asNumber(runtime.group.scale.x, 1)))
+    const groupScaleY = Math.max(0.001, Math.abs(asNumber(runtime.group.scale.y, 1)))
+    const groupScaleZ = Math.max(0.001, Math.abs(asNumber(runtime.group.scale.z, 1)))
+    const localWidth = size.x / groupScaleX
+    const localHeight = size.y / groupScaleY
+    const localDepth = size.z / groupScaleZ
+    const width = Math.max(0.55, Math.min(3.8, localWidth * 0.72))
+    const depth = Math.max(0.45, Math.min(3.2, localDepth * 0.68))
+    shadow.visible = true
+    shadow.position.set(localCenter.x, Math.max(0.01, localCenter.y - localHeight * 0.5 + 0.02), localCenter.z)
+    shadow.scale.set(width, depth, 1)
+    shadow.material.opacity = Math.max(0.14, Math.min(0.4, asNumber(state.layout?.shadowStrength, 0.45) * 0.68))
   }
 
   function isPuppeteerRoleName(name) {
@@ -3142,6 +3563,14 @@
       }
       if (Array.isArray(fx.entries)) {
         fx.entries.forEach((entry) => {
+          if (entry.node && entry.node.isMesh) {
+            if (typeof entry.originalCastShadow === 'boolean') {
+              entry.node.castShadow = entry.originalCastShadow
+            }
+            if (typeof entry.originalReceiveShadow === 'boolean') {
+              entry.node.receiveShadow = entry.originalReceiveShadow
+            }
+          }
           entry.materials.forEach((mat) => {
             if (!mat) return
             if (fx.type === 'flameDissolve') {
@@ -3424,6 +3853,68 @@
     return { group, shards, ring }
   }
 
+  function createMistRevealTransient(modelRoot, boundsInfo) {
+    const group = createEntranceTransientGroup(modelRoot, boundsInfo)
+    const plumes = []
+    const palette = ['#f4f8fb', '#d6e4ef', '#e8eef6', '#cfdce8']
+    for (let i = 0; i < 18; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(
+          boundsInfo.radius * (0.92 + Math.random() * 0.78),
+          boundsInfo.height * (0.62 + Math.random() * 0.46)
+        ),
+        new THREE.MeshBasicMaterial({
+          color: palette[i % palette.length],
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      )
+      mesh.renderOrder = 4
+      group.add(mesh)
+      const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.28
+      plumes.push({
+        mesh,
+        angle,
+        radius: boundsInfo.radius * (0.28 + Math.random() * 0.52),
+        lift: boundsInfo.height * (0.22 + Math.random() * 0.52),
+        drift: (Math.random() - 0.5) * boundsInfo.radius * 0.44,
+        yaw: (Math.random() - 0.5) * 0.72
+      })
+    }
+
+    const groundMist = new THREE.Mesh(
+      new THREE.CircleGeometry(boundsInfo.radius * 1.5, 56),
+      new THREE.MeshBasicMaterial({
+        color: '#dfe9f2',
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      })
+    )
+    groundMist.rotation.x = -Math.PI / 2
+    groundMist.position.y = -boundsInfo.height * 0.48
+    group.add(groundMist)
+
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(boundsInfo.radius * 0.5, boundsInfo.radius * 1.18, 48),
+      new THREE.MeshBasicMaterial({
+        color: '#f7fbff',
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    )
+    halo.rotation.x = -Math.PI / 2
+    halo.position.y = -boundsInfo.height * 0.45
+    group.add(halo)
+
+    return { group, plumes, groundMist, halo }
+  }
+
   function stopParticleEffectsForRoot(modelRoot) {
     if (!modelRoot || !activeParticleBursts.length) return
     for (let i = activeParticleBursts.length - 1; i >= 0; i--) {
@@ -3609,13 +4100,15 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         transientData = createSpotlightRushTransient(modelRoot, boundsInfo)
       } else if (effectType === 'prismBloom') {
         transientData = createPrismBloomTransient(modelRoot, boundsInfo)
+      } else if (effectType === 'mistReveal') {
+        transientData = createMistRevealTransient(modelRoot, boundsInfo)
       }
       fx = {
         type: effectType,
         entries: materialEntries,
         modelRoot,
         startedAt: performance.now(),
-        durationMs: effectType === 'spotlightRush' ? 1450 : effectType === 'cardStorm' ? 1850 : effectType === 'prismBloom' ? 1700 : 1500,
+        durationMs: effectType === 'spotlightRush' ? 1450 : effectType === 'cardStorm' ? 1850 : effectType === 'prismBloom' ? 1700 : effectType === 'mistReveal' ? 2100 : 1500,
         modelTransformBase,
         boundsInfo,
         transientGroup: transientData?.group || null,
@@ -3651,7 +4144,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         }
         mat.needsUpdate = true
       })
-      materialEntries.push({ node, materials })
+      materialEntries.push({
+        node,
+        materials,
+        originalCastShadow: !!node.castShadow,
+        originalReceiveShadow: !!node.receiveShadow
+      })
+      node.castShadow = false
+      node.receiveShadow = false
     })
     if (!materialEntries.length) {
       restoreEntranceTransform(fx)
@@ -3692,6 +4192,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         } else if (fx.type === 'prismBloom') {
           introScale = 0.82 + eased * 0.18 + pulse * 0.28
           lift = (1 - eased) * (fx.boundsInfo?.height || 1.8) * 0.08
+        } else if (fx.type === 'mistReveal') {
+          introScale = 0.92 + eased * 0.08 + pulse * 0.08
+          lift = (1 - eased) * (fx.boundsInfo?.height || 1.8) * 0.06
         }
         if (fx.modelTransformBase) {
           fx.modelRoot.scale.copy(fx.modelTransformBase.scale)
@@ -3760,6 +4263,35 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
           if (fx.transientGroup) {
             fx.transientGroup.rotation.y = eased * 0.9
           }
+        } else if (fx.type === 'mistReveal' && fx.transientData) {
+          const fogRise = THREE.MathUtils.clamp(t / 0.62, 0, 1)
+          const fogFade = 1 - THREE.MathUtils.clamp((t - 0.58) / 0.42, 0, 1)
+          if (Array.isArray(fx.transientData.plumes)) {
+            fx.transientData.plumes.forEach((plume, index) => {
+              const wobble = Math.sin(t * Math.PI * 2.4 + index * 0.7) * 0.11
+              const spread = 0.22 + fogRise * 1.08
+              plume.mesh.position.set(
+                Math.cos(plume.angle) * plume.radius * spread + plume.drift * t,
+                -((fx.boundsInfo?.height || 1.8) * 0.34) + plume.lift * fogRise,
+                Math.sin(plume.angle) * plume.radius * spread
+              )
+              plume.mesh.rotation.y = plume.angle + Math.PI * 0.5 + plume.yaw + wobble
+              plume.mesh.rotation.x = 0.18 + wobble * 0.45
+              plume.mesh.scale.setScalar(1.08 + fogRise * 0.72)
+              plume.mesh.material.opacity = (0.34 + Math.max(0, Math.sin(t * Math.PI * 1.1 + index * 0.3)) * 0.22) * fogFade
+            })
+          }
+          if (fx.transientData.groundMist) {
+            fx.transientData.groundMist.material.opacity = Math.sin(Math.min(1, t) * Math.PI) * 0.5
+            fx.transientData.groundMist.scale.setScalar(0.95 + fogRise * 1.02)
+          }
+          if (fx.transientData.halo) {
+            fx.transientData.halo.material.opacity = Math.max(0, Math.sin(t * Math.PI * 1.05)) * 0.24
+            fx.transientData.halo.scale.setScalar(0.95 + eased * 1.08)
+          }
+          if (fx.transientGroup) {
+            fx.transientGroup.rotation.y = (1 - eased) * 0.28
+          }
         }
 
         fx.entries.forEach((entry) => {
@@ -3774,6 +4306,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
                 ? THREE.MathUtils.clamp((t - 0.06) / 0.68, 0, 1)
                 : fx.type === 'prismBloom'
                   ? THREE.MathUtils.clamp((t - 0.04) / 0.7, 0, 1)
+                  : fx.type === 'mistReveal'
+                    ? THREE.MathUtils.clamp((t - 0.24) / 0.58, 0, 1)
                   : eased
             const revealEase = reveal * reveal * (3 - 2 * reveal)
             mat.opacity = Math.max(0.01, revealEase * baseOpacity)
@@ -3787,6 +4321,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
           fx.transientGroup = null
         }
         fx.entries.forEach((entry) => {
+          if (entry.node && entry.node.isMesh) {
+            if (typeof entry.originalCastShadow === 'boolean') {
+              entry.node.castShadow = entry.originalCastShadow
+            }
+            if (typeof entry.originalReceiveShadow === 'boolean') {
+              entry.node.receiveShadow = entry.originalReceiveShadow
+            }
+          }
           entry.materials.forEach((mat) => {
             if (!mat) return
             if (fx.type === 'flameDissolve') {
@@ -3953,9 +4495,10 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       removeModelFromSlot(key)
       runtime.modelPath = nextPath
       runtime.model = obj
-      prepareModelForShadows(obj)
+      prepareModelForShadows(obj, runtime.cfg?.roleType || '')
       applyStylizedToObject(obj, runtime.cfg?.roleType || '')
       runtime.group.add(obj)
+      updateBlobShadowForSlot(key)
       if (runtime.cfg?.roleType === 'survivor') {
         const roleName = state.slotDisplayNames[key] || ''
         console.warn('[CharacterModel3D][ModelLoad] survivor loaded', buildSurvivorScaleDebug(runtime, roleName, {
@@ -4314,6 +4857,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     dom.roleScaleModal.setAttribute('aria-hidden', 'true')
   }
 
+  function closeAnyOpenModal() {
+    closeRoleScaleModal()
+    closeCameraCurveModal()
+  }
+
   function applyRoleScaleOverrideToRole(roleName) {
     const normalized = sanitizeRoleName(roleName)
     if (!normalized) return
@@ -4499,7 +5047,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     state.layout.mode = next
     document.body.classList.toggle('render-mode', next === 'render')
     document.body.classList.toggle('edit-mode', next === 'edit')
-    if (next !== 'edit') closeRoleScaleModal()
+    if (next !== 'edit') closeAnyOpenModal()
     if (grid) grid.visible = next === 'edit'
     if (axes) axes.visible = next === 'edit'
     if (dom.modeToggleBtn) {
@@ -5185,6 +5733,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     dom.applyTransformBtn.addEventListener('click', applyInputsToSelectedTransform)
     if (dom.openRoleScaleModalBtn) dom.openRoleScaleModalBtn.addEventListener('click', openRoleScaleModal)
     if (dom.closeRoleScaleModalBtn) dom.closeRoleScaleModalBtn.addEventListener('click', closeRoleScaleModal)
+    if (dom.openCameraCurveModalBtn) dom.openCameraCurveModalBtn.addEventListener('click', openCameraCurveModal)
+    if (dom.closeCameraCurveModalBtn) dom.closeCameraCurveModalBtn.addEventListener('click', closeCameraCurveModal)
     if (dom.roleScaleRoleSelect) {
       dom.roleScaleRoleSelect.addEventListener('change', () => {
         syncRoleScaleModal(false)
@@ -5195,6 +5745,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.roleScaleModal) {
       dom.roleScaleModal.addEventListener('click', (e) => {
         if (e.target === dom.roleScaleModal) closeRoleScaleModal()
+      })
+    }
+    if (dom.cameraCurveModal) {
+      dom.cameraCurveModal.addEventListener('click', (e) => {
+        if (e.target === dom.cameraCurveModal) closeCameraCurveModal()
       })
     }
     if (dom.focusSelectedBtn) dom.focusSelectedBtn.addEventListener('click', focusCameraOnSelectedSlot)
@@ -5211,6 +5766,66 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         state.layout.cameraTransitionMs = Math.max(50, Math.min(10000, asNumber(dom.cameraTransitionMs.value, 900)))
         dom.cameraTransitionMs.value = String(state.layout.cameraTransitionMs)
         scheduleSaveLayout()
+      })
+    }
+    if (dom.cameraEasingPreset) {
+      dom.cameraEasingPreset.addEventListener('change', () => {
+        applyCameraEasingFromInputs(true)
+        const preset = CAMERA_EASING_PRESETS[state.layout?.cameraEasing?.preset || DEFAULT_CAMERA_EASING.preset]
+        setStatus(`镜头曲线: ${preset?.label || '平滑默认'}`)
+      })
+    }
+    if (dom.cameraCurveModalPreset) {
+      dom.cameraCurveModalPreset.addEventListener('change', () => {
+        applyCameraEasingFromInputs(true)
+        drawCameraCurveEditor()
+      })
+    }
+    ;[dom.cameraBezierX1, dom.cameraBezierY1, dom.cameraBezierX2, dom.cameraBezierY2].forEach((input) => {
+      if (!input) return
+      input.addEventListener('change', () => {
+        applyCameraEasingFromInputs(true)
+        setStatus('已更新自定义镜头曲线')
+      })
+    })
+    if (dom.cameraCurveResetBtn) {
+      dom.cameraCurveResetBtn.addEventListener('click', () => {
+        resetCustomCameraCurve()
+        setStatus('已重置自定义镜头曲线')
+      })
+    }
+    if (dom.applyCameraCurveBtn) {
+      dom.applyCameraCurveBtn.addEventListener('click', () => {
+        applyCameraEasingFromInputs(true)
+        setStatus(`镜头曲线已应用: ${getCameraCurveSummaryText()}`)
+      })
+    }
+    if (dom.previewCameraCurveBtn) {
+      dom.previewCameraCurveBtn.addEventListener('click', () => {
+        applyCameraEasingFromInputs(false)
+        previewSelectedCameraKeyframe()
+      })
+    }
+    if (dom.cameraCurveCanvas) {
+      dom.cameraCurveCanvas.addEventListener('pointerdown', (e) => {
+        if (state.layout?.cameraEasing?.preset !== 'custom') return
+        const handle = detectCameraCurveHandle(e.clientX, e.clientY)
+        if (!handle) return
+        cameraCurveDragHandle = handle
+        try { dom.cameraCurveCanvas.setPointerCapture(e.pointerId) } catch { }
+      })
+      dom.cameraCurveCanvas.addEventListener('pointermove', (e) => {
+        if (!cameraCurveDragHandle) return
+        updateCameraCurveFromCanvasPointer(e.clientX, e.clientY)
+      })
+      dom.cameraCurveCanvas.addEventListener('pointerup', (e) => {
+        if (!cameraCurveDragHandle) return
+        updateCameraCurveFromCanvasPointer(e.clientX, e.clientY)
+        cameraCurveDragHandle = ''
+        scheduleSaveLayout()
+      })
+      dom.cameraCurveCanvas.addEventListener('pointercancel', () => {
+        cameraCurveDragHandle = ''
       })
     }
     if (dom.applyEnvironmentPresetBtn) {
@@ -5303,7 +5918,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.entranceEffectSelect) {
       dom.entranceEffectSelect.addEventListener('change', () => {
         const next = dom.entranceEffectSelect.value
-        state.layout.entranceEffect = (next === 'none' || next === 'flameDissolve') ? next : 'fade'
+        state.layout.entranceEffect = (
+          next === 'none'
+          || next === 'flameDissolve'
+          || next === 'cardStorm'
+          || next === 'spotlightRush'
+          || next === 'prismBloom'
+          || next === 'mistReveal'
+        ) ? next : 'fade'
         scheduleSaveLayout()
       })
     }
@@ -5421,6 +6043,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isCameraCurveModalOpen()) {
+        e.preventDefault()
+        closeCameraCurveModal()
+        return
+      }
       if (e.key === 'Escape' && isRoleScaleModalOpen()) {
         e.preventDefault()
         closeRoleScaleModal()
@@ -5499,6 +6126,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (state.virtualCameraMode?.enabled) {
         refreshVirtualCameraStageFrame(120, '窗口尺寸变化')
       }
+      if (isCameraCurveModalOpen()) drawCameraCurveEditor()
     })
 
     dom.renderRoot.addEventListener('contextmenu', (e) => {

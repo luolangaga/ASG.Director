@@ -404,6 +404,32 @@ body.tab3d-adjust .three-view::after {
   /* 确保名字在 3D 模型上层 */
 }
 
+.character-box > .name,
+.hunter-box > .name {
+  display: none !important;
+}
+
+.character-name-box {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.character-name-value {
+  width: 100%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Ban位样式 - 干净版，用户可自定义 */
 .ban-container {
   display: grid;
