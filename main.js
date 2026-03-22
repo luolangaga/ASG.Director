@@ -363,7 +363,9 @@ const userModelsPath = path.join(userDataPath, 'user-models')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
 const configPath = path.join(userDataPath, 'config.json')
 const mainOnboardingSentinelPath = path.join(userDataPath, 'OKTeach.txt')
-const localPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
+const bundledLocalPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
+const bundledLocalPagesConfigPath = path.join(bundledLocalPagesBaseDir, 'pages.json')
+const localPagesBaseDir = path.join(userDataPath, 'local-pages')
 const localPagesConfigPath = path.join(localPagesBaseDir, 'pages.json')
 
 function hasMainOnboardingSentinel() {
@@ -730,6 +732,31 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function mergeLocalPagesConfig(existingConfig, bundledConfig) {
+  const existing = normalizeLocalPagesConfig(existingConfig || {})
+  const bundled = normalizeLocalPagesConfig(bundledConfig || {})
+  const existingPages = Array.isArray(existing.pages) ? existing.pages.slice() : []
+  const bundledPages = Array.isArray(bundled.pages) ? bundled.pages.slice() : []
+  const known = new Set(
+    existingPages
+      .map(item => String(item && item.fileName ? item.fileName : '').toLowerCase())
+      .filter(Boolean)
+  )
+
+  for (const page of bundledPages) {
+    const key = String(page && page.fileName ? page.fileName : '').toLowerCase()
+    if (!key || known.has(key)) continue
+    existingPages.push({ ...page })
+    known.add(key)
+  }
+
+  return {
+    port: existing.port,
+    host: existing.host,
+    pages: existingPages
+  }
+}
+
 async function runBpStartupWindowsAnimationIfEnabled() {
   const config = readJsonFileSafe(configPath, {})
   const enabled = normalizeBpStartupWindowAnimationSetting(config.bpStartupWindowAnimation)
@@ -783,7 +810,6 @@ async function runBpStartupWindowsAnimationIfEnabled() {
 }
 
 function ensureLocalPagesStorage() {
-  const config = normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
   if (!fs.existsSync(localPagesBaseDir)) {
     fs.mkdirSync(localPagesBaseDir, { recursive: true })
   }
@@ -791,10 +817,40 @@ function ensureLocalPagesStorage() {
   if (!fs.existsSync(pagesDir)) {
     fs.mkdirSync(pagesDir, { recursive: true })
   }
+  const bundledPagesDir = path.join(bundledLocalPagesBaseDir, 'pages')
+  if (fs.existsSync(bundledPagesDir)) {
+    try {
+      const bundledEntries = fs.readdirSync(bundledPagesDir, { withFileTypes: true })
+      for (const entry of bundledEntries) {
+        if (!entry.isFile()) continue
+        const srcPath = path.join(bundledPagesDir, entry.name)
+        const destPath = path.join(pagesDir, entry.name)
+        if (fs.existsSync(destPath)) continue
+        fs.mkdirSync(path.dirname(destPath), { recursive: true })
+        fs.copyFileSync(srcPath, destPath)
+      }
+    } catch (error) {
+      console.warn('[LocalPages] 复制内置页面到用户目录失败:', error?.message || error)
+    }
+  }
+
+  const bundledConfig = normalizeLocalPagesConfig(readJsonFileSafe(bundledLocalPagesConfigPath, {}))
+  let config = null
+  if (!fs.existsSync(localPagesConfigPath)) {
+    config = bundledConfig
+    writeJsonFileSafe(localPagesConfigPath, config)
+  } else {
+    const existingConfig = normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
+    config = mergeLocalPagesConfig(existingConfig, bundledConfig)
+    writeJsonFileSafe(localPagesConfigPath, config)
+  }
   return { config, dir: pagesDir }
 }
 
 function readLocalPagesConfig() {
+  if (!fs.existsSync(localPagesConfigPath)) {
+    ensureLocalPagesStorage()
+  }
   return normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
 }
 
