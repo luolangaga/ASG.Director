@@ -820,15 +820,25 @@ function ensureLocalPagesStorage() {
   const bundledPagesDir = path.join(bundledLocalPagesBaseDir, 'pages')
   if (fs.existsSync(bundledPagesDir)) {
     try {
-      const bundledEntries = fs.readdirSync(bundledPagesDir, { withFileTypes: true })
-      for (const entry of bundledEntries) {
-        if (!entry.isFile()) continue
-        const srcPath = path.join(bundledPagesDir, entry.name)
-        const destPath = path.join(pagesDir, entry.name)
-        if (fs.existsSync(destPath)) continue
-        fs.mkdirSync(path.dirname(destPath), { recursive: true })
-        fs.copyFileSync(srcPath, destPath)
+      const copyMissingEntries = (srcDir, destDir) => {
+        const bundledEntries = fs.readdirSync(srcDir, { withFileTypes: true })
+        for (const entry of bundledEntries) {
+          const srcPath = path.join(srcDir, entry.name)
+          const destPath = path.join(destDir, entry.name)
+          if (entry.isDirectory()) {
+            if (!fs.existsSync(destPath)) {
+              fs.mkdirSync(destPath, { recursive: true })
+            }
+            copyMissingEntries(srcPath, destPath)
+            continue
+          }
+          if (!entry.isFile()) continue
+          if (fs.existsSync(destPath)) continue
+          fs.mkdirSync(path.dirname(destPath), { recursive: true })
+          fs.copyFileSync(srcPath, destPath)
+        }
       }
+      copyMissingEntries(bundledPagesDir, pagesDir)
     } catch (error) {
       console.warn('[LocalPages] 复制内置页面到用户目录失败:', error?.message || error)
     }
@@ -1616,6 +1626,13 @@ function localPagesHandleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/local-bp-state') {
+    try {
+      __loadCharacterDisplayLayoutFromDiskIntoState__()
+      __loadCharacterModel3DLayoutFromDiskIntoState__()
+      __normalizeLocalBpStateInPlace__()
+    } catch (e) {
+      console.warn('[LocalPages] 读取 local-bp-state 前回填布局失败:', e?.message || e)
+    }
     res.writeHead(200)
     res.end(JSON.stringify({ success: true, data: localBpState || null }))
     return
@@ -1795,6 +1812,41 @@ function localPagesHandleApi(req, res, pathname) {
     return
   }
 
+  if (pathname === '/api/local-bp-character-model-3d-layout' && req.method === 'POST') {
+    let body = ''
+    req.on('data', chunk => {
+      body += chunk
+      if (body.length > 4 * 1024 * 1024) {
+        try { req.destroy() } catch {}
+      }
+    })
+    req.on('end', () => {
+      let payload = {}
+      try { payload = body ? JSON.parse(body) : {} } catch { payload = {} }
+      const layout = (payload && typeof payload === 'object' && payload.layout && typeof payload.layout === 'object')
+        ? payload.layout
+        : payload
+      try {
+        const prev = (localBpState.characterModel3DLayout && typeof localBpState.characterModel3DLayout === 'object')
+          ? localBpState.characterModel3DLayout
+          : {}
+        const incoming = normalizeCharacterModel3DLayoutInput(layout)
+        localBpState.characterModel3DLayout = {
+          ...prev,
+          ...incoming
+        }
+        __persistCharacterModel3DLayoutToDisk__()
+        broadcastLocalBpState()
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      }
+    })
+    return
+  }
+
   if (pathname === '/api/score-state' && req.method === 'POST') {
     localPagesReadJsonBody(req).then(payload => {
       try {
@@ -1889,28 +1941,30 @@ function localPagesHandleApi(req, res, pathname) {
 
   if (pathname === '/api/official-model-map') {
     try {
-      const modelsDir = path.join(userDataPath, 'official-models')
       const map = {}
-      if (fs.existsSync(modelsDir)) {
-        const files = fs.readdirSync(modelsDir)
-        for (const file of files) {
-          const fullPath = path.join(modelsDir, file)
-          let stat = null
-          try { stat = fs.statSync(fullPath) } catch { continue }
-          if (stat.isDirectory()) {
-            const potentialFiles = [file + '.gltf', file + '.glb', file + '.pmx']
-            for (const p of potentialFiles) {
-              if (fs.existsSync(path.join(fullPath, p))) {
-                map[file] = `/official-models/${file}/${p}`
-                break
-              }
-            }
-          } else if (/(.gltf|.glb|.pmx)$/i.test(file)) {
-            const name = path.basename(file, path.extname(file))
-            map[name] = `/official-models/${file}`
+      const sourceMap = (officialModelService && typeof officialModelService.loadOfficialModelMap === 'function')
+        ? officialModelService.loadOfficialModelMap()
+        : {}
+
+      for (const [key, value] of Object.entries(sourceMap || {})) {
+        if (!key || !value || typeof value !== 'string') continue
+        const trimmed = value.trim()
+        if (!trimmed) continue
+
+        if (/^https?:\/\//i.test(trimmed)) {
+          map[key] = trimmed
+          continue
+        }
+
+        if (fs.existsSync(trimmed)) {
+          const httpUrl = buildOfficialModelHttpUrl(trimmed)
+          if (httpUrl) {
+            map[key] = httpUrl
+            continue
           }
         }
       }
+
       res.writeHead(200)
       res.end(JSON.stringify(map))
     } catch {
@@ -8783,6 +8837,17 @@ ipcMain.handle('localBp:getCharacters', () => {
 app.whenReady().then(async () => {
   ensureDirectories()
   packManager.ensureDirectories()
+  try {
+    __loadCharacterDisplayLayoutFromDiskIntoState__()
+    __loadCharacterModel3DLayoutFromDiskIntoState__()
+    __normalizeLocalBpStateInPlace__()
+    localPagesCurrentState = {
+      type: 'state',
+      state: buildLocalBpFrontendState()
+    }
+  } catch (e) {
+    console.warn('[App] 启动时回填本地 BP 布局失败:', e?.message || e)
+  }
 
   try {
     const syncSettings = getDirectorSyncSettingsFromConfig()
@@ -9047,10 +9112,12 @@ ipcMain.handle('localBp:importBundledAsset', async (event, inputPath, options = 
 })
 
 try { ipcMain.removeHandler('read-binary-file') } catch { /* ignore */ }
-ipcMain.handle('read-binary-file', async (event, inputPath) => {
+ipcMain.handle('read-binary-file', async (event, inputPath, options = {}) => {
   try {
     const raw = String(inputPath || '').trim()
     if (!raw) return { success: false, error: 'empty-path' }
+    const metadataOnly = !!(options && typeof options === 'object' && options.metadataOnly)
+    const maxInlineBytes = Number.isFinite(Number(options?.maxInlineBytes)) ? Math.max(0, Number(options.maxInlineBytes)) : Infinity
 
     let resolvedPath = raw
     if (/^file:/i.test(resolvedPath)) {
@@ -9073,15 +9140,29 @@ ipcMain.handle('read-binary-file', async (event, inputPath) => {
       return { success: false, error: 'not-a-file' }
     }
 
-    const data = fs.readFileSync(resolvedPath)
     const basePath = path.dirname(resolvedPath)
     const basePathUrl = pathToFileURL(basePath + path.sep).toString()
-    return {
+    const response = {
       success: true,
       path: resolvedPath,
       size: stat.size,
       basePath,
-      basePathUrl,
+      basePathUrl
+    }
+    if (metadataOnly) {
+      return response
+    }
+    if (stat.size > maxInlineBytes) {
+      return {
+        ...response,
+        skippedInlineRead: true,
+        error: 'file-too-large-for-inline-read'
+      }
+    }
+
+    const data = fs.readFileSync(resolvedPath)
+    return {
+      ...response,
       base64: data.toString('base64')
     }
   } catch (error) {

@@ -63,10 +63,16 @@
       "order": 8
     },
     {
+      "fileName": "character-model-3d.html",
+      "title": "3D角色展示",
+      "enabled": true,
+      "order": 9
+    },
+    {
       "fileName": "AI-生成页面.html",
       "title": "AI 生成页面",
       "enabled": true,
-      "order": 9
+      "order": 10
     }
   ]
 }
