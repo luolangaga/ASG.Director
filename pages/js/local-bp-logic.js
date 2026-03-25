@@ -4298,6 +4298,40 @@ function loadPostMatchAny() {
   return normalizePostMatchData(null)
 }
 
+async function syncPostMatchStateToLocalPages(data) {
+  const normalized = normalizePostMatchData(data)
+  try {
+    if (window.electronAPI && window.electronAPI.invoke) {
+      const result = await window.electronAPI.invoke('localBp:savePostMatch', normalized)
+      if (result && result.success) return
+    }
+  } catch (e) {
+    console.warn('[LocalBP] 通过 localBp:savePostMatch 同步赛后数据失败:', e?.message || e)
+  }
+
+  try {
+    if (window.electronAPI && window.electronAPI.sendToFrontend) {
+      await window.electronAPI.sendToFrontend({
+        type: 'postmatch',
+        postMatchData: normalized
+      })
+      return
+    }
+  } catch (e) {
+    console.warn('[LocalBP] 通过 sendToFrontend 同步赛后数据失败:', e?.message || e)
+  }
+
+  try {
+    await fetch('/api/postmatch-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(normalized)
+    })
+  } catch (e) {
+    console.warn('[LocalBP] 同步赛后数据到本地页面服务失败:', e?.message || e)
+  }
+}
+
 function getPostMatchLiveMapName() {
   let currentMatchBase = matchBase
   if (window.baseManager) {
@@ -4380,6 +4414,7 @@ function syncPostMatchStorageBaseFields() {
   postMatchData = data
   localStorage.setItem(POSTMATCH_STORAGE_KEY, JSON.stringify(data))
   localStorage.setItem('localBp_postmatch', JSON.stringify(data))
+  syncPostMatchStateToLocalPages(data)
 }
 
 function initPostMatchPage() {
@@ -4397,6 +4432,7 @@ function initPostMatchPage() {
   populatePostMatchForm()
   syncPostMatchLiveHeaderToForm()
   syncPostMatchStorageBaseFields()
+  syncPostMatchStateToLocalPages(postMatchData)
   initPostMatchOcrWindowPicker()
 }
 
@@ -4482,6 +4518,7 @@ function savePostMatch() {
 
   localStorage.setItem(POSTMATCH_STORAGE_KEY, JSON.stringify(postMatchData))
   localStorage.setItem('localBp_postmatch', JSON.stringify(postMatchData))
+  syncPostMatchStateToLocalPages(postMatchData)
   alert('赛后数据已保存！')
 }
 
@@ -4517,6 +4554,7 @@ function resetPostMatch() {
     document.getElementById('pmHunterTerror').value = 0
     document.getElementById('pmHunterDown').value = 0
     syncPostMatchStorageBaseFields()
+    syncPostMatchStateToLocalPages(postMatchData)
   }
 }
 

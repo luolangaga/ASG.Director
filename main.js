@@ -1625,6 +1625,112 @@ function localPagesHandleApi(req, res, pathname) {
     return
   }
 
+  if (pathname === '/api/postmatch-layout' && req.method === 'GET') {
+    try {
+      const root = __readLayoutJsonSafe__()
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, layout: root.postMatchLayout || null }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
+  if (pathname === '/api/postmatch-layout' && req.method === 'POST') {
+    localPagesReadJsonBody(req).then(payload => {
+      try {
+        const layout = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'layout'))
+          ? payload.layout
+          : payload
+        const root = __readLayoutJsonSafe__()
+        root.postMatchLayout = layout || null
+        root.updatedAt = new Date().toISOString()
+        __writeLayoutJsonSafe__(root)
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      }
+    })
+    return
+  }
+
+  if (pathname === '/api/transparent-background') {
+    try {
+      const root = __readLayoutJsonSafe__()
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, transparentBackground: !!root.transparentBackground }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
+  if (pathname === '/api/font-config') {
+    try {
+      const root = __readLayoutJsonSafe__()
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, config: root.fontConfig || null }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
+  if (pathname === '/api/custom-fonts') {
+    try {
+      ensureFontsDir()
+      const files = fs.readdirSync(fontsPath)
+      const fonts = []
+      for (const file of files) {
+        if (!isFontFile(file)) continue
+        fonts.push({
+          fileName: file,
+          fontFamily: path.basename(file, path.extname(file)),
+          path: path.join(fontsPath, file)
+        })
+      }
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, fonts }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
+  if (pathname === '/api/font-url') {
+    try {
+      const url = new URL(req.url, `http://localhost:${localPagesServerPort || 9528}`)
+      const fileName = url.searchParams.get('fileName') || ''
+      const fontPath = path.join(fontsPath, fileName)
+      if (!fileName || !fs.existsSync(fontPath)) {
+        res.writeHead(200)
+        res.end(JSON.stringify({ success: false, error: '字体文件不存在' }))
+        return
+      }
+
+      let normalized = fontPath.replace(/\\/g, '/')
+      if (/^[a-zA-Z]:\//.test(normalized)) normalized = '/' + normalized
+
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: true, url: `/userdata/${encodeURI(path.relative(userDataPath, fontPath).replace(/\\/g, '/'))}` }))
+      return
+    } catch (e) {
+      res.writeHead(200)
+      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
+      return
+    }
+  }
+
   if (pathname === '/api/local-bp-state') {
     try {
       __loadCharacterDisplayLayoutFromDiskIntoState__()
@@ -1875,6 +1981,7 @@ function localPagesHandleApi(req, res, pathname) {
       try {
         if (payload && typeof payload === 'object') {
           localPagesCurrentPostMatchData = payload
+          __persistPostMatchDataToDisk__(localPagesCurrentPostMatchData)
           localPagesBroadcastSse('state-update', { type: 'postmatch', postMatchData: localPagesCurrentPostMatchData })
         }
         res.writeHead(200)
@@ -1888,6 +1995,7 @@ function localPagesHandleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/postmatch-state') {
+    if (!localPagesCurrentPostMatchData) __loadPostMatchDataFromDisk__()
     res.writeHead(200)
     res.end(JSON.stringify({ success: true, data: localPagesCurrentPostMatchData }))
     return
@@ -2258,6 +2366,7 @@ function startLocalPagesServer(options = {}) {
         if (localBpScoreData) {
           localPagesCurrentScoreData = localBpScoreData
         }
+        __loadPostMatchDataFromDisk__()
       } catch {}
       if (!global.__localPageServerHooks) {
         global.__localPageServerHooks = {}
@@ -2266,6 +2375,9 @@ function startLocalPagesServer(options = {}) {
         if (data) {
           if (data.type === 'score' && data.scoreData) {
             localPagesCurrentScoreData = data.scoreData
+          }
+          if (data.type === 'postmatch' && data.postMatchData) {
+            localPagesCurrentPostMatchData = data.postMatchData
           }
           if (data.type === 'state' || data.state) {
             localPagesCurrentState = data
@@ -6533,6 +6645,30 @@ function __persistCharacterModel3DLayoutToDisk__() {
   }
 }
 
+function __persistPostMatchDataToDisk__(data) {
+  try {
+    const root = __readLayoutJsonSafe__()
+    root.localBpPostMatchData = (data && typeof data === 'object') ? data : null
+    __writeLayoutJsonSafe__(root)
+  } catch (e) {
+    console.warn('[LocalBP] 持久化赛后数据失败:', e.message)
+  }
+}
+
+function __loadPostMatchDataFromDisk__() {
+  try {
+    const root = __readLayoutJsonSafe__()
+    const data = (root && root.localBpPostMatchData && typeof root.localBpPostMatchData === 'object')
+      ? root.localBpPostMatchData
+      : null
+    if (data) localPagesCurrentPostMatchData = data
+    return data
+  } catch (e) {
+    console.warn('[LocalBP] 从 layout.json 回填赛后数据失败:', e.message)
+    return null
+  }
+}
+
 function __loadCharacterDisplayLayoutFromDiskIntoState__() {
   try {
     const root = __readLayoutJsonSafe__()
@@ -8198,6 +8334,23 @@ ipcMain.handle('localBp:updateScoreData', (event, payload) => {
     broadcastUpdateData({ type: 'score', scoreData: payload })
     if (obsAutomationService && typeof obsAutomationService.onLocalBpScoreData === 'function') {
       obsAutomationService.onLocalBpScoreData(payload, { reason: 'localbp:update-score-data' })
+    }
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('localBp:savePostMatch', (event, payload) => {
+  try {
+    const data = (payload && typeof payload === 'object') ? payload : null
+    localPagesCurrentPostMatchData = data
+    __persistPostMatchDataToDisk__(data)
+    broadcastUpdateData({ type: 'postmatch', postMatchData: data })
+    if (global.__localPageServerHooks && typeof global.__localPageServerHooks.onDataUpdate === 'function') {
+      global.__localPageServerHooks.onDataUpdate({ type: 'postmatch', postMatchData: data })
+    } else {
+      localPagesBroadcastSse('state-update', { type: 'postmatch', postMatchData: data })
     }
     return { success: true }
   } catch (error) {
