@@ -68,7 +68,6 @@ const pluginPackManager = require('./utils/pluginPackManager')
 const { LocalBpOcrService } = require('./utils/localBpOcrService')
 const { ObsAutomationService } = require('./internal/obs-automation/Service')
 const { createDirectorSyncService, normalizeDirectorSyncSettings } = require('./internal/director-sync-service')
-const { createDirectorSyncDiscoveryService } = require('./internal/director-sync-discovery')
 
 // 插件系统
 const { bootstrapPluginSystem, waitPluginSystemReady, setPluginWindow, setPluginRoomData, shutdownPlugins, pluginManager } = require('./src/plugins/lifecycle')
@@ -362,44 +361,8 @@ const bgImagePath = path.join(userDataPath, 'background')
 const userModelsPath = path.join(userDataPath, 'user-models')
 const installedPacksPath = path.join(userDataPath, 'installed-packs.json')
 const configPath = path.join(userDataPath, 'config.json')
-const mainOnboardingSentinelPath = path.join(userDataPath, 'OKTeach.txt')
-const bundledLocalPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
-const bundledLocalPagesConfigPath = path.join(bundledLocalPagesBaseDir, 'pages.json')
-const localPagesBaseDir = path.join(userDataPath, 'local-pages')
+const localPagesBaseDir = path.join(app.getAppPath(), 'assets', 'local-pages')
 const localPagesConfigPath = path.join(localPagesBaseDir, 'pages.json')
-
-function hasMainOnboardingSentinel() {
-  try {
-    return fs.existsSync(mainOnboardingSentinelPath)
-  } catch {
-    return false
-  }
-}
-
-function writeMainOnboardingSentinel(status = 'completed') {
-  try {
-    const content = [
-      'ASG.Director Main Onboarding',
-      `status=${status}`,
-      `updatedAt=${new Date().toISOString()}`
-    ].join('\n')
-    fs.writeFileSync(mainOnboardingSentinelPath, content, 'utf8')
-    return true
-  } catch (error) {
-    console.warn('[Main] 写入 OKTeach.txt 失败:', error?.message || error)
-    return false
-  }
-}
-
-function removeMainOnboardingSentinel() {
-  try {
-    if (fs.existsSync(mainOnboardingSentinelPath)) fs.unlinkSync(mainOnboardingSentinelPath)
-    return true
-  } catch (error) {
-    console.warn('[Main] 删除 OKTeach.txt 失败:', error?.message || error)
-    return false
-  }
-}
 
 function normalizeLocalPagesConfig(input) {
   const base = input && typeof input === 'object' ? input : {}
@@ -569,12 +532,6 @@ const directorSyncService = createDirectorSyncService({
   logger: console
 })
 
-const directorSyncDiscoveryService = createDirectorSyncDiscoveryService({
-  getSyncStatus: () => directorSyncService.getStatus(),
-  instanceId: directorSyncService.instanceId,
-  logger: console
-})
-
 function forwardUpdateToDirectorSync(data) {
   if (!data || typeof data !== 'object') return
   if (data.__asgDirectorSyncRemote) return
@@ -732,31 +689,6 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function mergeLocalPagesConfig(existingConfig, bundledConfig) {
-  const existing = normalizeLocalPagesConfig(existingConfig || {})
-  const bundled = normalizeLocalPagesConfig(bundledConfig || {})
-  const existingPages = Array.isArray(existing.pages) ? existing.pages.slice() : []
-  const bundledPages = Array.isArray(bundled.pages) ? bundled.pages.slice() : []
-  const known = new Set(
-    existingPages
-      .map(item => String(item && item.fileName ? item.fileName : '').toLowerCase())
-      .filter(Boolean)
-  )
-
-  for (const page of bundledPages) {
-    const key = String(page && page.fileName ? page.fileName : '').toLowerCase()
-    if (!key || known.has(key)) continue
-    existingPages.push({ ...page })
-    known.add(key)
-  }
-
-  return {
-    port: existing.port,
-    host: existing.host,
-    pages: existingPages
-  }
-}
-
 async function runBpStartupWindowsAnimationIfEnabled() {
   const config = readJsonFileSafe(configPath, {})
   const enabled = normalizeBpStartupWindowAnimationSetting(config.bpStartupWindowAnimation)
@@ -810,6 +742,7 @@ async function runBpStartupWindowsAnimationIfEnabled() {
 }
 
 function ensureLocalPagesStorage() {
+  const config = normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
   if (!fs.existsSync(localPagesBaseDir)) {
     fs.mkdirSync(localPagesBaseDir, { recursive: true })
   }
@@ -817,50 +750,10 @@ function ensureLocalPagesStorage() {
   if (!fs.existsSync(pagesDir)) {
     fs.mkdirSync(pagesDir, { recursive: true })
   }
-  const bundledPagesDir = path.join(bundledLocalPagesBaseDir, 'pages')
-  if (fs.existsSync(bundledPagesDir)) {
-    try {
-      const copyMissingEntries = (srcDir, destDir) => {
-        const bundledEntries = fs.readdirSync(srcDir, { withFileTypes: true })
-        for (const entry of bundledEntries) {
-          const srcPath = path.join(srcDir, entry.name)
-          const destPath = path.join(destDir, entry.name)
-          if (entry.isDirectory()) {
-            if (!fs.existsSync(destPath)) {
-              fs.mkdirSync(destPath, { recursive: true })
-            }
-            copyMissingEntries(srcPath, destPath)
-            continue
-          }
-          if (!entry.isFile()) continue
-          if (fs.existsSync(destPath)) continue
-          fs.mkdirSync(path.dirname(destPath), { recursive: true })
-          fs.copyFileSync(srcPath, destPath)
-        }
-      }
-      copyMissingEntries(bundledPagesDir, pagesDir)
-    } catch (error) {
-      console.warn('[LocalPages] 复制内置页面到用户目录失败:', error?.message || error)
-    }
-  }
-
-  const bundledConfig = normalizeLocalPagesConfig(readJsonFileSafe(bundledLocalPagesConfigPath, {}))
-  let config = null
-  if (!fs.existsSync(localPagesConfigPath)) {
-    config = bundledConfig
-    writeJsonFileSafe(localPagesConfigPath, config)
-  } else {
-    const existingConfig = normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
-    config = mergeLocalPagesConfig(existingConfig, bundledConfig)
-    writeJsonFileSafe(localPagesConfigPath, config)
-  }
   return { config, dir: pagesDir }
 }
 
 function readLocalPagesConfig() {
-  if (!fs.existsSync(localPagesConfigPath)) {
-    ensureLocalPagesStorage()
-  }
   return normalizeLocalPagesConfig(readJsonFileSafe(localPagesConfigPath, {}))
 }
 
@@ -1182,8 +1075,6 @@ function buildLocalPagesIndexHtml(pages, baseUrl, baseDir) {
     'frontend.html': '/frontend',
     'scoreboard.html': '/scoreboard',
     'character-display.html': '/character-display',
-    'obs-bp.html': '/obs-bp',
-    'obs-automation-sidebar.html': '/obs-automation-sidebar',
     'lower-third.html': '/lower-third',
     'ticker.html': '/ticker',
     'match-card.html': '/match-card'
@@ -1625,120 +1516,7 @@ function localPagesHandleApi(req, res, pathname) {
     return
   }
 
-  if (pathname === '/api/postmatch-layout' && req.method === 'GET') {
-    try {
-      const root = __readLayoutJsonSafe__()
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: true, layout: root.postMatchLayout || null }))
-      return
-    } catch (e) {
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      return
-    }
-  }
-
-  if (pathname === '/api/postmatch-layout' && req.method === 'POST') {
-    localPagesReadJsonBody(req).then(payload => {
-      try {
-        const layout = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'layout'))
-          ? payload.layout
-          : payload
-        const root = __readLayoutJsonSafe__()
-        root.postMatchLayout = layout || null
-        root.updatedAt = new Date().toISOString()
-        __writeLayoutJsonSafe__(root)
-        res.writeHead(200)
-        res.end(JSON.stringify({ success: true }))
-      } catch (e) {
-        res.writeHead(200)
-        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      }
-    })
-    return
-  }
-
-  if (pathname === '/api/transparent-background') {
-    try {
-      const root = __readLayoutJsonSafe__()
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: true, transparentBackground: !!root.transparentBackground }))
-      return
-    } catch (e) {
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      return
-    }
-  }
-
-  if (pathname === '/api/font-config') {
-    try {
-      const root = __readLayoutJsonSafe__()
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: true, config: root.fontConfig || null }))
-      return
-    } catch (e) {
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      return
-    }
-  }
-
-  if (pathname === '/api/custom-fonts') {
-    try {
-      ensureFontsDir()
-      const files = fs.readdirSync(fontsPath)
-      const fonts = []
-      for (const file of files) {
-        if (!isFontFile(file)) continue
-        fonts.push({
-          fileName: file,
-          fontFamily: path.basename(file, path.extname(file)),
-          path: path.join(fontsPath, file)
-        })
-      }
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: true, fonts }))
-      return
-    } catch (e) {
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      return
-    }
-  }
-
-  if (pathname === '/api/font-url') {
-    try {
-      const url = new URL(req.url, `http://localhost:${localPagesServerPort || 9528}`)
-      const fileName = url.searchParams.get('fileName') || ''
-      const fontPath = path.join(fontsPath, fileName)
-      if (!fileName || !fs.existsSync(fontPath)) {
-        res.writeHead(200)
-        res.end(JSON.stringify({ success: false, error: '字体文件不存在' }))
-        return
-      }
-
-      let normalized = fontPath.replace(/\\/g, '/')
-      if (/^[a-zA-Z]:\//.test(normalized)) normalized = '/' + normalized
-
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: true, url: `/userdata/${encodeURI(path.relative(userDataPath, fontPath).replace(/\\/g, '/'))}` }))
-      return
-    } catch (e) {
-      res.writeHead(200)
-      res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      return
-    }
-  }
-
   if (pathname === '/api/local-bp-state') {
-    try {
-      __loadCharacterDisplayLayoutFromDiskIntoState__()
-      __loadCharacterModel3DLayoutFromDiskIntoState__()
-      __normalizeLocalBpStateInPlace__()
-    } catch (e) {
-      console.warn('[LocalPages] 读取 local-bp-state 前回填布局失败:', e?.message || e)
-    }
     res.writeHead(200)
     res.end(JSON.stringify({ success: true, data: localBpState || null }))
     return
@@ -1918,41 +1696,6 @@ function localPagesHandleApi(req, res, pathname) {
     return
   }
 
-  if (pathname === '/api/local-bp-character-model-3d-layout' && req.method === 'POST') {
-    let body = ''
-    req.on('data', chunk => {
-      body += chunk
-      if (body.length > 4 * 1024 * 1024) {
-        try { req.destroy() } catch {}
-      }
-    })
-    req.on('end', () => {
-      let payload = {}
-      try { payload = body ? JSON.parse(body) : {} } catch { payload = {} }
-      const layout = (payload && typeof payload === 'object' && payload.layout && typeof payload.layout === 'object')
-        ? payload.layout
-        : payload
-      try {
-        const prev = (localBpState.characterModel3DLayout && typeof localBpState.characterModel3DLayout === 'object')
-          ? localBpState.characterModel3DLayout
-          : {}
-        const incoming = normalizeCharacterModel3DLayoutInput(layout)
-        localBpState.characterModel3DLayout = {
-          ...prev,
-          ...incoming
-        }
-        __persistCharacterModel3DLayoutToDisk__()
-        broadcastLocalBpState()
-        res.writeHead(200)
-        res.end(JSON.stringify({ success: true }))
-      } catch (e) {
-        res.writeHead(200)
-        res.end(JSON.stringify({ success: false, error: e?.message || String(e) }))
-      }
-    })
-    return
-  }
-
   if (pathname === '/api/score-state' && req.method === 'POST') {
     localPagesReadJsonBody(req).then(payload => {
       try {
@@ -1981,7 +1724,6 @@ function localPagesHandleApi(req, res, pathname) {
       try {
         if (payload && typeof payload === 'object') {
           localPagesCurrentPostMatchData = payload
-          __persistPostMatchDataToDisk__(localPagesCurrentPostMatchData)
           localPagesBroadcastSse('state-update', { type: 'postmatch', postMatchData: localPagesCurrentPostMatchData })
         }
         res.writeHead(200)
@@ -1995,7 +1737,6 @@ function localPagesHandleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/postmatch-state') {
-    if (!localPagesCurrentPostMatchData) __loadPostMatchDataFromDisk__()
     res.writeHead(200)
     res.end(JSON.stringify({ success: true, data: localPagesCurrentPostMatchData }))
     return
@@ -2049,30 +1790,28 @@ function localPagesHandleApi(req, res, pathname) {
 
   if (pathname === '/api/official-model-map') {
     try {
+      const modelsDir = path.join(userDataPath, 'official-models')
       const map = {}
-      const sourceMap = (officialModelService && typeof officialModelService.loadOfficialModelMap === 'function')
-        ? officialModelService.loadOfficialModelMap()
-        : {}
-
-      for (const [key, value] of Object.entries(sourceMap || {})) {
-        if (!key || !value || typeof value !== 'string') continue
-        const trimmed = value.trim()
-        if (!trimmed) continue
-
-        if (/^https?:\/\//i.test(trimmed)) {
-          map[key] = trimmed
-          continue
-        }
-
-        if (fs.existsSync(trimmed)) {
-          const httpUrl = buildOfficialModelHttpUrl(trimmed)
-          if (httpUrl) {
-            map[key] = httpUrl
-            continue
+      if (fs.existsSync(modelsDir)) {
+        const files = fs.readdirSync(modelsDir)
+        for (const file of files) {
+          const fullPath = path.join(modelsDir, file)
+          let stat = null
+          try { stat = fs.statSync(fullPath) } catch { continue }
+          if (stat.isDirectory()) {
+            const potentialFiles = [file + '.gltf', file + '.glb', file + '.pmx']
+            for (const p of potentialFiles) {
+              if (fs.existsSync(path.join(fullPath, p))) {
+                map[file] = `/official-models/${file}/${p}`
+                break
+              }
+            }
+          } else if (/(.gltf|.glb|.pmx)$/i.test(file)) {
+            const name = path.basename(file, path.extname(file))
+            map[name] = `/official-models/${file}`
           }
         }
       }
-
       res.writeHead(200)
       res.end(JSON.stringify(map))
     } catch {
@@ -2118,16 +1857,6 @@ function handleLocalPagesRequest(req, res) {
   if (pathname === '/character-display' || pathname === '/character-display.html') {
     const filePath = path.join(dir, 'character-display.html')
     localPagesHandleHtmlPage(req, res, filePath, 'character-display')
-    return
-  }
-  if (pathname === '/obs-bp' || pathname === '/obs-bp.html') {
-    const filePath = path.join(dir, 'obs-bp.html')
-    localPagesHandleHtmlPage(req, res, filePath, 'obs-bp')
-    return
-  }
-  if (pathname === '/obs-automation-sidebar' || pathname === '/obs-automation-sidebar.html') {
-    const filePath = path.join(dir, 'obs-automation-sidebar.html')
-    localPagesHandleHtmlPage(req, res, filePath, 'obs-automation-sidebar')
     return
   }
   if (pathname === '/lower-third' || pathname === '/lower-third.html') {
@@ -2250,109 +1979,33 @@ function handleLocalPagesRequest(req, res) {
 let localPagesServer = null
 let localPagesServerPort = null
 let localPagesServerHost = null
-const LOCAL_PAGES_MIN_PORT = 1024
-const LOCAL_PAGES_MAX_PORT = 65535
-const LOCAL_PAGES_MAX_PORT_SWITCHES = 8
-
-function getNextLocalPagesPort(port) {
-  let nextPort = Number.isFinite(Number(port)) ? Number(port) + 1 : 9529
-  if (nextPort > LOCAL_PAGES_MAX_PORT) {
-    nextPort = LOCAL_PAGES_MIN_PORT
-  }
-  return nextPort
-}
-
-function persistLocalPagesPort(port) {
-  const nextPort = Number(port)
-  if (!Number.isFinite(nextPort)) return readLocalPagesConfig()
-  const config = readLocalPagesConfig()
-  if (config.port === nextPort) return config
-  config.port = nextPort
-  writeJsonFileSafe(localPagesConfigPath, config)
-  return config
-}
-
-function buildLocalPagesStartupFailureBody(error, initialPort, attemptedPort, switchCount) {
-  if (error && error.code === 'EADDRINUSE' && switchCount >= LOCAL_PAGES_MAX_PORT_SWITCHES) {
-    return `OBS 本地页面服务器启动失败：端口 ${initialPort} 起已自动切换 ${LOCAL_PAGES_MAX_PORT_SWITCHES} 次，最后尝试 ${attemptedPort}，但端口仍被占用。`
-  }
-  const message = error && error.message ? error.message : '未知错误'
-  return `OBS 本地页面服务器启动失败：${message}`
-}
 
 function startLocalPagesServer(options = {}) {
   const opts = options && typeof options === 'object' ? options : {}
   const notifyReason = typeof opts.reason === 'string' ? opts.reason : 'start'
   ensureLocalPagesStorage()
   const config = readLocalPagesConfig()
-  const initialPort = config.port
+  const port = config.port
   const host = config.host || '127.0.0.1'
-  if (localPagesServer && localPagesServerPort === initialPort && localPagesServerHost === host) {
-    return Promise.resolve({ success: true, port: initialPort, running: true })
+  if (localPagesServer && localPagesServerPort === port && localPagesServerHost === host) {
+    return Promise.resolve({ success: true, port, running: true })
   }
   if (localPagesServer) {
     return stopLocalPagesServer().then(() => startLocalPagesServer(opts))
   }
-  const tryStartServer = (port, switchCount = 0) => new Promise(resolve => {
+  return new Promise(resolve => {
     const server = http.createServer(handleLocalPagesRequest)
-    let settled = false
-
-    const finish = (result) => {
-      if (settled) return
-      settled = true
-      resolve(result)
-    }
-
-    const onStartupError = err => {
-      try {
-        server.close()
-      } catch {
-        // ignore
-      }
-
-      if (err && err.code === 'EADDRINUSE' && switchCount < LOCAL_PAGES_MAX_PORT_SWITCHES) {
-        const nextPort = getNextLocalPagesPort(port)
-        showWindowsNativeNotification({
-          title: 'ASG Director',
-          body: `OBS 本地页面端口 ${port} 已被占用，已自动切换到 ${nextPort} 并重试（${switchCount + 1}/${LOCAL_PAGES_MAX_PORT_SWITCHES}）。`
-        })
-        finish({ retry: true, nextPort, switchCount: switchCount + 1 })
-        return
-      }
-
-      const body = buildLocalPagesStartupFailureBody(err, initialPort, port, switchCount)
-      showWindowsNativeNotification({
-        title: 'ASG Director',
-        body
-      })
-      finish({
-        success: false,
-        running: false,
-        port,
-        error: err && err.message ? err.message : '启动失败',
-        code: err && err.code ? err.code : null
-      })
-    }
-
-    server.once('error', onStartupError)
+    server.on('error', err => {
+      resolve({ success: false, error: err.message })
+    })
     server.listen(port, host, () => {
-      server.removeListener('error', onStartupError)
-      server.on('error', err => {
-        console.error('[LocalPages] 本地页面服务器运行异常:', err?.message || err)
-      })
-
-      if (port !== initialPort) {
-        persistLocalPagesPort(port)
-      }
       localPagesServer = server
       localPagesServerPort = port
       localPagesServerHost = host
       const endpoint = getLocalPagesNotificationUrl(host, port)
-      const switchedPortNote = port !== initialPort ? `（端口已从 ${initialPort} 自动切换到 ${port}）` : ''
-      const endpointNote = endpoint.note ? `（${endpoint.note}）` : ''
       const body = notifyReason === 'host-change'
-        ? `OBS 本地页面服务器监听地址已更新：${endpoint.url}${endpointNote}${switchedPortNote}`
-        : `OBS 本地页面服务器已启动：${endpoint.url}${endpointNote}${switchedPortNote}`
+        ? `OBS 本地页面服务器监听地址已更新：${endpoint.url}${endpoint.note ? `（${endpoint.note}）` : ''}`
+        : `OBS 本地页面服务器已启动：${endpoint.url}${endpoint.note ? `（${endpoint.note}）` : ''}`
       showWindowsNativeNotification({
         title: 'ASG Director',
         body
@@ -2366,7 +2019,6 @@ function startLocalPagesServer(options = {}) {
         if (localBpScoreData) {
           localPagesCurrentScoreData = localBpScoreData
         }
-        __loadPostMatchDataFromDisk__()
       } catch {}
       if (!global.__localPageServerHooks) {
         global.__localPageServerHooks = {}
@@ -2375,9 +2027,6 @@ function startLocalPagesServer(options = {}) {
         if (data) {
           if (data.type === 'score' && data.scoreData) {
             localPagesCurrentScoreData = data.scoreData
-          }
-          if (data.type === 'postmatch' && data.postMatchData) {
-            localPagesCurrentPostMatchData = data.postMatchData
           }
           if (data.type === 'state' || data.state) {
             localPagesCurrentState = data
@@ -2393,20 +2042,9 @@ function startLocalPagesServer(options = {}) {
       global.__localPageServerHooks.onLocalBpBlink = index => {
         localPagesBroadcastSse('local-bp-blink', { index })
       }
-      finish({ success: true, port, running: true })
+      resolve({ success: true, port, running: true })
     })
   })
-
-  const attemptStart = (port, switchCount = 0) => {
-    return tryStartServer(port, switchCount).then(result => {
-      if (result && result.retry) {
-        return attemptStart(result.nextPort, result.switchCount)
-      }
-      return result
-    })
-  }
-
-  return attemptStart(initialPort, 0)
 }
 
 function stopLocalPagesServer() {
@@ -2749,19 +2387,6 @@ ipcMain.handle('director-sync:get-status', () => {
   return { success: true, status: directorSyncService.getStatus() }
 })
 
-ipcMain.handle('director-sync:discover', async () => {
-  try {
-    const result = await directorSyncDiscoveryService.scan({ timeoutMs: 1600 })
-    return result
-  } catch (error) {
-    return {
-      success: false,
-      message: error && error.message ? error.message : String(error),
-      devices: []
-    }
-  }
-})
-
 ipcMain.handle('director-sync:reconnect', () => {
   const status = directorSyncService.reconnectOutbound()
   return { success: true, status }
@@ -2862,29 +2487,6 @@ ipcMain.handle('main-ui-bootstrap-ready', async () => {
   return { success: true }
 })
 
-ipcMain.handle('main-onboarding:get-status', async () => {
-  return {
-    success: true,
-    shouldShow: !hasMainOnboardingSentinel(),
-    sentinelPath: mainOnboardingSentinelPath
-  }
-})
-
-ipcMain.handle('main-onboarding:mark-seen', async (event, status) => {
-  const normalizedStatus = status === 'skipped' ? 'skipped' : 'completed'
-  const success = writeMainOnboardingSentinel(normalizedStatus)
-  return {
-    success,
-    status: normalizedStatus,
-    sentinelPath: mainOnboardingSentinelPath
-  }
-})
-
-ipcMain.handle('main-onboarding:reset', async () => {
-  const success = removeMainOnboardingSentinel()
-  return { success, sentinelPath: mainOnboardingSentinelPath }
-})
-
 function openLogViewerWindow() {
   if (logViewerWindow && !logViewerWindow.isDestroyed()) {
     if (logViewerWindow.isMinimized()) logViewerWindow.restore()
@@ -2952,17 +2554,9 @@ function createMainWindow() {
   }
   createStartupLoadingWindow()
 
-  const mainWorkArea = screen.getPrimaryDisplay()?.workAreaSize || { width: 1600, height: 900 }
-  const mainWindowWidth = Math.max(960, Math.min(1460, Number(mainWorkArea.width || 1600) - 80))
-  const mainWindowHeight = Math.max(720, Math.min(980, Number(mainWorkArea.height || 900) - 80))
-  const mainWindowMinWidth = Math.min(mainWindowWidth, 1180)
-  const mainWindowMinHeight = Math.min(mainWindowHeight, 820)
-
   mainWindow = new BrowserWindow({
-    width: mainWindowWidth,
-    height: mainWindowHeight,
-    minWidth: mainWindowMinWidth,
-    minHeight: mainWindowMinHeight,
+    width: 800,
+    height: 700,
     title: '导播端',
     resizable: true,
     show: false,
@@ -5606,19 +5200,85 @@ ipcMain.handle('store-upload-pack', async (event, metadata) => {
       }
       console.log('[Store] 使用手动选择的布局包文件:', packFilePath)
     } else {
-      // 未选择文件时，复用 packManager 的导出准备逻辑，避免上传和本地导出行为分叉。
-      const windowRefs = {
-        frontendWindow,
-        scoreboardWindowA,
-        scoreboardWindowB,
-        scoreboardOverviewWindow,
-        postMatchWindow
-      }
-      const prepared = await packManager.prepareExportDir({ windowRefs })
-      tempDir = prepared.tempDir
+      // 未选择文件时，导出当前布局包到临时文件后上传（兼容旧流程）
+      tempDir = path.join(os.tmpdir(), 'bppack-upload-' + Date.now())
+      fs.mkdirSync(tempDir, { recursive: true })
       console.log('[Store] Temp dir created:', tempDir)
-      console.log('[Store] 临时目录文件列表:', prepared.files)
-      console.log('[Store] 临时目录文件数:', prepared.files.length)
+
+      // 创建临时布局包
+      if (fs.existsSync(layoutPath)) {
+        console.log('[Store] 复制布局文件:', layoutPath)
+        fs.copyFileSync(layoutPath, path.join(tempDir, 'layout.json'))
+
+        // 验证复制
+        const copiedLayoutPath = path.join(tempDir, 'layout.json')
+        if (fs.existsSync(copiedLayoutPath)) {
+          const content = fs.readFileSync(copiedLayoutPath, 'utf8')
+          console.log('[Store] 布局文件已复制，大小:', content.length, '字节')
+        } else {
+          console.error('[Store] 布局文件复制失败!')
+        }
+      } else {
+        console.warn('[Store] 布局文件不存在:', layoutPath)
+      }
+
+      // 收集窗口配置数据
+      const packData = {}
+      if (frontendWindow && !frontendWindow.isDestroyed()) {
+        packData.frontendBounds = frontendWindow.getBounds()
+      }
+      if (scoreboardWindowA && !scoreboardWindowA.isDestroyed()) {
+        packData.scoreboardABounds = scoreboardWindowA.getBounds()
+        packData.scoreboardLayoutA = packData.scoreboardABounds
+      }
+      if (scoreboardWindowB && !scoreboardWindowB.isDestroyed()) {
+        packData.scoreboardBBounds = scoreboardWindowB.getBounds()
+        packData.scoreboardLayoutB = packData.scoreboardBBounds
+      }
+      if (scoreboardOverviewWindow && !scoreboardOverviewWindow.isDestroyed()) {
+        packData.scoreboardOverviewBounds = scoreboardOverviewWindow.getBounds()
+      }
+      if (postMatchWindow && !postMatchWindow.isDestroyed()) {
+        packData.postMatchBounds = postMatchWindow.getBounds()
+      }
+
+      if (Object.keys(packData).length > 0) {
+        fs.writeFileSync(
+          path.join(tempDir, 'pack-config.json'),
+          JSON.stringify(packData, null, 2)
+        )
+      }
+
+      // 复制所有图片文件
+      if (fs.existsSync(bgImagePath)) {
+        const files = fs.readdirSync(bgImagePath)
+        console.log('[Store] 背景图片目录文件数:', files.length)
+        files.forEach(file => {
+          const srcPath = path.join(bgImagePath, file)
+          const destPath = path.join(tempDir, file)
+          if (fs.statSync(srcPath).isFile()) {
+            fs.copyFileSync(srcPath, destPath)
+            console.log('[Store] 复制图片:', file)
+          }
+        })
+      } else {
+        console.warn('[Store] 背景图片目录不存在:', bgImagePath)
+      }
+
+      // 复制用户自定义模型目录（用于角色模型3D页）
+      if (fs.existsSync(userModelsPath)) {
+        const modelEntries = fs.readdirSync(userModelsPath)
+        if (modelEntries.length > 0) {
+          const destUserModels = path.join(tempDir, 'user-models')
+          copyDirRecursive(userModelsPath, destUserModels)
+          console.log('[Store] 已复制 user-models 目录，条目数:', modelEntries.length)
+        }
+      }
+
+      // 列出临时目录中的所有文件
+      const tempFiles = fs.readdirSync(tempDir)
+      console.log('[Store] 临时目录文件列表:', tempFiles)
+      console.log('[Store] 临时目录文件数:', tempFiles.length)
 
       // 打包成zip
       const packFileName = `${metadata.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_v${metadata.version}.bppack`
@@ -6317,24 +5977,6 @@ let localBpState = {
   // 角色模型3D展示窗口布局
   characterModel3DLayout: {
     mode: 'edit',
-    advancedRender: {
-      antialiasEnabled: true,
-      lightTextureEnabled: true,
-      exposure: 1,
-      contrast: 1,
-      saturation: 1,
-      renderScale: 1,
-      shadowMapBoost: 1,
-      shadowRadiusBoost: 1,
-      shadowBias: -0.00012,
-      shadowNormalBias: 0.01,
-      ambientBoost: 1,
-      hemiBoost: 1,
-      keyBoost: 1,
-      fillBoost: 1,
-      rimBoost: 1,
-      bounceBoost: 1
-    },
     transparentBackground: true,
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
@@ -6357,19 +5999,10 @@ let localBpState = {
     },
     survivorScale: 1,
     hunterScale: 1.1,
-    roleScaleOverrides: {},
     videoScreen: {
       path: '',
       loop: true,
       muted: true,
-      width: 2.2,
-      height: 1.2
-    },
-    cameraScreen: {
-      enabled: false,
-      deviceId: '',
-      muted: true,
-      mirrored: true,
       width: 2.2,
       height: 1.2
     },
@@ -6391,8 +6024,7 @@ let localBpState = {
     },
     camera: {
       position: { x: 0, y: 2, z: 8 },
-      target: { x: 0, y: 1, z: 0 },
-      fov: 45
+      target: { x: 0, y: 1, z: 0 }
     },
     cameraTransitionMs: 900,
     cameraKeyframes: {
@@ -6451,23 +6083,6 @@ function __normalizeLocalBpStateInPlace__() {
   }
   const m3d = localBpState.characterModel3DLayout
   m3d.mode = (m3d.mode === 'render') ? 'render' : 'edit'
-  if (!m3d.advancedRender || typeof m3d.advancedRender !== 'object') m3d.advancedRender = {}
-  m3d.advancedRender.antialiasEnabled = m3d.advancedRender.antialiasEnabled !== false
-  m3d.advancedRender.lightTextureEnabled = m3d.advancedRender.lightTextureEnabled !== false
-  m3d.advancedRender.exposure = Math.max(0.6, Math.min(2.2, Number.isFinite(Number(m3d.advancedRender.exposure)) ? Number(m3d.advancedRender.exposure) : 1))
-  m3d.advancedRender.contrast = Math.max(0.8, Math.min(1.6, Number.isFinite(Number(m3d.advancedRender.contrast)) ? Number(m3d.advancedRender.contrast) : 1))
-  m3d.advancedRender.saturation = Math.max(0.7, Math.min(1.8, Number.isFinite(Number(m3d.advancedRender.saturation)) ? Number(m3d.advancedRender.saturation) : 1))
-  m3d.advancedRender.renderScale = Math.max(0.7, Math.min(2, Number.isFinite(Number(m3d.advancedRender.renderScale)) ? Number(m3d.advancedRender.renderScale) : 1))
-  m3d.advancedRender.shadowMapBoost = Math.max(0.5, Math.min(2, Number.isFinite(Number(m3d.advancedRender.shadowMapBoost)) ? Number(m3d.advancedRender.shadowMapBoost) : 1))
-  m3d.advancedRender.shadowRadiusBoost = Math.max(0.5, Math.min(2.5, Number.isFinite(Number(m3d.advancedRender.shadowRadiusBoost)) ? Number(m3d.advancedRender.shadowRadiusBoost) : 1))
-  m3d.advancedRender.shadowBias = Math.max(-0.001, Math.min(0.001, Number.isFinite(Number(m3d.advancedRender.shadowBias)) ? Number(m3d.advancedRender.shadowBias) : -0.00012))
-  m3d.advancedRender.shadowNormalBias = Math.max(0, Math.min(0.1, Number.isFinite(Number(m3d.advancedRender.shadowNormalBias)) ? Number(m3d.advancedRender.shadowNormalBias) : 0.01))
-  m3d.advancedRender.ambientBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.ambientBoost)) ? Number(m3d.advancedRender.ambientBoost) : 1))
-  m3d.advancedRender.hemiBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.hemiBoost)) ? Number(m3d.advancedRender.hemiBoost) : 1))
-  m3d.advancedRender.keyBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.keyBoost)) ? Number(m3d.advancedRender.keyBoost) : 1))
-  m3d.advancedRender.fillBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.fillBoost)) ? Number(m3d.advancedRender.fillBoost) : 1))
-  m3d.advancedRender.rimBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.rimBoost)) ? Number(m3d.advancedRender.rimBoost) : 1))
-  m3d.advancedRender.bounceBoost = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.advancedRender.bounceBoost)) ? Number(m3d.advancedRender.bounceBoost) : 1))
   m3d.transparentBackground = m3d.transparentBackground !== false
   m3d.environmentPreset = (m3d.environmentPreset === 'cyberpunkNight'
     || m3d.environmentPreset === 'horrorNight'
@@ -6476,7 +6091,7 @@ function __normalizeLocalBpStateInPlace__() {
     || m3d.environmentPreset === 'goldenNoon')
     ? m3d.environmentPreset
     : 'duskCinema'
-  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic' || m3d.qualityPreset === 'ultra')
+  m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic')
     ? m3d.qualityPreset
     : 'high'
   m3d.maxFps = Math.max(10, Math.min(240, Number.isFinite(Number(m3d.maxFps)) ? Number(m3d.maxFps) : 60))
@@ -6488,11 +6103,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.shadowStrength = Math.max(0, Math.min(1, Number.isFinite(Number(m3d.shadowStrength))
     ? Number(m3d.shadowStrength)
     : 0.45))
-  m3d.entranceEffect = (m3d.entranceEffect === 'none'
-    || m3d.entranceEffect === 'flameDissolve'
-    || m3d.entranceEffect === 'cardStorm'
-    || m3d.entranceEffect === 'spotlightRush'
-    || m3d.entranceEffect === 'prismBloom')
+  m3d.entranceEffect = (m3d.entranceEffect === 'none' || m3d.entranceEffect === 'flameDissolve')
     ? m3d.entranceEffect
     : 'fade'
   if (!m3d.entranceParticle || typeof m3d.entranceParticle !== 'object') m3d.entranceParticle = {}
@@ -6510,30 +6121,12 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
     : Number.isFinite(Number(m3d?.slots?.hunter?.scale?.x)) ? Number(m3d.slots.hunter.scale.x) : 1.1)
-  {
-    const rawOverrides = (m3d.roleScaleOverrides && typeof m3d.roleScaleOverrides === 'object') ? m3d.roleScaleOverrides : {}
-    const nextOverrides = {}
-    Object.keys(rawOverrides).forEach((key) => {
-      const roleName = String(key || '').replace(/["'“”‘’]/g, '').trim()
-      const scale = Math.max(0.001, Number.isFinite(Number(rawOverrides[key])) ? Number(rawOverrides[key]) : NaN)
-      if (!roleName || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-6) return
-      nextOverrides[roleName] = scale
-    })
-    m3d.roleScaleOverrides = nextOverrides
-  }
   if (!m3d.videoScreen || typeof m3d.videoScreen !== 'object') m3d.videoScreen = {}
   m3d.videoScreen.path = (typeof m3d.videoScreen.path === 'string') ? m3d.videoScreen.path : ''
   m3d.videoScreen.loop = m3d.videoScreen.loop !== false
   m3d.videoScreen.muted = m3d.videoScreen.muted !== false
   m3d.videoScreen.width = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.width)) ? Number(m3d.videoScreen.width) : 2.2)
   m3d.videoScreen.height = Math.max(0.1, Number.isFinite(Number(m3d.videoScreen.height)) ? Number(m3d.videoScreen.height) : 1.2)
-  if (!m3d.cameraScreen || typeof m3d.cameraScreen !== 'object') m3d.cameraScreen = {}
-  m3d.cameraScreen.enabled = !!m3d.cameraScreen.enabled
-  m3d.cameraScreen.deviceId = (typeof m3d.cameraScreen.deviceId === 'string') ? m3d.cameraScreen.deviceId : ''
-  m3d.cameraScreen.muted = m3d.cameraScreen.muted !== false
-  m3d.cameraScreen.mirrored = m3d.cameraScreen.mirrored !== false
-  m3d.cameraScreen.width = Math.max(0.1, Number.isFinite(Number(m3d.cameraScreen.width)) ? Number(m3d.cameraScreen.width) : 2.2)
-  m3d.cameraScreen.height = Math.max(0.1, Number.isFinite(Number(m3d.cameraScreen.height)) ? Number(m3d.cameraScreen.height) : 1.2)
   m3d.customModelPath = (typeof m3d.customModelPath === 'string') ? m3d.customModelPath : ''
 
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
@@ -6553,7 +6146,7 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.scene.scale = ensureVec3(m3d.scene.scale, { x: 1, y: 1, z: 1 })
 
   if (!m3d.slots || typeof m3d.slots !== 'object') m3d.slots = {}
-  const slotKeys = ['light1', 'video1', 'camera1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     if (!m3d.slots[key] || typeof m3d.slots[key] !== 'object') m3d.slots[key] = {}
     m3d.slots[key].position = ensureVec3(m3d.slots[key].position, { x: 0, y: 0, z: 0 })
@@ -6584,7 +6177,6 @@ function __normalizeLocalBpStateInPlace__() {
   if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
   m3d.camera.position = ensureVec3(m3d.camera.position, { x: 0, y: 2, z: 8 })
   m3d.camera.target = ensureVec3(m3d.camera.target, { x: 0, y: 1, z: 0 })
-  m3d.camera.fov = Math.max(12, Math.min(80, Number.isFinite(Number(m3d.camera.fov)) ? Number(m3d.camera.fov) : 45))
   m3d.cameraTransitionMs = Math.max(50, Math.min(10000, Number.isFinite(Number(m3d.cameraTransitionMs)) ? Number(m3d.cameraTransitionMs) : 900))
   if (!m3d.cameraKeyframes || typeof m3d.cameraKeyframes !== 'object') m3d.cameraKeyframes = {}
   const cameraEventKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunterSelected']
@@ -6596,8 +6188,7 @@ function __normalizeLocalBpStateInPlace__() {
     }
     m3d.cameraKeyframes[key] = {
       position: ensureVec3(frame.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 }),
-      fov: Math.max(12, Math.min(80, Number.isFinite(Number(frame.fov)) ? Number(frame.fov) : 45))
+      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 })
     }
   }
 }
@@ -6642,30 +6233,6 @@ function __persistCharacterModel3DLayoutToDisk__() {
     __writeLayoutJsonSafe__(root)
   } catch (e) {
     console.warn('[LocalBP] 持久化角色模型3D展示布局失败:', e.message)
-  }
-}
-
-function __persistPostMatchDataToDisk__(data) {
-  try {
-    const root = __readLayoutJsonSafe__()
-    root.localBpPostMatchData = (data && typeof data === 'object') ? data : null
-    __writeLayoutJsonSafe__(root)
-  } catch (e) {
-    console.warn('[LocalBP] 持久化赛后数据失败:', e.message)
-  }
-}
-
-function __loadPostMatchDataFromDisk__() {
-  try {
-    const root = __readLayoutJsonSafe__()
-    const data = (root && root.localBpPostMatchData && typeof root.localBpPostMatchData === 'object')
-      ? root.localBpPostMatchData
-      : null
-    if (data) localPagesCurrentPostMatchData = data
-    return data
-  } catch (e) {
-    console.warn('[LocalBP] 从 layout.json 回填赛后数据失败:', e.message)
-    return null
   }
 }
 
@@ -6728,9 +6295,6 @@ function __loadCharacterModel3DLayoutFromDiskIntoState__() {
     localBpState.characterModel3DLayout = {
       ...existing,
       ...fromDisk,
-      roleScaleOverrides: (fromDisk.roleScaleOverrides && typeof fromDisk.roleScaleOverrides === 'object')
-        ? fromDisk.roleScaleOverrides
-        : (existing.roleScaleOverrides || {}),
       scene: {
         ...(existing.scene || {}),
         ...(fromDisk.scene || {})
@@ -7620,15 +7184,9 @@ function createLocalBpGuideWindow() {
     return localBpGuideWindow
   }
 
-  const guideWorkArea = screen.getPrimaryDisplay()?.workAreaSize || { width: 1600, height: 900 }
-  const guideWidth = Math.max(1020, Math.min(1360, Number(guideWorkArea.width || 1600) - 60))
-  const guideHeight = Math.max(760, Math.min(920, Number(guideWorkArea.height || 900) - 60))
-
   localBpGuideWindow = new BrowserWindow({
-    width: guideWidth,
-    height: guideHeight,
-    minWidth: Math.min(guideWidth, 1020),
-    minHeight: Math.min(guideHeight, 760),
+    width: 860,
+    height: 760,
     title: 'BP引导',
     resizable: true,
     webPreferences: {
@@ -8341,23 +7899,6 @@ ipcMain.handle('localBp:updateScoreData', (event, payload) => {
   }
 })
 
-ipcMain.handle('localBp:savePostMatch', (event, payload) => {
-  try {
-    const data = (payload && typeof payload === 'object') ? payload : null
-    localPagesCurrentPostMatchData = data
-    __persistPostMatchDataToDisk__(data)
-    broadcastUpdateData({ type: 'postmatch', postMatchData: data })
-    if (global.__localPageServerHooks && typeof global.__localPageServerHooks.onDataUpdate === 'function') {
-      global.__localPageServerHooks.onDataUpdate({ type: 'postmatch', postMatchData: data })
-    } else {
-      localPagesBroadcastSse('state-update', { type: 'postmatch', postMatchData: data })
-    }
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: error.message }
-  }
-})
-
 
 // 设置单个求生者的天赋（index: 0-3, talents: 天赋数组）
 ipcMain.handle('localBp:setSurvivorTalents', (event, { index, talents }) => {
@@ -8480,66 +8021,23 @@ function normalizeCharacterModel3DLayoutInput(input) {
     if (!v || typeof v !== 'object') return null
     return {
       position: ensureVec3(v.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 }),
-      fov: Math.max(12, Math.min(80, Number.isFinite(Number(v.fov)) ? Number(v.fov) : 45))
+      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 })
     }
-  }
-
-  const normalizeRoleScaleOverrides = (value) => {
-    const src = (value && typeof value === 'object') ? value : {}
-    const out = {}
-    Object.keys(src).forEach((key) => {
-      const roleName = String(key || '').replace(/["'“”‘’]/g, '').trim()
-      const scale = Math.max(0.001, Number.isFinite(Number(src[key])) ? Number(src[key]) : NaN)
-      if (!roleName || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-6) return
-      out[roleName] = scale
-    })
-    return out
   }
 
   const out = {
     mode: base.mode === 'render' ? 'render' : 'edit',
-    advancedRender: {
-      antialiasEnabled: base?.advancedRender?.antialiasEnabled !== false,
-      lightTextureEnabled: base?.advancedRender?.lightTextureEnabled !== false,
-      exposure: Math.max(0.6, Math.min(2.2, Number.isFinite(Number(base?.advancedRender?.exposure)) ? Number(base.advancedRender.exposure) : 1)),
-      contrast: Math.max(0.8, Math.min(1.6, Number.isFinite(Number(base?.advancedRender?.contrast)) ? Number(base.advancedRender.contrast) : 1)),
-      saturation: Math.max(0.7, Math.min(1.8, Number.isFinite(Number(base?.advancedRender?.saturation)) ? Number(base.advancedRender.saturation) : 1)),
-      renderScale: Math.max(0.7, Math.min(2, Number.isFinite(Number(base?.advancedRender?.renderScale)) ? Number(base.advancedRender.renderScale) : 1)),
-      shadowMapBoost: Math.max(0.5, Math.min(2, Number.isFinite(Number(base?.advancedRender?.shadowMapBoost)) ? Number(base.advancedRender.shadowMapBoost) : 1)),
-      shadowRadiusBoost: Math.max(0.5, Math.min(2.5, Number.isFinite(Number(base?.advancedRender?.shadowRadiusBoost)) ? Number(base.advancedRender.shadowRadiusBoost) : 1)),
-      shadowBias: Math.max(-0.001, Math.min(0.001, Number.isFinite(Number(base?.advancedRender?.shadowBias)) ? Number(base.advancedRender.shadowBias) : -0.00012)),
-      shadowNormalBias: Math.max(0, Math.min(0.1, Number.isFinite(Number(base?.advancedRender?.shadowNormalBias)) ? Number(base.advancedRender.shadowNormalBias) : 0.01)),
-      ambientBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.ambientBoost)) ? Number(base.advancedRender.ambientBoost) : 1)),
-      hemiBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.hemiBoost)) ? Number(base.advancedRender.hemiBoost) : 1)),
-      keyBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.keyBoost)) ? Number(base.advancedRender.keyBoost) : 1)),
-      fillBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.fillBoost)) ? Number(base.advancedRender.fillBoost) : 1)),
-      rimBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.rimBoost)) ? Number(base.advancedRender.rimBoost) : 1)),
-      bounceBoost: Math.max(0, Math.min(3, Number.isFinite(Number(base?.advancedRender?.bounceBoost)) ? Number(base.advancedRender.bounceBoost) : 1))
-    },
     transparentBackground: base.transparentBackground !== false,
     environmentPreset: (base.environmentPreset === 'cyberpunkNight'
       || base.environmentPreset === 'horrorNight'
       || base.environmentPreset === 'sunnyDaylight'
       || base.environmentPreset === 'studioHighKey'
       || base.environmentPreset === 'goldenNoon')
-      || base.environmentPreset === 'cloudyStage'
-      || base.environmentPreset === 'moonlitBlue'
-      || base.environmentPreset === 'sunsetRose'
-      || base.environmentPreset === 'mistyMorning'
       ? base.environmentPreset
       : 'duskCinema',
-    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic' || base.qualityPreset === 'ultra')
+    qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic')
       ? base.qualityPreset
       : 'high',
-    weatherPreset: (base.weatherPreset === 'thunderstorm' || base.weatherPreset === 'windy' || base.weatherPreset === 'stormWindy')
-      ? base.weatherPreset
-      : 'clear',
-    weather: {
-      windIntensity: Math.max(0, Math.min(3, Number.isFinite(Number(base?.weather?.windIntensity)) ? Number(base.weather.windIntensity) : 1.35)),
-      audioEnabled: base?.weather?.audioEnabled !== false,
-      audioVolume: Math.max(0, Math.min(1, Number.isFinite(Number(base?.weather?.audioVolume)) ? Number(base.weather.audioVolume) : 0.65))
-    },
     maxFps: Math.max(10, Math.min(240, Number.isFinite(Number(base.maxFps)) ? Number(base.maxFps) : 60)),
     droneMode: !!base.droneMode,
     fogEnabled: base.fogEnabled !== false,
@@ -8549,11 +8047,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     shadowStrength: Math.max(0, Math.min(1, Number.isFinite(Number(base.shadowStrength))
       ? Number(base.shadowStrength)
       : 0.45)),
-    entranceEffect: (base.entranceEffect === 'none'
-      || base.entranceEffect === 'flameDissolve'
-      || base.entranceEffect === 'cardStorm'
-      || base.entranceEffect === 'spotlightRush'
-      || base.entranceEffect === 'prismBloom')
+    entranceEffect: (base.entranceEffect === 'none' || base.entranceEffect === 'flameDissolve')
       ? base.entranceEffect
       : 'fade',
     entranceParticle: {
@@ -8577,21 +8071,12 @@ function normalizeCharacterModel3DLayoutInput(input) {
     hunterScale: Math.max(0.001, Number.isFinite(Number(base.hunterScale))
       ? Number(base.hunterScale)
       : Number.isFinite(Number(base?.slots?.hunter?.scale?.x)) ? Number(base.slots.hunter.scale.x) : 1.1),
-    roleScaleOverrides: normalizeRoleScaleOverrides(base.roleScaleOverrides),
     videoScreen: {
       path: typeof base?.videoScreen?.path === 'string' ? base.videoScreen.path : '',
       loop: base?.videoScreen?.loop !== false,
       muted: base?.videoScreen?.muted !== false,
       width: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.width)) ? Number(base.videoScreen.width) : 2.2),
       height: Math.max(0.1, Number.isFinite(Number(base?.videoScreen?.height)) ? Number(base.videoScreen.height) : 1.2)
-    },
-    cameraScreen: {
-      enabled: !!base?.cameraScreen?.enabled,
-      deviceId: typeof base?.cameraScreen?.deviceId === 'string' ? base.cameraScreen.deviceId : '',
-      muted: base?.cameraScreen?.muted !== false,
-      mirrored: base?.cameraScreen?.mirrored !== false,
-      width: Math.max(0.1, Number.isFinite(Number(base?.cameraScreen?.width)) ? Number(base.cameraScreen.width) : 2.2),
-      height: Math.max(0.1, Number.isFinite(Number(base?.cameraScreen?.height)) ? Number(base.cameraScreen.height) : 1.2)
     },
     customModelPath: typeof base?.customModelPath === 'string' ? base.customModelPath : '',
     scene: {
@@ -8619,8 +8104,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
     },
     camera: {
       position: ensureVec3(base?.camera?.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 }),
-      fov: Math.max(12, Math.min(80, Number.isFinite(Number(base?.camera?.fov)) ? Number(base.camera.fov) : 45))
+      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 })
     },
     cameraTransitionMs: Math.max(50, Math.min(10000, Number.isFinite(Number(base.cameraTransitionMs)) ? Number(base.cameraTransitionMs) : 900)),
     cameraKeyframes: {
@@ -8628,12 +8112,11 @@ function normalizeCharacterModel3DLayoutInput(input) {
       survivor2: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor2),
       survivor3: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor3),
       survivor4: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor4),
-      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected),
-      banUpdated: normalizeCameraKeyframe(base?.cameraKeyframes?.banUpdated)
+      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected)
     }
   }
 
-  const slotKeys = ['light1', 'video1', 'camera1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
+  const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
   for (const key of slotKeys) {
     out.slots[key] = {
       position: ensureVec3(base?.slots?.[key]?.position, { x: 0, y: 0, z: 0 }),
@@ -8778,7 +8261,6 @@ ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
     localBpState.characterModel3DLayout = {
       ...prev,
       ...incoming,
-      roleScaleOverrides: incoming.roleScaleOverrides || {},
       scene: { ...(prev.scene || {}), ...(incoming.scene || {}) },
       slots: { ...(prev.slots || {}), ...(incoming.slots || {}) },
       lights: { ...(prev.lights || {}), ...(incoming.lights || {}) },
@@ -8990,17 +8472,6 @@ ipcMain.handle('localBp:getCharacters', () => {
 app.whenReady().then(async () => {
   ensureDirectories()
   packManager.ensureDirectories()
-  try {
-    __loadCharacterDisplayLayoutFromDiskIntoState__()
-    __loadCharacterModel3DLayoutFromDiskIntoState__()
-    __normalizeLocalBpStateInPlace__()
-    localPagesCurrentState = {
-      type: 'state',
-      state: buildLocalBpFrontendState()
-    }
-  } catch (e) {
-    console.warn('[App] 启动时回填本地 BP 布局失败:', e?.message || e)
-  }
 
   try {
     const syncSettings = getDirectorSyncSettingsFromConfig()
@@ -9073,11 +8544,6 @@ app.on('before-quit', async () => {
     directorSyncService.dispose()
   } catch (e) {
     console.error('[App] 关闭跨导播同步服务失败:', e?.message || e)
-  }
-  try {
-    directorSyncDiscoveryService.dispose()
-  } catch (e) {
-    console.error('[App] 关闭跨导播发现服务失败:', e?.message || e)
   }
   try {
     if (obsAutomationService && typeof obsAutomationService.shutdown === 'function') {
@@ -9265,12 +8731,10 @@ ipcMain.handle('localBp:importBundledAsset', async (event, inputPath, options = 
 })
 
 try { ipcMain.removeHandler('read-binary-file') } catch { /* ignore */ }
-ipcMain.handle('read-binary-file', async (event, inputPath, options = {}) => {
+ipcMain.handle('read-binary-file', async (event, inputPath) => {
   try {
     const raw = String(inputPath || '').trim()
     if (!raw) return { success: false, error: 'empty-path' }
-    const metadataOnly = !!(options && typeof options === 'object' && options.metadataOnly)
-    const maxInlineBytes = Number.isFinite(Number(options?.maxInlineBytes)) ? Math.max(0, Number(options.maxInlineBytes)) : Infinity
 
     let resolvedPath = raw
     if (/^file:/i.test(resolvedPath)) {
@@ -9293,29 +8757,15 @@ ipcMain.handle('read-binary-file', async (event, inputPath, options = {}) => {
       return { success: false, error: 'not-a-file' }
     }
 
+    const data = fs.readFileSync(resolvedPath)
     const basePath = path.dirname(resolvedPath)
     const basePathUrl = pathToFileURL(basePath + path.sep).toString()
-    const response = {
+    return {
       success: true,
       path: resolvedPath,
       size: stat.size,
       basePath,
-      basePathUrl
-    }
-    if (metadataOnly) {
-      return response
-    }
-    if (stat.size > maxInlineBytes) {
-      return {
-        ...response,
-        skippedInlineRead: true,
-        error: 'file-too-large-for-inline-read'
-      }
-    }
-
-    const data = fs.readFileSync(resolvedPath)
-    return {
-      ...response,
+      basePathUrl,
       base64: data.toString('base64')
     }
   } catch (error) {

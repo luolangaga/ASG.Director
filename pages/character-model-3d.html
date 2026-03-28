@@ -103,8 +103,13 @@
         <div class="toolbar-row">
           <span class="label">天气控制</span>
           <label>风力倍率<input id="weatherWindIntensity" type="number" step="0.1" min="0" max="3" value="1.35"></label>
+          <label>风粒子密度<input id="weatherParticleDensity" type="number" step="0.1" min="0" max="4" value="1"></label>
+          <label>风粒子速度<input id="weatherParticleSpeed" type="number" step="0.1" min="0" max="3" value="0.6"></label>
           <label><input id="weatherAudioEnabled" type="checkbox" checked> 天气音效</label>
           <label>音量<input id="weatherAudioVolume" type="number" step="0.05" min="0" max="1" value="0.65"></label>
+          <button id="weatherParticleTextureImportBtn" class="btn">导入风粒子图片</button>
+          <button id="weatherParticleTextureClearBtn" class="btn">清除风粒子图片</button>
+          <span id="weatherParticleTextureInfo" class="label">风粒子图片: 默认白块</span>
           <button id="applyWeatherSettingsBtn" class="btn">应用天气参数</button>
         </div>
         <div class="toolbar-row">

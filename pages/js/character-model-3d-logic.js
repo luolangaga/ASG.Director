@@ -380,6 +380,9 @@
     weatherPreset: 'clear',
     weather: {
       windIntensity: 1.35,
+      particleDensity: 1,
+      particleSpeed: 0.6,
+      particleTexturePath: '',
       audioEnabled: true,
       audioVolume: 0.65
     },
@@ -564,6 +567,11 @@
     animations: [],
     loadingPromise: null
   }
+  const weatherParticleTextureAsset = {
+    path: '',
+    texture: null,
+    loadingPromise: null
+  }
   const weatherRuntime = {
     group: null,
     rain: null,
@@ -574,6 +582,8 @@
     windDustCount: 0,
     windDustPositions: null,
     windDustSeed: null,
+    windTexturePath: '',
+    windBuildToken: 0,
     configKey: 'clear',
     time: 0,
     flashStrength: 0,
@@ -582,6 +592,7 @@
     pendingFlash: 0,
     windScroll: 0
   }
+  let weatherWindInstanceDummy = null
   const weatherAudio = {
     context: null,
     masterGain: null,
@@ -718,8 +729,13 @@
     , applyWeatherPresetBtn: document.getElementById('applyWeatherPresetBtn')
     , weatherPresetInfo: document.getElementById('weatherPresetInfo')
     , weatherWindIntensity: document.getElementById('weatherWindIntensity')
+    , weatherParticleDensity: document.getElementById('weatherParticleDensity')
+    , weatherParticleSpeed: document.getElementById('weatherParticleSpeed')
     , weatherAudioEnabled: document.getElementById('weatherAudioEnabled')
     , weatherAudioVolume: document.getElementById('weatherAudioVolume')
+    , weatherParticleTextureImportBtn: document.getElementById('weatherParticleTextureImportBtn')
+    , weatherParticleTextureClearBtn: document.getElementById('weatherParticleTextureClearBtn')
+    , weatherParticleTextureInfo: document.getElementById('weatherParticleTextureInfo')
     , applyWeatherSettingsBtn: document.getElementById('applyWeatherSettingsBtn')
     , entranceEffectSelect: document.getElementById('entranceEffectSelect')
     , particleImportBtn: document.getElementById('particleImportBtn')
@@ -1030,6 +1046,9 @@
       : 'clear'
     out.weather = {
       windIntensity: Math.max(0, Math.min(3, asNumber(base?.weather?.windIntensity, DEFAULT_LAYOUT.weather.windIntensity))),
+      particleDensity: Math.max(0, Math.min(4, asNumber(base?.weather?.particleDensity, DEFAULT_LAYOUT.weather.particleDensity))),
+      particleSpeed: Math.max(0, Math.min(3, asNumber(base?.weather?.particleSpeed, DEFAULT_LAYOUT.weather.particleSpeed))),
+      particleTexturePath: (typeof base?.weather?.particleTexturePath === 'string') ? base.weather.particleTexturePath : '',
       audioEnabled: base?.weather?.audioEnabled !== false,
       audioVolume: Math.max(0, Math.min(1, asNumber(base?.weather?.audioVolume, DEFAULT_LAYOUT.weather.audioVolume)))
     }
@@ -1872,6 +1891,9 @@
     const src = (state.layout?.weather && typeof state.layout.weather === 'object') ? state.layout.weather : {}
     return {
       windIntensity: Math.max(0, Math.min(3, asNumber(src.windIntensity, DEFAULT_LAYOUT.weather.windIntensity))),
+      particleDensity: Math.max(0, Math.min(4, asNumber(src.particleDensity, DEFAULT_LAYOUT.weather.particleDensity))),
+      particleSpeed: Math.max(0, Math.min(3, asNumber(src.particleSpeed, DEFAULT_LAYOUT.weather.particleSpeed))),
+      particleTexturePath: (typeof src.particleTexturePath === 'string') ? src.particleTexturePath.trim() : '',
       audioEnabled: src.audioEnabled !== false,
       audioVolume: Math.max(0, Math.min(1, asNumber(src.audioVolume, DEFAULT_LAYOUT.weather.audioVolume)))
     }
@@ -1881,6 +1903,9 @@
     const normalized = getWeatherSettings()
     state.layout.weather = {
       windIntensity: normalized.windIntensity,
+      particleDensity: normalized.particleDensity,
+      particleSpeed: normalized.particleSpeed,
+      particleTexturePath: normalized.particleTexturePath,
       audioEnabled: normalized.audioEnabled,
       audioVolume: normalized.audioVolume
     }
@@ -1900,11 +1925,23 @@
       swayPitch: base.swayPitch * (0.55 + windFactor * 0.8),
       swayYaw: base.swayYaw * (0.55 + windFactor * 0.8),
       windScrollSpeed: base.windScrollSpeed * (0.5 + windFactor * 0.7),
-      windParticleCount: Math.round(base.windParticleCount * (0.45 + windFactor * 0.78)),
-      windParticleSpeed: base.windParticleSpeed * (0.5 + windFactor * 0.75),
+      windParticleCount: Math.round(base.windParticleCount * (0.45 + windFactor * 0.78) * settings.particleDensity),
+      windParticleSpeed: base.windParticleSpeed * (0.5 + windFactor * 0.75) * settings.particleSpeed,
+      windParticleTexturePath: settings.particleTexturePath,
       rainDriftX: base.rainDriftX * (base.wind ? (0.72 + windFactor * 0.62) : 1),
       rainDriftZ: base.rainDriftZ * (base.wind ? (0.72 + windFactor * 0.62) : 1)
     }
+  }
+
+  function syncWeatherParticleTextureUi() {
+    if (!dom.weatherParticleTextureInfo) return
+    const path = String(state.layout?.weather?.particleTexturePath || '').trim()
+    if (!path) {
+      dom.weatherParticleTextureInfo.textContent = '风粒子图片: 默认白块'
+      return
+    }
+    const shortName = path.split(/[\\/]/).pop() || path
+    dom.weatherParticleTextureInfo.textContent = `风粒子图片: ${shortName}`
   }
 
   function syncWeatherInputs() {
@@ -1912,19 +1949,67 @@
     const settings = ensureWeatherSettings()
     if (dom.weatherPresetSelect) dom.weatherPresetSelect.value = state.layout?.weatherPreset || 'clear'
     if (dom.weatherWindIntensity) dom.weatherWindIntensity.value = String(settings.windIntensity.toFixed(2))
+    if (dom.weatherParticleDensity) dom.weatherParticleDensity.value = String(settings.particleDensity.toFixed(2))
+    if (dom.weatherParticleSpeed) dom.weatherParticleSpeed.value = String(settings.particleSpeed.toFixed(2))
     if (dom.weatherAudioEnabled) dom.weatherAudioEnabled.checked = settings.audioEnabled !== false
     if (dom.weatherAudioVolume) dom.weatherAudioVolume.value = String(settings.audioVolume.toFixed(2))
     if (dom.weatherPresetInfo) dom.weatherPresetInfo.textContent = `天气: ${config.label}`
+    syncWeatherParticleTextureUi()
   }
 
   function applyWeatherSettingsFromInputs(shouldSave = true) {
     const next = ensureWeatherSettings()
     next.windIntensity = Math.max(0, Math.min(3, asNumber(dom.weatherWindIntensity?.value, next.windIntensity)))
+    next.particleDensity = Math.max(0, Math.min(4, asNumber(dom.weatherParticleDensity?.value, next.particleDensity)))
+    next.particleSpeed = Math.max(0, Math.min(3, asNumber(dom.weatherParticleSpeed?.value, next.particleSpeed)))
     next.audioEnabled = dom.weatherAudioEnabled ? !!dom.weatherAudioEnabled.checked : next.audioEnabled !== false
     next.audioVolume = Math.max(0, Math.min(1, asNumber(dom.weatherAudioVolume?.value, next.audioVolume)))
     syncWeatherInputs()
     applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
     if (shouldSave) scheduleSaveLayout()
+  }
+
+  function disposeWeatherParticleTextureAsset() {
+    if (weatherParticleTextureAsset.texture && typeof weatherParticleTextureAsset.texture.dispose === 'function') {
+      try { weatherParticleTextureAsset.texture.dispose() } catch { }
+    }
+    weatherParticleTextureAsset.path = ''
+    weatherParticleTextureAsset.texture = null
+    weatherParticleTextureAsset.loadingPromise = null
+  }
+
+  async function ensureWeatherParticleTexture(path) {
+    const nextPath = String(path || '').trim()
+    if (!nextPath || !THREE) {
+      disposeWeatherParticleTextureAsset()
+      return null
+    }
+    if (weatherParticleTextureAsset.path === nextPath && weatherParticleTextureAsset.texture) {
+      return weatherParticleTextureAsset.texture
+    }
+    if (weatherParticleTextureAsset.path === nextPath && weatherParticleTextureAsset.loadingPromise) {
+      return weatherParticleTextureAsset.loadingPromise
+    }
+    disposeWeatherParticleTextureAsset()
+    weatherParticleTextureAsset.path = nextPath
+    const resolved = normalizeFileUrl(nextPath)
+    weatherParticleTextureAsset.loadingPromise = new Promise((resolve) => {
+      const loader = new THREE.TextureLoader()
+      loader.load(resolved, (texture) => {
+        if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace
+        else if ('encoding' in texture && THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding
+        texture.minFilter = THREE.LinearFilter
+        texture.magFilter = THREE.LinearFilter
+        weatherParticleTextureAsset.texture = texture
+        weatherParticleTextureAsset.loadingPromise = null
+        resolve(texture)
+      }, undefined, (error) => {
+        console.warn('[CharacterModel3D] 风粒子图片加载失败:', error)
+        disposeWeatherParticleTextureAsset()
+        resolve(null)
+      })
+    })
+    return weatherParticleTextureAsset.loadingPromise
   }
 
   function createWeatherNoiseBuffer(ctx, mode = 'wind') {
@@ -2204,6 +2289,7 @@
     weatherRuntime.windDustCount = 0
     weatherRuntime.windDustPositions = null
     weatherRuntime.windDustSeed = null
+    weatherRuntime.windTexturePath = ''
   }
 
   function writeWeatherRainSegment(positions, index, x, y, z, config) {
@@ -2214,6 +2300,27 @@
     positions[base + 3] = x - config.rainDriftX * config.rainLength
     positions[base + 4] = y - config.rainLength
     positions[base + 5] = z - config.rainDriftZ * config.rainLength
+  }
+
+  function seedWeatherWindParticle(seed, seedIndex, positions, posIndex, bounds = {}) {
+    const halfX = Math.max(1, asNumber(bounds.halfX, 16))
+    const halfZ = Math.max(1, asNumber(bounds.halfZ, 12))
+    const resetX = bounds.resetX === true
+    positions[posIndex] = resetX ? (-halfX - Math.random() * 4.2) : ((Math.random() - 0.5) * halfX * 2)
+    positions[posIndex + 1] = 0.45 + Math.random() * 7.4
+    positions[posIndex + 2] = (Math.random() - 0.5) * halfZ * 2
+    seed[seedIndex] = 0.56 + Math.random() * 0.68
+    seed[seedIndex + 1] = Math.random() * Math.PI * 2
+    seed[seedIndex + 2] = Math.random() * Math.PI * 2
+    seed[seedIndex + 3] = 0.05 + Math.random() * 0.15
+    seed[seedIndex + 4] = (Math.random() - 0.5) * 0.28
+    seed[seedIndex + 5] = 0.12 + Math.random() * 0.28
+    seed[seedIndex + 6] = 0.2 + Math.random() * 0.65
+    seed[seedIndex + 7] = 0.6 + Math.random() * 1.8
+    seed[seedIndex + 8] = 0.8 + Math.random() * 2.4
+    seed[seedIndex + 9] = 0.35 + Math.random() * 1.35
+    seed[seedIndex + 10] = 0.14 + Math.random() * 0.18
+    seed[seedIndex + 11] = 0.18 + Math.random() * 0.26
   }
 
   function rebuildWeatherRain(config) {
@@ -2268,57 +2375,65 @@
     weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
   }
 
-  function rebuildWeatherWind(config) {
+  async function rebuildWeatherWind(config) {
     if (!weatherRuntime.group || !THREE) return
+    if (!weatherWindInstanceDummy) weatherWindInstanceDummy = new THREE.Object3D()
     if (!config.wind || config.windParticleCount <= 0) {
+      weatherRuntime.windBuildToken += 1
       disposeWeatherWind()
+      weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
       return
     }
-    if (weatherRuntime.windDust && weatherRuntime.windDustCount === config.windParticleCount && weatherRuntime.configKey === (state.layout?.weatherPreset || 'clear')) {
+    const texturePath = String(config.windParticleTexturePath || '').trim()
+    if (weatherRuntime.windDust
+      && weatherRuntime.windDustCount === config.windParticleCount
+      && weatherRuntime.configKey === (state.layout?.weatherPreset || 'clear')
+      && weatherRuntime.windTexturePath === texturePath) {
       return
     }
 
     disposeWeatherWind()
+    const buildToken = ++weatherRuntime.windBuildToken
+    const windTexture = await ensureWeatherParticleTexture(texturePath)
+    if (buildToken !== weatherRuntime.windBuildToken) return
 
     const count = Math.max(40, Math.min(800, Math.round(asNumber(config.windParticleCount, 0))))
     const positions = new Float32Array(count * 3)
-    const seed = new Float32Array(count * 5)
+    const seed = new Float32Array(count * 12)
+    const halfX = 16
+    const halfZ = 12
     for (let i = 0; i < count; i++) {
       const p = i * 3
-      const s = i * 5
-      const x = (Math.random() - 0.5) * 28
-      const y = 0.35 + Math.random() * 7.5
-      const z = (Math.random() - 0.5) * 22
-      positions[p] = x
-      positions[p + 1] = y
-      positions[p + 2] = z
-      seed[s] = x
-      seed[s + 1] = y
-      seed[s + 2] = z
-      seed[s + 3] = 0.8 + Math.random() * 0.7
-      seed[s + 4] = Math.random() * Math.PI * 2
+      const s = i * 12
+      seedWeatherWindParticle(seed, s, positions, p, { halfX, halfZ, resetX: false })
     }
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-
-    const material = new THREE.PointsMaterial({
-      color: 0xdfeaf3,
-      size: config.windParticleSpeed > 7 ? 0.18 : 0.14,
-      sizeAttenuation: true,
+    const material = new THREE.MeshBasicMaterial({
+      color: windTexture ? 0xffffff : 0xe8f1f8,
       transparent: true,
-      opacity: config.windParticleSpeed > 7 ? 0.22 : 0.16,
-      depthWrite: false
+      opacity: windTexture ? 0.82 : 0.34,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false
     })
+    if (windTexture) {
+      material.map = windTexture
+      material.alphaMap = windTexture
+      material.alphaTest = 0.12
+    }
 
-    const windDust = new THREE.Points(geometry, material)
+    const geometry = new THREE.PlaneGeometry(1, 1)
+    const windDust = new THREE.InstancedMesh(geometry, material, count)
     windDust.frustumCulled = false
     windDust.renderOrder = 3
+    windDust.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     weatherRuntime.group.add(windDust)
     weatherRuntime.windDust = windDust
     weatherRuntime.windDustCount = count
     weatherRuntime.windDustPositions = positions
     weatherRuntime.windDustSeed = seed
+    weatherRuntime.windTexturePath = texturePath
+    weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
   }
 
   function applyWeatherLightingState(flashStrength = weatherRuntime.flashStrength) {
@@ -2415,42 +2530,62 @@
   }
 
   function updateWeatherWind(config, dt, time = weatherRuntime.time) {
-    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed) return
+    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed || !weatherWindInstanceDummy) return
     const positions = weatherRuntime.windDustPositions
     const seed = weatherRuntime.windDustSeed
     const count = weatherRuntime.windDustCount
     const halfX = 16
     const halfZ = 12
     const speed = Math.max(0, asNumber(config.windParticleSpeed, 0))
+    const downSpeed = speed * 0.06
+    const gust = 0.78 + Math.sin(time * 0.85) * 0.14 + Math.sin(time * 0.31 + 0.8) * 0.08
 
     for (let i = 0; i < count; i++) {
       const p = i * 3
-      const s = i * 5
+      const s = i * 12
       let x = positions[p]
       let y = positions[p + 1]
       let z = positions[p + 2]
-      const speedMul = seed[s + 3]
-      const phase = seed[s + 4]
+      const speedMul = seed[s]
+      const phase = seed[s + 1]
+      const phaseB = seed[s + 2]
+      const fallMul = seed[s + 3]
+      const driftZ = seed[s + 4]
+      const wobbleY = seed[s + 5]
+      const wobbleZ = seed[s + 6]
+      const rotSpeedX = seed[s + 7]
+      const rotSpeedY = seed[s + 8]
+      const rotSpeedZ = seed[s + 9]
+      const scaleX = seed[s + 10]
+      const scaleY = seed[s + 11]
 
-      x += dt * speed * speedMul
-      y = seed[s + 1] + Math.sin(time * 1.8 + phase) * 0.18
-      z = seed[s + 2] + Math.cos(time * 1.35 + phase) * 0.45
+      x += dt * speed * speedMul * (0.82 + gust * 0.35)
+      y += dt * (-downSpeed * fallMul + Math.sin(time * 2.2 + phase) * wobbleY)
+      z += dt * (driftZ * speed * 0.36 + Math.cos(time * 1.45 + phaseB) * wobbleZ)
 
-      if (x > halfX + 3) {
-        x = -halfX - Math.random() * 3
-        seed[s + 1] = 0.35 + Math.random() * 7.5
-        seed[s + 2] = (Math.random() - 0.5) * halfZ * 2
-        seed[s + 3] = 0.8 + Math.random() * 0.7
-        y = seed[s + 1]
-        z = seed[s + 2]
+      if (x > halfX + 3.5 || y < -0.8 || y > 10.5 || z < -halfZ - 3 || z > halfZ + 3) {
+        seedWeatherWindParticle(seed, s, positions, p, { halfX, halfZ, resetX: true })
+        x = positions[p]
+        y = positions[p + 1]
+        z = positions[p + 2]
       }
 
       positions[p] = x
       positions[p + 1] = y
       positions[p + 2] = z
+
+      weatherWindInstanceDummy.position.set(x, y, z)
+      weatherWindInstanceDummy.rotation.set(
+        Math.sin(time * rotSpeedX + phase) * 0.8 + Math.cos(time * 1.6 + phaseB) * 0.2,
+        time * rotSpeedY + phaseB,
+        Math.sin(time * rotSpeedZ + phase) * 0.6 + driftZ * 0.9
+      )
+      weatherWindInstanceDummy.scale.set(scaleX, scaleY, 1)
+      weatherWindInstanceDummy.updateMatrix()
+      weatherRuntime.windDust.setMatrixAt(i, weatherWindInstanceDummy.matrix)
     }
 
-    weatherRuntime.windDust.geometry.attributes.position.needsUpdate = true
+    weatherRuntime.windDust.instanceMatrix.needsUpdate = true
   }
 
   function updateWeatherAffectedGroups(config, time = 0) {
@@ -2489,7 +2624,7 @@
       weatherRuntime.lightningCooldown = 2.8
     }
     rebuildWeatherRain(config)
-    rebuildWeatherWind(config)
+    void rebuildWeatherWind(config)
     syncWeatherInputs()
     applyWeatherLightingState(0)
     updateWeatherAffectedGroups(config, weatherRuntime.time)
@@ -5445,6 +5580,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (String(payload?.videoScreen?.path || '').startsWith('blob:')) payload.videoScreen.path = ''
       if (String(payload?.customModelPath || '').startsWith('blob:')) payload.customModelPath = ''
       if (String(payload?.entranceParticle?.path || '').startsWith('blob:')) payload.entranceParticle.path = ''
+      if (String(payload?.weather?.particleTexturePath || '').startsWith('blob:')) payload.weather.particleTexturePath = ''
     }
     return payload
   }
@@ -6151,6 +6287,56 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     setStatus('已导入出场粒子特效')
   }
 
+  async function importWeatherParticleTexture() {
+    let selectedPath = ''
+    try {
+      if (window.electronAPI && window.electronAPI.selectFileWithFilter) {
+        const result = await window.electronAPI.selectFileWithFilter({
+          filters: [{ name: '图片', extensions: ['png', 'webp', 'jpg', 'jpeg'] }]
+        })
+        if (result && result.success && result.path) selectedPath = result.path
+      } else {
+        const picked = await selectAssetPathForBrowser({
+          accept: '.png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg',
+          preferredExtensions: ['.png', '.webp', '.jpg', '.jpeg'],
+          promptText: '请输入风粒子图片 URL（推荐透明 PNG / WebP）:',
+          defaultValue: state.layout?.weather?.particleTexturePath || ''
+        })
+        if (picked && picked.path) selectedPath = picked.path
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 选择风粒子图片失败:', error)
+    }
+    if (!selectedPath) {
+      const input = window.prompt('请输入风粒子图片路径(URL 或本地路径，推荐透明 PNG / WebP):', state.layout?.weather?.particleTexturePath || '')
+      if (!input) return
+      selectedPath = input.trim()
+    }
+    if (!selectedPath) return
+    selectedPath = await importAssetForPack(selectedPath, 'single')
+    const texture = await ensureWeatherParticleTexture(selectedPath)
+    if (!texture) {
+      window.alert('风粒子图片加载失败，请确认文件存在且为可用图片格式')
+      return
+    }
+    const next = ensureWeatherSettings()
+    next.particleTexturePath = selectedPath
+    syncWeatherInputs()
+    applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
+    scheduleSaveLayout()
+    setStatus('已导入风粒子图片')
+  }
+
+  function clearWeatherParticleTexture() {
+    const next = ensureWeatherSettings()
+    next.particleTexturePath = ''
+    disposeWeatherParticleTextureAsset()
+    syncWeatherInputs()
+    applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
+    scheduleSaveLayout()
+    setStatus('已恢复默认风粒子白块')
+  }
+
   function clearEntranceParticle() {
     if (!state.layout.entranceParticle) state.layout.entranceParticle = { path: '' }
     state.layout.entranceParticle.path = ''
@@ -6183,6 +6369,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.customModelClearBtn) dom.customModelClearBtn.addEventListener('click', clearCustomModel)
     if (dom.particleImportBtn) dom.particleImportBtn.addEventListener('click', importEntranceParticle)
     if (dom.particleClearBtn) dom.particleClearBtn.addEventListener('click', clearEntranceParticle)
+    if (dom.weatherParticleTextureImportBtn) dom.weatherParticleTextureImportBtn.addEventListener('click', importWeatherParticleTexture)
+    if (dom.weatherParticleTextureClearBtn) dom.weatherParticleTextureClearBtn.addEventListener('click', clearWeatherParticleTexture)
     if (dom.videoImportBtn) dom.videoImportBtn.addEventListener('click', importVideoScreen)
     if (dom.videoClearBtn) dom.videoClearBtn.addEventListener('click', clearVideoScreen)
     if (dom.applyVideoSettingsBtn) dom.applyVideoSettingsBtn.addEventListener('click', applyVideoSettingsFromInputs)
@@ -6329,6 +6517,16 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     if (dom.weatherWindIntensity) {
       dom.weatherWindIntensity.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherParticleDensity) {
+      dom.weatherParticleDensity.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherParticleSpeed) {
+      dom.weatherParticleSpeed.addEventListener('change', () => {
         applyWeatherSettingsFromInputs(true)
       })
     }

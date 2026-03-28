@@ -113,7 +113,6 @@ const electronAPI = {
   directorSyncGetSettings: () => ipcRenderer.invoke('director-sync:get-settings'),
   directorSyncSetSettings: (patch) => ipcRenderer.invoke('director-sync:set-settings', patch),
   directorSyncGetStatus: () => ipcRenderer.invoke('director-sync:get-status'),
-  directorSyncDiscover: () => ipcRenderer.invoke('director-sync:discover'),
   directorSyncReconnect: () => ipcRenderer.invoke('director-sync:reconnect'),
   directorSyncDisconnect: () => ipcRenderer.invoke('director-sync:disconnect'),
   onDirectorSyncStatus: (callback) => ipcRenderer.on('director-sync-status', (event, status) => callback(status)),
@@ -148,7 +147,6 @@ const electronAPI = {
 
   // 本地前台（仅前台窗口）
   openLocalFrontend: () => ipcRenderer.invoke('open-local-frontend'),
-  openLocalBpGuide: () => ipcRenderer.invoke('open-local-bp-guide'),
   openCustomFrontendWindow: (windowId) => ipcRenderer.invoke('open-custom-frontend-window', windowId),
   closeCustomFrontendWindow: (windowId) => ipcRenderer.invoke('close-custom-frontend-window', windowId),
 
@@ -237,9 +235,6 @@ const electronAPI = {
   // 应用控制
   restartApp: () => ipcRenderer.invoke('app-restart'),
   notifyMainUiBootstrapReady: () => ipcRenderer.invoke('main-ui-bootstrap-ready'),
-  getMainOnboardingStatus: () => ipcRenderer.invoke('main-onboarding:get-status'),
-  markMainOnboardingSeen: (status) => ipcRenderer.invoke('main-onboarding:mark-seen', status),
-  resetMainOnboardingSeen: () => ipcRenderer.invoke('main-onboarding:reset'),
 
   // 应用更新
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
@@ -282,7 +277,7 @@ const electronAPI = {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   selectFileWithFilter: (options) => ipcRenderer.invoke('select-file', options),
   importBundledAsset: (filePath, options) => ipcRenderer.invoke('localBp:importBundledAsset', filePath, options),
-  readBinaryFile: (filePath, options) => ipcRenderer.invoke('read-binary-file', filePath, options),
+  readBinaryFile: (filePath) => ipcRenderer.invoke('read-binary-file', filePath),
   saveModelConfig: (config) => ipcRenderer.invoke('save-model-config', config),
   getModelConfig: () => ipcRenderer.invoke('get-model-config'),
   scanModels: (dir) => ipcRenderer.invoke('scan-models', dir),
