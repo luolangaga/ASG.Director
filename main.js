@@ -5980,6 +5980,16 @@ let localBpState = {
     transparentBackground: true,
     environmentPreset: 'duskCinema',
     qualityPreset: 'high',
+    weatherPreset: 'clear',
+    weather: {
+      windIntensity: 1.35,
+      particleDensity: 1,
+      particleSpeed: 0.6,
+      particleMaxDistance: 12,
+      particleTexturePath: '',
+      audioEnabled: true,
+      audioVolume: 0.65
+    },
     droneMode: false,
     maxFps: 60,
     fogEnabled: true,
@@ -6024,7 +6034,8 @@ let localBpState = {
     },
     camera: {
       position: { x: 0, y: 2, z: 8 },
-      target: { x: 0, y: 1, z: 0 }
+      target: { x: 0, y: 1, z: 0 },
+      fov: 45
     },
     cameraTransitionMs: 900,
     cameraKeyframes: {
@@ -6032,7 +6043,8 @@ let localBpState = {
       survivor2: null,
       survivor3: null,
       survivor4: null,
-      hunterSelected: null
+      hunterSelected: null,
+      banUpdated: null
     }
   }
 }
@@ -6094,6 +6106,31 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.qualityPreset = (m3d.qualityPreset === 'low' || m3d.qualityPreset === 'medium' || m3d.qualityPreset === 'high' || m3d.qualityPreset === 'cinematic')
     ? m3d.qualityPreset
     : 'high'
+  m3d.weatherPreset = (m3d.weatherPreset === 'thunderstorm'
+    || m3d.weatherPreset === 'windy'
+    || m3d.weatherPreset === 'stormWindy')
+    ? m3d.weatherPreset
+    : 'clear'
+  if (!m3d.weather || typeof m3d.weather !== 'object') m3d.weather = {}
+  m3d.weather.windIntensity = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.weather.windIntensity))
+    ? Number(m3d.weather.windIntensity)
+    : 1.35))
+  m3d.weather.particleDensity = Math.max(0, Math.min(4, Number.isFinite(Number(m3d.weather.particleDensity))
+    ? Number(m3d.weather.particleDensity)
+    : 1))
+  m3d.weather.particleSpeed = Math.max(0, Math.min(3, Number.isFinite(Number(m3d.weather.particleSpeed))
+    ? Number(m3d.weather.particleSpeed)
+    : 0.6))
+  m3d.weather.particleMaxDistance = Math.max(2, Math.min(40, Number.isFinite(Number(m3d.weather.particleMaxDistance))
+    ? Number(m3d.weather.particleMaxDistance)
+    : 12))
+  m3d.weather.particleTexturePath = (typeof m3d.weather.particleTexturePath === 'string')
+    ? m3d.weather.particleTexturePath
+    : ''
+  m3d.weather.audioEnabled = m3d.weather.audioEnabled !== false
+  m3d.weather.audioVolume = Math.max(0, Math.min(1, Number.isFinite(Number(m3d.weather.audioVolume))
+    ? Number(m3d.weather.audioVolume)
+    : 0.65))
   m3d.maxFps = Math.max(10, Math.min(240, Number.isFinite(Number(m3d.maxFps)) ? Number(m3d.maxFps) : 60))
   m3d.droneMode = !!m3d.droneMode
   m3d.fogEnabled = m3d.fogEnabled !== false
@@ -6177,9 +6214,10 @@ function __normalizeLocalBpStateInPlace__() {
   if (!m3d.camera || typeof m3d.camera !== 'object') m3d.camera = {}
   m3d.camera.position = ensureVec3(m3d.camera.position, { x: 0, y: 2, z: 8 })
   m3d.camera.target = ensureVec3(m3d.camera.target, { x: 0, y: 1, z: 0 })
+  m3d.camera.fov = Math.max(12, Math.min(80, Number.isFinite(Number(m3d.camera.fov)) ? Number(m3d.camera.fov) : 45))
   m3d.cameraTransitionMs = Math.max(50, Math.min(10000, Number.isFinite(Number(m3d.cameraTransitionMs)) ? Number(m3d.cameraTransitionMs) : 900))
   if (!m3d.cameraKeyframes || typeof m3d.cameraKeyframes !== 'object') m3d.cameraKeyframes = {}
-  const cameraEventKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunterSelected']
+  const cameraEventKeys = ['survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunterSelected', 'banUpdated']
   for (const key of cameraEventKeys) {
     const frame = m3d.cameraKeyframes[key]
     if (!frame || typeof frame !== 'object') {
@@ -6188,7 +6226,8 @@ function __normalizeLocalBpStateInPlace__() {
     }
     m3d.cameraKeyframes[key] = {
       position: ensureVec3(frame.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 })
+      target: ensureVec3(frame.target, { x: 0, y: 1, z: 0 }),
+      fov: Math.max(12, Math.min(80, Number.isFinite(Number(frame.fov)) ? Number(frame.fov) : 45))
     }
   }
 }
@@ -8021,7 +8060,8 @@ function normalizeCharacterModel3DLayoutInput(input) {
     if (!v || typeof v !== 'object') return null
     return {
       position: ensureVec3(v.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 })
+      target: ensureVec3(v.target, { x: 0, y: 1, z: 0 }),
+      fov: Math.max(12, Math.min(80, Number.isFinite(Number(v.fov)) ? Number(v.fov) : 45))
     }
   }
 
@@ -8038,6 +8078,30 @@ function normalizeCharacterModel3DLayoutInput(input) {
     qualityPreset: (base.qualityPreset === 'low' || base.qualityPreset === 'medium' || base.qualityPreset === 'high' || base.qualityPreset === 'cinematic')
       ? base.qualityPreset
       : 'high',
+    weatherPreset: (base.weatherPreset === 'thunderstorm'
+      || base.weatherPreset === 'windy'
+      || base.weatherPreset === 'stormWindy')
+      ? base.weatherPreset
+      : 'clear',
+    weather: {
+      windIntensity: Math.max(0, Math.min(3, Number.isFinite(Number(base?.weather?.windIntensity))
+        ? Number(base.weather.windIntensity)
+        : 1.35)),
+      particleDensity: Math.max(0, Math.min(4, Number.isFinite(Number(base?.weather?.particleDensity))
+        ? Number(base.weather.particleDensity)
+        : 1)),
+      particleSpeed: Math.max(0, Math.min(3, Number.isFinite(Number(base?.weather?.particleSpeed))
+        ? Number(base.weather.particleSpeed)
+        : 0.6)),
+      particleMaxDistance: Math.max(2, Math.min(40, Number.isFinite(Number(base?.weather?.particleMaxDistance))
+        ? Number(base.weather.particleMaxDistance)
+        : 12)),
+      particleTexturePath: typeof base?.weather?.particleTexturePath === 'string' ? base.weather.particleTexturePath : '',
+      audioEnabled: base?.weather?.audioEnabled !== false,
+      audioVolume: Math.max(0, Math.min(1, Number.isFinite(Number(base?.weather?.audioVolume))
+        ? Number(base.weather.audioVolume)
+        : 0.65))
+    },
     maxFps: Math.max(10, Math.min(240, Number.isFinite(Number(base.maxFps)) ? Number(base.maxFps) : 60)),
     droneMode: !!base.droneMode,
     fogEnabled: base.fogEnabled !== false,
@@ -8104,7 +8168,8 @@ function normalizeCharacterModel3DLayoutInput(input) {
     },
     camera: {
       position: ensureVec3(base?.camera?.position, { x: 0, y: 2, z: 8 }),
-      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 })
+      target: ensureVec3(base?.camera?.target, { x: 0, y: 1, z: 0 }),
+      fov: Math.max(12, Math.min(80, Number.isFinite(Number(base?.camera?.fov)) ? Number(base.camera.fov) : 45))
     },
     cameraTransitionMs: Math.max(50, Math.min(10000, Number.isFinite(Number(base.cameraTransitionMs)) ? Number(base.cameraTransitionMs) : 900)),
     cameraKeyframes: {
@@ -8112,7 +8177,8 @@ function normalizeCharacterModel3DLayoutInput(input) {
       survivor2: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor2),
       survivor3: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor3),
       survivor4: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor4),
-      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected)
+      hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected),
+      banUpdated: normalizeCameraKeyframe(base?.cameraKeyframes?.banUpdated)
     }
   }
 

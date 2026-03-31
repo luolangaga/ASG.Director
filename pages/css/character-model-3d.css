@@ -557,6 +557,179 @@ body.render-mode .fps-badge {
   width: min(860px, calc(100vw - 32px));
 }
 
+.block-event-modal {
+  width: min(1320px, calc(100vw - 32px));
+}
+
+.block-event-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.block-event-modal-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(44, 118, 255, 0.12);
+  border: 1px solid rgba(104, 170, 255, 0.24);
+  color: rgba(228, 239, 255, 0.92);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.block-event-workspace-pane,
+.block-event-side-pane {
+  min-width: 0;
+}
+
+.blockly-workspace {
+  width: 100%;
+  min-height: 560px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  background: rgba(10, 14, 22, 0.96);
+}
+
+.block-rule-editor {
+  padding: 14px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.block-rule-empty {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(227, 238, 250, 0.88);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.block-rule-list {
+  display: grid;
+  gap: 14px;
+}
+
+.block-rule-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.block-rule-event {
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(255, 159, 67, 0.32), rgba(255, 159, 67, 0.16));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.block-rule-actions {
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.block-rule-head,
+.block-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.block-rule-title,
+.block-action-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 245, 232, 0.96);
+}
+
+.block-action-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(56, 168, 255, 0.22), rgba(56, 168, 255, 0.1));
+  border: 1px solid rgba(96, 190, 255, 0.18);
+}
+
+.block-form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.block-form-grid label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.block-form-grid .btn {
+  align-self: center;
+}
+
+.block-action-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(217, 231, 248, 0.84);
+}
+
+.block-shot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.block-shot-list {
+  display: grid;
+  gap: 10px;
+}
+
+.block-shot-card {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.block-shot-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.block-shot-card input[type="text"] {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.block-shot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.block-shot-meta {
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(220, 232, 247, 0.82);
+  white-space: pre-line;
+}
+
 .curve-editor-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;
@@ -602,5 +775,13 @@ body.render-mode .fps-badge {
 
   .curve-editor-shell {
     grid-template-columns: 1fr;
+  }
+
+  .block-event-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .blockly-workspace {
+    min-height: 420px;
   }
 }
