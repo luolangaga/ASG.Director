@@ -2736,8 +2736,14 @@
     weatherRuntime.rain.geometry.attributes.position.needsUpdate = true
   }
 
+let _windMatrixLocal = null
+  let _windQuatLocal = null
+  let _windPosLocal = null
+  let _windScaleLocal = null
+  let _windEulerLocal = null
+
   function updateWeatherWind(config, dt, time = weatherRuntime.time) {
-    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed || !weatherWindInstanceDummy) return
+    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed) return
     const positions = weatherRuntime.windDustPositions
     const seed = weatherRuntime.windDustSeed
     const count = weatherRuntime.windDustCount
@@ -2749,6 +2755,20 @@
     const cameraPos = camera ? camera.position : null
     const downSpeed = speed * 0.06
     const gust = 0.78 + Math.sin(time * 0.85) * 0.14 + Math.sin(time * 0.31 + 0.8) * 0.08
+
+    if (!_windMatrixLocal) {
+      _windMatrixLocal = new THREE.Matrix4()
+      _windQuatLocal = new THREE.Quaternion()
+      _windPosLocal = new THREE.Vector3()
+      _windScaleLocal = new THREE.Vector3()
+      _windEulerLocal = new THREE.Euler()
+    }
+    const matrix = _windMatrixLocal
+    const quat = _windQuatLocal
+    const pos = _windPosLocal
+    const scale = _windScaleLocal
+    const euler = _windEulerLocal
+    const windDust = weatherRuntime.windDust
 
     for (let i = 0; i < count; i++) {
       const p = i * 3
@@ -2790,23 +2810,24 @@
       const distSq = cameraPos ? (dx * dx + dy * dy + dz * dz) : 0
       const visible = !cameraPos || distSq <= maxDistanceSq
 
-      weatherWindInstanceDummy.position.set(x, y, z)
+      pos.set(x, y, z)
       if (visible) {
-        weatherWindInstanceDummy.rotation.set(
+        euler.set(
           Math.sin(time * rotSpeedX + phase) * 0.8 + Math.cos(time * 1.6 + phaseB) * 0.2,
           time * rotSpeedY + phaseB,
           Math.sin(time * rotSpeedZ + phase) * 0.6 + driftZ * 0.9
         )
-        weatherWindInstanceDummy.scale.set(scaleX, scaleY, 1)
+        quat.setFromEuler(euler)
+        scale.set(scaleX, scaleY, 1)
       } else {
-        weatherWindInstanceDummy.rotation.set(0, 0, 0)
-        weatherWindInstanceDummy.scale.set(0.0001, 0.0001, 0.0001)
+        quat.set(0, 0, 0, 1)
+        scale.set(0.0001, 0.0001, 0.0001)
       }
-      weatherWindInstanceDummy.updateMatrix()
-      weatherRuntime.windDust.setMatrixAt(i, weatherWindInstanceDummy.matrix)
+      matrix.compose(pos, quat, scale)
+      windDust.setMatrixAt(i, matrix)
     }
 
-    weatherRuntime.windDust.instanceMatrix.needsUpdate = true
+    windDust.instanceMatrix.needsUpdate = true
   }
 
   function updateWeatherAffectedGroups(config, time = 0) {
@@ -3869,12 +3890,10 @@
     const cfg = ensureBlockEventState()
     if (!cfg.cameraShots || typeof cfg.cameraShots !== 'object' || Array.isArray(cfg.cameraShots)) cfg.cameraShots = {}
     cfg.rules = cfg.rules.map((rule, index) => normalizeBlockEventRule(rule, index)).filter(Boolean)
-    if (!cfg.rules.length) {
-      cfg.rules = [createDefaultBlockEventRule()]
-    }
+    // 不再自动添加默认规则，允许用户清空所有规则
     cfg.rules.forEach((rule) => {
-      if (!Array.isArray(rule.actions) || !rule.actions.length) {
-        rule.actions = [createDefaultBlockEventAction('wait')]
+      if (!Array.isArray(rule.actions)) {
+        rule.actions = []
       }
     })
     return cfg
@@ -3951,11 +3970,11 @@
 
   function refreshBlockEventSummary() {
     if (!dom.blockEventSummary) return
-    const cfg = healBlockEventConfig()
+    const cfg = ensureBlockEventState()
     const entries = getBlockCameraShotEntries()
     dom.blockEventSummary.textContent = cfg.enabled
-      ? `积木事件: 已启用 / ${cfg.rules.length} 条规则 / ${entries.length} 个镜头点位`
-      : `积木事件: 已关闭 / ${cfg.rules.length} 条规则 / ${entries.length} 个镜头点位`
+      ? `积木事件: 已启用 / ${(cfg.rules || []).length} 条规则 / ${entries.length} 个镜头点位`
+      : `积木事件: 已关闭 / ${(cfg.rules || []).length} 条规则 / ${entries.length} 个镜头点位`
   }
 
   function rerenderBlocklyWorkspace() {
@@ -4098,11 +4117,15 @@
 
   function renderBlockEventRuleEditor() {
     if (!dom.blocklyWorkspace) return
-    const cfg = healBlockEventConfig()
+    const cfg = ensureBlockEventState()
+    // 只在首次或规则为空且不需要删除操作时才调用 heal
+    if (!Array.isArray(cfg.rules) || !cfg.rules.length) {
+      // 不强制添加默认规则，让用户可以清空
+    }
     dom.blocklyWorkspace.innerHTML = ''
     const rules = Array.isArray(cfg.rules) ? cfg.rules : []
     if (!rules.length) {
-      dom.blocklyWorkspace.innerHTML = '<div class="block-rule-empty">还没有事件积木。点击上方“新增事件积木”，或者直接点“清空积木区”恢复为默认模板。默认模板会从“选择第 1 个求生者”开始，方便你立刻改。</div>'
+      dom.blocklyWorkspace.innerHTML = '<div class="block-rule-empty">还没有事件积木。点击上方"新增事件积木"，或者直接点"清空积木区"恢复为默认模板。默认模板会从"选择第 1 个求生者"开始，方便你立刻改。</div>'
       return
     }
     const list = document.createElement('div')
@@ -4122,10 +4145,14 @@
       deleteRuleBtn.className = 'btn'
       deleteRuleBtn.type = 'button'
       deleteRuleBtn.textContent = '删除事件积木'
-      deleteRuleBtn.addEventListener('click', () => {
-        cfg.rules = cfg.rules.filter(item => item.id !== rule.id)
+      deleteRuleBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        const currentCfg = ensureBlockEventState()
+        currentCfg.rules = currentCfg.rules.filter(item => item.id !== rule.id)
         renderBlockEventRuleEditor()
         saveBlockEventWorkspaceToLayout(true)
+        refreshBlockEventSummary()
         setBlockEventModalStatus('已删除一个事件积木。')
       })
       eventHead.appendChild(title)
@@ -4251,10 +4278,17 @@
       addActionBtn.className = 'btn'
       addActionBtn.type = 'button'
       addActionBtn.textContent = '新增动作积木'
-      addActionBtn.addEventListener('click', () => {
-        rule.actions.push(createDefaultBlockEventAction('wait'))
+      addActionBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        const currentRule = getBlockEventRuleById(rule.id)
+        if (currentRule) {
+          if (!Array.isArray(currentRule.actions)) currentRule.actions = []
+          currentRule.actions.push(createDefaultBlockEventAction('wait'))
+        }
         renderBlockEventRuleEditor()
         saveBlockEventWorkspaceToLayout(true)
+        refreshBlockEventSummary()
         setBlockEventModalStatus('已添加一个动作积木。')
       })
       actionsHead.appendChild(actionsTitle)
@@ -4279,10 +4313,16 @@
           removeActionBtn.className = 'btn'
           removeActionBtn.type = 'button'
           removeActionBtn.textContent = '删除动作'
-          removeActionBtn.addEventListener('click', () => {
-            rule.actions = rule.actions.filter(item => item.id !== action.id)
+          removeActionBtn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            const currentRule = getBlockEventRuleById(rule.id)
+            if (currentRule && Array.isArray(currentRule.actions)) {
+              currentRule.actions = currentRule.actions.filter(item => item.id !== action.id)
+            }
             renderBlockEventRuleEditor()
             saveBlockEventWorkspaceToLayout(true)
+            refreshBlockEventSummary()
             setBlockEventModalStatus('已删除一个动作积木。')
           })
           actionHead.appendChild(actionTitle)
@@ -6048,7 +6088,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (cached && !/^https?:\/\//i.test(cached)) return cached
     }
 
-    // 1) 强制优先从本机 official-models 目录解析
+    // 1) 强制优先从本机 official-models 目录解析 (Electron 环境)
     try {
       if (window.electronAPI && window.electronAPI.invoke) {
         const res = await window.electronAPI.invoke('localBp:getOfficialModelLocalPath', roleName)
@@ -6065,15 +6105,64 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       console.warn('[CharacterModel3D] 获取本地官方模型失败:', roleName, error)
     }
 
+    // 2) 浏览器模式：通过 HTTP API 获取模型映射
+    if (runtimeEnv.isBrowserHosted && window.location.protocol.startsWith('http')) {
+      try {
+        // 每次都重新获取模型映射，确保数据最新
+        const mapRes = await fetch('/api/official-model-map')
+        if (mapRes.ok) {
+          const mapData = await mapRes.json()
+          if (mapData && typeof mapData === 'object' && Object.keys(mapData).length > 0) {
+            state.officialModelMap = mapData
+            state.officialModelMapLoaded = true
+            // 尝试多种匹配方式
+            const mappedPath = mapData[roleName] || mapData[clean] || ''
+            if (mappedPath) {
+              state.roleModelPathCache[cacheKey] = mappedPath
+              return mappedPath
+            }
+            // 模糊匹配：遍历映射表查找包含角色名的条目
+            for (const [key, path] of Object.entries(mapData)) {
+              if (key.includes(clean) || key.includes(roleName) || clean.includes(key) || roleName.includes(key)) {
+                state.roleModelPathCache[cacheKey] = path
+                return path
+              }
+            }
+          }
+        }
+        // 直接尝试标准路径格式
+        const nameToUse = clean || roleName
+        const encodedName = encodeURIComponent(nameToUse)
+        const standardPaths = [
+          `/official-models/${encodedName}/${encodedName}.glb`,
+          `/official-models/${encodedName}/${encodedName}.gltf`,
+          `/official-models/${encodedName}.glb`,
+          `/official-models/${encodedName}.gltf`
+        ]
+        for (const testPath of standardPaths) {
+          try {
+            const headRes = await fetch(testPath, { method: 'HEAD' })
+            if (headRes.ok) {
+              state.roleModelPathCache[cacheKey] = testPath
+              return testPath
+            }
+          } catch { /* ignore */ }
+        }
+      } catch (error) {
+        console.warn('[CharacterModel3D] 浏览器模式获取官方模型失败:', roleName, error)
+      }
+    }
+
+    // 3) 从已加载的映射中查找
     const directMap = state.officialModelMap && typeof state.officialModelMap === 'object'
-      ? (state.officialModelMap[clean] || state.officialModelMap[roleName] || '')
+      ? (state.officialModelMap[roleName] || state.officialModelMap[clean] || '')
       : ''
     if (typeof directMap === 'string' && directMap.trim()) {
       state.roleModelPathCache[cacheKey] = directMap.trim()
       return directMap.trim()
     }
 
-    // 2) 浏览器模式允许显式配置的 HTTP(S) / blob URL / 相对路径映射
+    // 4) 浏览器模式允许显式配置的 HTTP(S) / blob URL / 相对路径映射
     return ''
   }
 

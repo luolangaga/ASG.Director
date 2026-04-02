@@ -1516,6 +1516,44 @@ function localPagesHandleApi(req, res, pathname) {
     return
   }
 
+  if (pathname === '/api/official-model-map') {
+    try {
+      const modelsDir = path.join(userDataPath, 'official-models')
+      const map = {}
+      if (fs.existsSync(modelsDir)) {
+        const files = fs.readdirSync(modelsDir)
+        for (const file of files) {
+          const fullPath = path.join(modelsDir, file)
+          let stat = null
+          try { stat = fs.statSync(fullPath) } catch { continue }
+          if (stat.isDirectory()) {
+            // 目录模式：查找目录内的模型文件
+            try {
+              const dirFiles = fs.readdirSync(fullPath)
+              const modelFiles = dirFiles.filter(f => /\.(gltf|glb|pmx)$/i.test(f))
+              if (modelFiles.length > 0) {
+                // 优先使用与目录名相同的文件
+                const preferredFile = modelFiles.find(f => path.basename(f, path.extname(f)) === file) || modelFiles[0]
+                map[file] = `/official-models/${encodeURIComponent(file)}/${encodeURIComponent(preferredFile)}`
+              }
+            } catch {}
+          } else if (/\.(gltf|glb|pmx)$/i.test(file)) {
+            // 文件模式：直接使用文件名
+            const name = path.basename(file, path.extname(file))
+            map[name] = `/official-models/${encodeURIComponent(file)}`
+          }
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify(map))
+    } catch (e) {
+      console.warn('[LocalPages] 获取官方模型映射失败:', e)
+      res.writeHead(200)
+      res.end('{}')
+    }
+    return
+  }
+
   if (pathname === '/api/local-bp-state') {
     res.writeHead(200)
     res.end(JSON.stringify({ success: true, data: localBpState || null }))
@@ -6158,6 +6196,12 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
     : Number.isFinite(Number(m3d?.slots?.hunter?.scale?.x)) ? Number(m3d.slots.hunter.scale.x) : 1.1)
+  if (!m3d.roleScaleOverrides || typeof m3d.roleScaleOverrides !== 'object') m3d.roleScaleOverrides = {}
+  for (const rsk of Object.keys(m3d.roleScaleOverrides)) {
+    const rsv = Number(m3d.roleScaleOverrides[rsk])
+    if (!Number.isFinite(rsv) || rsv <= 0) delete m3d.roleScaleOverrides[rsk]
+    else m3d.roleScaleOverrides[rsk] = Math.max(0.001, rsv)
+  }
   if (!m3d.videoScreen || typeof m3d.videoScreen !== 'object') m3d.videoScreen = {}
   m3d.videoScreen.path = (typeof m3d.videoScreen.path === 'string') ? m3d.videoScreen.path : ''
   m3d.videoScreen.loop = m3d.videoScreen.loop !== false
@@ -6230,6 +6274,45 @@ function __normalizeLocalBpStateInPlace__() {
       fov: Math.max(12, Math.min(80, Number.isFinite(Number(frame.fov)) ? Number(frame.fov) : 45))
     }
   }
+
+  // 积木事件 blockEvents 规范化
+  if (!m3d.blockEvents || typeof m3d.blockEvents !== 'object') m3d.blockEvents = {}
+  m3d.blockEvents.enabled = m3d.blockEvents.enabled === true
+  if (!m3d.blockEvents.cameraShots || typeof m3d.blockEvents.cameraShots !== 'object' || Array.isArray(m3d.blockEvents.cameraShots)) {
+    m3d.blockEvents.cameraShots = {}
+  }
+  const shotKeys = Object.keys(m3d.blockEvents.cameraShots)
+  for (const shotKey of shotKeys) {
+    const shot = m3d.blockEvents.cameraShots[shotKey]
+    if (!shot || typeof shot !== 'object' || !shot.id) {
+      delete m3d.blockEvents.cameraShots[shotKey]
+      continue
+    }
+    shot.name = (typeof shot.name === 'string' && shot.name.trim()) ? shot.name.trim() : shot.id
+    shot.position = ensureVec3(shot.position, { x: 0, y: 2, z: 8 })
+    shot.target = ensureVec3(shot.target, { x: 0, y: 1, z: 0 })
+    shot.fov = Math.max(12, Math.min(80, Number.isFinite(Number(shot.fov)) ? Number(shot.fov) : 45))
+  }
+  if (!Array.isArray(m3d.blockEvents.rules)) m3d.blockEvents.rules = []
+  m3d.blockEvents.rules = m3d.blockEvents.rules.filter(rule => rule && typeof rule === 'object' && rule.id).map((rule) => {
+    if (typeof rule.eventType !== 'string') rule.eventType = 'page_init'
+    rule.survivorIndex = Math.max(1, Math.min(4, Math.round(Number.isFinite(Number(rule.survivorIndex)) ? Number(rule.survivorIndex) : 1)))
+    rule.banSide = rule.banSide === 'hunter' ? 'hunter' : 'survivor'
+    rule.banScope = rule.banScope === 'global' ? 'global' : (rule.banScope === 'round' ? 'round' : 'any')
+    rule.banCount = Math.max(1, Math.min(8, Math.round(Number.isFinite(Number(rule.banCount)) ? Number(rule.banCount) : 1)))
+    if (!Array.isArray(rule.actions)) rule.actions = []
+    rule.actions = rule.actions.filter(a => a && typeof a === 'object' && a.id).map((action) => {
+      if (typeof action.type !== 'string') action.type = 'wait'
+      if (typeof action.shotId !== 'string') action.shotId = ''
+      action.durationMs = Math.max(50, Math.min(10000, Math.round(Number.isFinite(Number(action.durationMs)) ? Number(action.durationMs) : 900)))
+      if (typeof action.eventKey !== 'string') action.eventKey = 'survivor1'
+      if (action.cameraMode !== 'virtual_on' && action.cameraMode !== 'virtual_off') action.cameraMode = 'virtual_toggle'
+      if (typeof action.weatherPreset !== 'string') action.weatherPreset = 'clear'
+      action.waitSeconds = Math.max(0, Math.min(60, Number.isFinite(Number(action.waitSeconds)) ? Number(action.waitSeconds) : 1))
+      return action
+    })
+    return rule
+  })
 }
 
 function __readLayoutJsonSafe__() {
@@ -8045,6 +8128,94 @@ ipcMain.handle('localBp:setCharacterDisplayTransparentBackground', (event, enabl
   }
 })
 
+function normalizeBlockEventShotInput(src) {
+  if (!src || typeof src !== 'object') return null
+  const id = String(src.id || '').trim()
+  if (!id) return null
+  const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
+    const s = (v && typeof v === 'object') ? v : {}
+    return {
+      x: Number.isFinite(Number(s.x)) ? Number(s.x) : fallback.x,
+      y: Number.isFinite(Number(s.y)) ? Number(s.y) : fallback.y,
+      z: Number.isFinite(Number(s.z)) ? Number(s.z) : fallback.z
+    }
+  }
+  return {
+    id,
+    name: String(src.name || id).trim() || id,
+    position: ensureVec3(src.position, { x: 0, y: 2, z: 8 }),
+    target: ensureVec3(src.target, { x: 0, y: 1, z: 0 }),
+    fov: Math.max(12, Math.min(80, Number.isFinite(Number(src.fov)) ? Number(src.fov) : 45))
+  }
+}
+
+function normalizeBlockEventActionInput(action) {
+  if (!action || typeof action !== 'object') return null
+  const id = String(action.id || '').trim()
+  if (!id) return null
+  return {
+    id,
+    type: typeof action.type === 'string' ? action.type : 'wait',
+    shotId: typeof action.shotId === 'string' ? action.shotId : '',
+    durationMs: Math.max(50, Math.min(10000, Math.round(Number.isFinite(Number(action.durationMs)) ? Number(action.durationMs) : 900))),
+    eventKey: typeof action.eventKey === 'string' ? action.eventKey : 'survivor1',
+    cameraMode: action.cameraMode === 'virtual_on' || action.cameraMode === 'virtual_off' || action.cameraMode === 'virtual_toggle' ? action.cameraMode : 'virtual_toggle',
+    weatherPreset: typeof action.weatherPreset === 'string' ? action.weatherPreset : 'clear',
+    waitSeconds: Math.max(0, Math.min(60, Number.isFinite(Number(action.waitSeconds)) ? Number(action.waitSeconds) : 1))
+  }
+}
+
+function normalizeBlockEventRuleInput(rule) {
+  if (!rule || typeof rule !== 'object') return null
+  const id = String(rule.id || '').trim()
+  if (!id) return null
+  const actions = Array.isArray(rule.actions)
+    ? rule.actions.map(normalizeBlockEventActionInput).filter(Boolean)
+    : []
+  return {
+    id,
+    eventType: typeof rule.eventType === 'string' ? rule.eventType : 'page_init',
+    survivorIndex: Math.max(1, Math.min(4, Math.round(Number.isFinite(Number(rule.survivorIndex)) ? Number(rule.survivorIndex) : 1))),
+    banSide: rule.banSide === 'hunter' ? 'hunter' : 'survivor',
+    banScope: rule.banScope === 'global' ? 'global' : (rule.banScope === 'round' ? 'round' : 'any'),
+    banCount: Math.max(1, Math.min(8, Math.round(Number.isFinite(Number(rule.banCount)) ? Number(rule.banCount) : 1))),
+    actions
+  }
+}
+
+function normalizeBlockEventsInput(input) {
+  if (!input || typeof input !== 'object') {
+    return { enabled: false, rules: [], cameraShots: {} }
+  }
+  const rawShots = (input.cameraShots && typeof input.cameraShots === 'object') ? input.cameraShots : {}
+  const cameraShots = {}
+  for (const key of Object.keys(rawShots)) {
+    const shot = normalizeBlockEventShotInput(rawShots[key])
+    if (shot) cameraShots[shot.id] = shot
+  }
+  const rules = Array.isArray(input.rules)
+    ? input.rules.map(normalizeBlockEventRuleInput).filter(Boolean)
+    : []
+  return {
+    enabled: input.enabled === true,
+    rules,
+    cameraShots
+  }
+}
+
+function normalizeRoleScaleOverridesForPersist(input) {
+  if (!input || typeof input !== 'object') return {}
+  const result = {}
+  for (const key of Object.keys(input)) {
+    const val = Number(input[key])
+    if (Number.isFinite(val) && val > 0) {
+      const sanitizedKey = String(key).replace(/\s+/g, ' ').trim()
+      if (sanitizedKey) result[sanitizedKey] = Math.max(0.001, val)
+    }
+  }
+  return result
+}
+
 function normalizeCharacterModel3DLayoutInput(input) {
   const base = (input && typeof input === 'object') ? input : {}
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
@@ -8179,7 +8350,9 @@ function normalizeCharacterModel3DLayoutInput(input) {
       survivor4: normalizeCameraKeyframe(base?.cameraKeyframes?.survivor4),
       hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected),
       banUpdated: normalizeCameraKeyframe(base?.cameraKeyframes?.banUpdated)
-    }
+    },
+    blockEvents: normalizeBlockEventsInput(base?.blockEvents),
+    roleScaleOverrides: normalizeRoleScaleOverridesForPersist(base?.roleScaleOverrides)
   }
 
   const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
@@ -8324,13 +8497,19 @@ ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
       ? localBpState.characterModel3DLayout
       : {}
     const incoming = normalizeCharacterModel3DLayoutInput(layout)
+    const mergedRoleScale = {
+      ...(prev.roleScaleOverrides || {}),
+      ...(incoming.roleScaleOverrides || {})
+    }
     localBpState.characterModel3DLayout = {
       ...prev,
       ...incoming,
       scene: { ...(prev.scene || {}), ...(incoming.scene || {}) },
       slots: { ...(prev.slots || {}), ...(incoming.slots || {}) },
       lights: { ...(prev.lights || {}), ...(incoming.lights || {}) },
-      camera: { ...(prev.camera || {}), ...(incoming.camera || {}) }
+      camera: { ...(prev.camera || {}), ...(incoming.camera || {}) },
+      blockEvents: incoming.blockEvents || { enabled: false, rules: [], cameraShots: {} },
+      roleScaleOverrides: mergedRoleScale
     }
     __normalizeLocalBpStateInPlace__()
     __persistCharacterModel3DLayoutToDisk__()

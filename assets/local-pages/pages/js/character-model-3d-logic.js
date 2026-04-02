@@ -380,6 +380,10 @@
     weatherPreset: 'clear',
     weather: {
       windIntensity: 1.35,
+      particleDensity: 1,
+      particleSpeed: 0.6,
+      particleMaxDistance: 12,
+      particleTexturePath: '',
       audioEnabled: true,
       audioVolume: 0.65
     },
@@ -458,6 +462,11 @@
       survivor4: null,
       hunterSelected: null,
       banUpdated: null
+    },
+    blockEvents: {
+      enabled: false,
+      workspaceXml: '',
+      cameraShots: {}
     }
   }
 
@@ -537,6 +546,11 @@
   let clock = null
   let outlineEffect = null
   let saveTimer = null
+  let blocklyWorkspace = null
+  let blocklyEventsReady = false
+  let blocklyInitTriggered = false
+  let blocklyWorkspaceSyncing = false
+  let blocklyWorkspaceSaveTimer = null
   let cameraCurveDragHandle = ''
   let cameraTransition = null
   let fpsAccum = 0
@@ -564,6 +578,12 @@
     animations: [],
     loadingPromise: null
   }
+  const weatherParticleTextureAsset = {
+    path: '',
+    texture: null,
+    objectUrl: '',
+    loadingPromise: null
+  }
   const weatherRuntime = {
     group: null,
     rain: null,
@@ -574,6 +594,8 @@
     windDustCount: 0,
     windDustPositions: null,
     windDustSeed: null,
+    windTexturePath: '',
+    windBuildToken: 0,
     configKey: 'clear',
     time: 0,
     flashStrength: 0,
@@ -582,6 +604,7 @@
     pendingFlash: 0,
     windScroll: 0
   }
+  let weatherWindInstanceDummy = null
   const weatherAudio = {
     context: null,
     masterGain: null,
@@ -705,7 +728,19 @@
     cameraCurveHint: document.getElementById('cameraCurveHint'),
     applyCameraCurveBtn: document.getElementById('applyCameraCurveBtn'),
     previewCameraCurveBtn: document.getElementById('previewCameraCurveBtn'),
-    cameraEventInfo: document.getElementById('cameraEventInfo')
+    cameraEventInfo: document.getElementById('cameraEventInfo'),
+    openBlockEventModalBtn: document.getElementById('openBlockEventModalBtn'),
+    blockEventModal: document.getElementById('blockEventModal'),
+    closeBlockEventModalBtn: document.getElementById('closeBlockEventModalBtn'),
+    blockEventEnabled: document.getElementById('blockEventEnabled'),
+    addBlockEventRuleBtn: document.getElementById('addBlockEventRuleBtn'),
+    recordBlockCameraShotBtn: document.getElementById('recordBlockCameraShotBtn'),
+    clearBlockWorkspaceBtn: document.getElementById('clearBlockWorkspaceBtn'),
+    blockEventSummary: document.getElementById('blockEventSummary'),
+    blockEventModalStatus: document.getElementById('blockEventModalStatus'),
+    blocklyWorkspace: document.getElementById('blocklyWorkspace'),
+    blockCameraShotList: document.getElementById('blockCameraShotList'),
+    refreshBlockShotListBtn: document.getElementById('refreshBlockShotListBtn')
     , environmentPresetSelect: document.getElementById('environmentPresetSelect')
     , renderQualitySelect: document.getElementById('renderQualitySelect')
     , applyEnvironmentPresetBtn: document.getElementById('applyEnvironmentPresetBtn')
@@ -718,8 +753,14 @@
     , applyWeatherPresetBtn: document.getElementById('applyWeatherPresetBtn')
     , weatherPresetInfo: document.getElementById('weatherPresetInfo')
     , weatherWindIntensity: document.getElementById('weatherWindIntensity')
+    , weatherParticleDensity: document.getElementById('weatherParticleDensity')
+    , weatherParticleSpeed: document.getElementById('weatherParticleSpeed')
+    , weatherParticleMaxDistance: document.getElementById('weatherParticleMaxDistance')
     , weatherAudioEnabled: document.getElementById('weatherAudioEnabled')
     , weatherAudioVolume: document.getElementById('weatherAudioVolume')
+    , weatherParticleTextureImportBtn: document.getElementById('weatherParticleTextureImportBtn')
+    , weatherParticleTextureClearBtn: document.getElementById('weatherParticleTextureClearBtn')
+    , weatherParticleTextureInfo: document.getElementById('weatherParticleTextureInfo')
     , applyWeatherSettingsBtn: document.getElementById('applyWeatherSettingsBtn')
     , entranceEffectSelect: document.getElementById('entranceEffectSelect')
     , particleImportBtn: document.getElementById('particleImportBtn')
@@ -827,6 +868,12 @@
 
   function setStatus(text) {
     if (dom.statusBar) dom.statusBar.textContent = text || ''
+  }
+
+  function setBlockEventModalStatus(text) {
+    if (!dom.blockEventModalStatus) return
+    const message = String(text || '').trim()
+    dom.blockEventModalStatus.textContent = message || '这里可以直接编辑事件、参数和动作；镜头动作也可以在块里一键记录当前视角。'
   }
 
   function setPersistentError(text = '') {
@@ -1030,6 +1077,10 @@
       : 'clear'
     out.weather = {
       windIntensity: Math.max(0, Math.min(3, asNumber(base?.weather?.windIntensity, DEFAULT_LAYOUT.weather.windIntensity))),
+      particleDensity: Math.max(0, Math.min(4, asNumber(base?.weather?.particleDensity, DEFAULT_LAYOUT.weather.particleDensity))),
+      particleSpeed: Math.max(0, Math.min(3, asNumber(base?.weather?.particleSpeed, DEFAULT_LAYOUT.weather.particleSpeed))),
+      particleMaxDistance: Math.max(2, Math.min(40, asNumber(base?.weather?.particleMaxDistance, DEFAULT_LAYOUT.weather.particleMaxDistance))),
+      particleTexturePath: (typeof base?.weather?.particleTexturePath === 'string') ? base.weather.particleTexturePath : '',
       audioEnabled: base?.weather?.audioEnabled !== false,
       audioVolume: Math.max(0, Math.min(1, asNumber(base?.weather?.audioVolume, DEFAULT_LAYOUT.weather.audioVolume)))
     }
@@ -1106,6 +1157,7 @@
     for (const eventCfg of CAMERA_EVENT_OPTIONS) {
       out.cameraKeyframes[eventCfg.key] = normalizeCameraKeyframe(base?.cameraKeyframes?.[eventCfg.key], null)
     }
+    out.blockEvents = normalizeBlockEventConfig(base?.blockEvents)
     return out
   }
 
@@ -1238,6 +1290,65 @@
       }
       onError(error)
       return true
+    }
+  }
+
+  function normalizeBlockEventConfig(input) {
+    const source = (input && typeof input === 'object') ? input : {}
+    const rawShots = (source.cameraShots && typeof source.cameraShots === 'object') ? source.cameraShots : {}
+    const cameraShots = {}
+    Object.keys(rawShots).forEach((key) => {
+      const src = rawShots[key]
+      if (!src || typeof src !== 'object') return
+      const id = String(src.id || key || '').trim()
+      if (!id) return
+      cameraShots[id] = {
+        id,
+        name: String(src.name || id).trim() || id,
+        position: ensureVec3(src.position, DEFAULT_LAYOUT.camera.position),
+        target: ensureVec3(src.target, DEFAULT_LAYOUT.camera.target),
+        fov: clampCameraFov(src.fov, DEFAULT_LAYOUT.camera.fov)
+      }
+    })
+    const rawRules = Array.isArray(source.rules) ? source.rules : []
+    const rules = rawRules.map((rule, index) => normalizeBlockEventRule(rule, index)).filter(Boolean)
+    return {
+      enabled: source.enabled === true,
+      rules,
+      cameraShots
+    }
+  }
+
+  function normalizeBlockEventRule(rule, index = 0) {
+    const src = (rule && typeof rule === 'object') ? rule : {}
+    const id = String(src.id || `rule_${index + 1}`).trim()
+    if (!id) return null
+    const eventType = typeof src.eventType === 'string' ? src.eventType : 'page_init'
+    const actions = Array.isArray(src.actions) ? src.actions.map((action, actionIndex) => normalizeBlockEventAction(action, actionIndex)).filter(Boolean) : []
+    return {
+      id,
+      eventType,
+      survivorIndex: Math.max(1, Math.min(4, Math.round(asNumber(src.survivorIndex, 1)))),
+      banSide: src.banSide === 'hunter' ? 'hunter' : 'survivor',
+      banScope: src.banScope === 'global' ? 'global' : (src.banScope === 'round' ? 'round' : 'any'),
+      banCount: Math.max(1, Math.min(8, Math.round(asNumber(src.banCount, 1)))),
+      actions
+    }
+  }
+
+  function normalizeBlockEventAction(action, index = 0) {
+    const src = (action && typeof action === 'object') ? action : {}
+    const id = String(src.id || `action_${index + 1}`).trim()
+    if (!id) return null
+    return {
+      id,
+      type: typeof src.type === 'string' ? src.type : 'wait',
+      shotId: typeof src.shotId === 'string' ? src.shotId : '',
+      durationMs: Math.max(50, Math.min(10000, Math.round(asNumber(src.durationMs, 900)))),
+      eventKey: CAMERA_EVENT_OPTIONS.some(item => item.key === src.eventKey) ? src.eventKey : CAMERA_EVENT_OPTIONS[0].key,
+      cameraMode: src.cameraMode === 'virtual_on' || src.cameraMode === 'virtual_off' || src.cameraMode === 'virtual_toggle' ? src.cameraMode : 'virtual_toggle',
+      weatherPreset: WEATHER_PRESETS[src.weatherPreset] ? src.weatherPreset : 'clear',
+      waitSeconds: Math.max(0, Math.min(60, asNumber(src.waitSeconds, 1)))
     }
   }
 
@@ -1872,6 +1983,10 @@
     const src = (state.layout?.weather && typeof state.layout.weather === 'object') ? state.layout.weather : {}
     return {
       windIntensity: Math.max(0, Math.min(3, asNumber(src.windIntensity, DEFAULT_LAYOUT.weather.windIntensity))),
+      particleDensity: Math.max(0, Math.min(4, asNumber(src.particleDensity, DEFAULT_LAYOUT.weather.particleDensity))),
+      particleSpeed: Math.max(0, Math.min(3, asNumber(src.particleSpeed, DEFAULT_LAYOUT.weather.particleSpeed))),
+      particleMaxDistance: Math.max(2, Math.min(40, asNumber(src.particleMaxDistance, DEFAULT_LAYOUT.weather.particleMaxDistance))),
+      particleTexturePath: (typeof src.particleTexturePath === 'string') ? src.particleTexturePath.trim() : '',
       audioEnabled: src.audioEnabled !== false,
       audioVolume: Math.max(0, Math.min(1, asNumber(src.audioVolume, DEFAULT_LAYOUT.weather.audioVolume)))
     }
@@ -1881,6 +1996,10 @@
     const normalized = getWeatherSettings()
     state.layout.weather = {
       windIntensity: normalized.windIntensity,
+      particleDensity: normalized.particleDensity,
+      particleSpeed: normalized.particleSpeed,
+      particleMaxDistance: normalized.particleMaxDistance,
+      particleTexturePath: normalized.particleTexturePath,
       audioEnabled: normalized.audioEnabled,
       audioVolume: normalized.audioVolume
     }
@@ -1900,11 +2019,24 @@
       swayPitch: base.swayPitch * (0.55 + windFactor * 0.8),
       swayYaw: base.swayYaw * (0.55 + windFactor * 0.8),
       windScrollSpeed: base.windScrollSpeed * (0.5 + windFactor * 0.7),
-      windParticleCount: Math.round(base.windParticleCount * (0.45 + windFactor * 0.78)),
-      windParticleSpeed: base.windParticleSpeed * (0.5 + windFactor * 0.75),
+      windParticleCount: Math.round(base.windParticleCount * (0.45 + windFactor * 0.78) * settings.particleDensity),
+      windParticleSpeed: base.windParticleSpeed * (0.5 + windFactor * 0.75) * settings.particleSpeed,
+      windParticleMaxDistance: settings.particleMaxDistance,
+      windParticleTexturePath: settings.particleTexturePath,
       rainDriftX: base.rainDriftX * (base.wind ? (0.72 + windFactor * 0.62) : 1),
       rainDriftZ: base.rainDriftZ * (base.wind ? (0.72 + windFactor * 0.62) : 1)
     }
+  }
+
+  function syncWeatherParticleTextureUi() {
+    if (!dom.weatherParticleTextureInfo) return
+    const path = String(state.layout?.weather?.particleTexturePath || '').trim()
+    if (!path) {
+      dom.weatherParticleTextureInfo.textContent = '风粒子图片: 默认白块'
+      return
+    }
+    const shortName = path.split(/[\\/]/).pop() || path
+    dom.weatherParticleTextureInfo.textContent = `风粒子图片: ${shortName}`
   }
 
   function syncWeatherInputs() {
@@ -1912,19 +2044,180 @@
     const settings = ensureWeatherSettings()
     if (dom.weatherPresetSelect) dom.weatherPresetSelect.value = state.layout?.weatherPreset || 'clear'
     if (dom.weatherWindIntensity) dom.weatherWindIntensity.value = String(settings.windIntensity.toFixed(2))
+    if (dom.weatherParticleDensity) dom.weatherParticleDensity.value = String(settings.particleDensity.toFixed(2))
+    if (dom.weatherParticleSpeed) dom.weatherParticleSpeed.value = String(settings.particleSpeed.toFixed(2))
+    if (dom.weatherParticleMaxDistance) dom.weatherParticleMaxDistance.value = String(settings.particleMaxDistance.toFixed(1))
     if (dom.weatherAudioEnabled) dom.weatherAudioEnabled.checked = settings.audioEnabled !== false
     if (dom.weatherAudioVolume) dom.weatherAudioVolume.value = String(settings.audioVolume.toFixed(2))
     if (dom.weatherPresetInfo) dom.weatherPresetInfo.textContent = `天气: ${config.label}`
+    syncWeatherParticleTextureUi()
   }
 
   function applyWeatherSettingsFromInputs(shouldSave = true) {
     const next = ensureWeatherSettings()
     next.windIntensity = Math.max(0, Math.min(3, asNumber(dom.weatherWindIntensity?.value, next.windIntensity)))
+    next.particleDensity = Math.max(0, Math.min(4, asNumber(dom.weatherParticleDensity?.value, next.particleDensity)))
+    next.particleSpeed = Math.max(0, Math.min(3, asNumber(dom.weatherParticleSpeed?.value, next.particleSpeed)))
+    next.particleMaxDistance = Math.max(2, Math.min(40, asNumber(dom.weatherParticleMaxDistance?.value, next.particleMaxDistance)))
     next.audioEnabled = dom.weatherAudioEnabled ? !!dom.weatherAudioEnabled.checked : next.audioEnabled !== false
     next.audioVolume = Math.max(0, Math.min(1, asNumber(dom.weatherAudioVolume?.value, next.audioVolume)))
     syncWeatherInputs()
     applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
     if (shouldSave) scheduleSaveLayout()
+  }
+
+  function disposeWeatherParticleTextureAsset() {
+    if (weatherParticleTextureAsset.texture && typeof weatherParticleTextureAsset.texture.dispose === 'function') {
+      try { weatherParticleTextureAsset.texture.dispose() } catch { }
+    }
+    if (weatherParticleTextureAsset.objectUrl) {
+      try { URL.revokeObjectURL(weatherParticleTextureAsset.objectUrl) } catch { }
+    }
+    weatherParticleTextureAsset.path = ''
+    weatherParticleTextureAsset.texture = null
+    weatherParticleTextureAsset.objectUrl = ''
+    weatherParticleTextureAsset.loadingPromise = null
+  }
+
+  function getImageMimeTypeFromPath(path) {
+    const ext = getPathExt(path)
+    if (ext === '.png') return 'image/png'
+    if (ext === '.webp') return 'image/webp'
+    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+    if (ext === '.gif') return 'image/gif'
+    return 'application/octet-stream'
+  }
+
+  async function decodeImageElementFromBlob(blob, objectUrl) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(blob)
+        return { kind: 'bitmap', image: bitmap }
+      } catch (error) {
+        console.warn('[CharacterModel3D] createImageBitmap 解码失败，尝试 <img> 回退:', error)
+      }
+    }
+    return await new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve({ kind: 'image', image: img })
+      img.onerror = () => reject(new Error('image-element-decode-failed'))
+      img.src = objectUrl
+    })
+  }
+
+  function createTextureFromDecodedImage(decoded) {
+    if (!decoded || !decoded.image || !THREE) return null
+    const source = decoded.image
+    const width = Math.max(1, Math.round(asNumber(source.width, source.videoWidth || 1)))
+    const height = Math.max(1, Math.round(asNumber(source.height, source.videoHeight || 1)))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d', { alpha: true })
+    if (!ctx) return null
+    ctx.clearRect(0, 0, width, height)
+    ctx.drawImage(source, 0, 0, width, height)
+    if (decoded.kind === 'bitmap' && typeof source.close === 'function') {
+      try { source.close() } catch { }
+    }
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  async function tryResolveTextureLoadUrl(path) {
+    const rawPath = String(path || '').trim()
+    if (!rawPath) return ''
+    if (!window.electronAPI || typeof window.electronAPI.readBinaryFile !== 'function') {
+      return normalizeFileUrl(rawPath)
+    }
+    const localPath = toLocalFilePath(rawPath)
+      || (/^[a-zA-Z]:[\\/]/.test(rawPath) || rawPath.startsWith('\\\\') ? rawPath : '')
+    if (!localPath) return normalizeFileUrl(rawPath)
+    try {
+      const readRes = await window.electronAPI.readBinaryFile(localPath, {
+        maxInlineBytes: 16 * 1024 * 1024
+      })
+      if (!readRes || !readRes.success || !readRes.base64) {
+        return normalizeFileUrl(rawPath)
+      }
+      const bytes = base64ToArrayBuffer(readRes.base64)
+      const blob = new Blob([bytes], { type: getImageMimeTypeFromPath(rawPath) })
+      weatherParticleTextureAsset.objectUrl = URL.createObjectURL(blob)
+      return weatherParticleTextureAsset.objectUrl
+    } catch (error) {
+      console.warn('[CharacterModel3D] 本地风粒子图片改走 Blob URL 失败，回退普通加载:', error)
+      return normalizeFileUrl(rawPath)
+    }
+  }
+
+  async function tryLoadWeatherTextureFromLocalFile(path) {
+    const rawPath = String(path || '').trim()
+    if (!rawPath || !window.electronAPI || typeof window.electronAPI.readBinaryFile !== 'function') return null
+    const localPath = toLocalFilePath(rawPath)
+      || (/^[a-zA-Z]:[\\/]/.test(rawPath) || rawPath.startsWith('\\\\') ? rawPath : '')
+    if (!localPath) return null
+    try {
+      const readRes = await window.electronAPI.readBinaryFile(localPath, {
+        maxInlineBytes: 16 * 1024 * 1024
+      })
+      if (!readRes || !readRes.success || !readRes.base64) return null
+      const bytes = base64ToArrayBuffer(readRes.base64)
+      const blob = new Blob([bytes], { type: getImageMimeTypeFromPath(rawPath) })
+      weatherParticleTextureAsset.objectUrl = URL.createObjectURL(blob)
+      const decoded = await decodeImageElementFromBlob(blob, weatherParticleTextureAsset.objectUrl)
+      return createTextureFromDecodedImage(decoded)
+    } catch (error) {
+      console.warn('[CharacterModel3D] 本地风粒子图片手动解码失败，将回退 TextureLoader:', error)
+      return null
+    }
+  }
+
+  async function ensureWeatherParticleTexture(path) {
+    const nextPath = String(path || '').trim()
+    if (!nextPath || !THREE) {
+      disposeWeatherParticleTextureAsset()
+      return null
+    }
+    if (weatherParticleTextureAsset.path === nextPath && weatherParticleTextureAsset.texture) {
+      return weatherParticleTextureAsset.texture
+    }
+    if (weatherParticleTextureAsset.path === nextPath && weatherParticleTextureAsset.loadingPromise) {
+      return weatherParticleTextureAsset.loadingPromise
+    }
+    disposeWeatherParticleTextureAsset()
+    weatherParticleTextureAsset.path = nextPath
+    weatherParticleTextureAsset.loadingPromise = new Promise((resolve) => {
+      void (async () => {
+        const manualTexture = await tryLoadWeatherTextureFromLocalFile(nextPath)
+        if (manualTexture) {
+          if ('colorSpace' in manualTexture && THREE.SRGBColorSpace) manualTexture.colorSpace = THREE.SRGBColorSpace
+          else if ('encoding' in manualTexture && THREE.sRGBEncoding) manualTexture.encoding = THREE.sRGBEncoding
+          manualTexture.minFilter = THREE.LinearFilter
+          manualTexture.magFilter = THREE.LinearFilter
+          weatherParticleTextureAsset.texture = manualTexture
+          weatherParticleTextureAsset.loadingPromise = null
+          resolve(manualTexture)
+          return
+        }
+        const resolved = await tryResolveTextureLoadUrl(nextPath)
+        const loader = new THREE.TextureLoader()
+        loader.load(resolved, (texture) => {
+          if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace
+          else if ('encoding' in texture && THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding
+          texture.minFilter = THREE.LinearFilter
+          texture.magFilter = THREE.LinearFilter
+          weatherParticleTextureAsset.texture = texture
+          weatherParticleTextureAsset.loadingPromise = null
+          resolve(texture)
+        }, undefined, (error) => {
+          console.warn('[CharacterModel3D] 风粒子图片加载失败:', error)
+          disposeWeatherParticleTextureAsset()
+          resolve(null)
+        })
+      })()
+    })
+    return weatherParticleTextureAsset.loadingPromise
   }
 
   function createWeatherNoiseBuffer(ctx, mode = 'wind') {
@@ -2204,6 +2497,7 @@
     weatherRuntime.windDustCount = 0
     weatherRuntime.windDustPositions = null
     weatherRuntime.windDustSeed = null
+    weatherRuntime.windTexturePath = ''
   }
 
   function writeWeatherRainSegment(positions, index, x, y, z, config) {
@@ -2214,6 +2508,27 @@
     positions[base + 3] = x - config.rainDriftX * config.rainLength
     positions[base + 4] = y - config.rainLength
     positions[base + 5] = z - config.rainDriftZ * config.rainLength
+  }
+
+  function seedWeatherWindParticle(seed, seedIndex, positions, posIndex, bounds = {}) {
+    const halfX = Math.max(1, asNumber(bounds.halfX, 16))
+    const halfZ = Math.max(1, asNumber(bounds.halfZ, 12))
+    const resetX = bounds.resetX === true
+    positions[posIndex] = resetX ? (-halfX - Math.random() * 4.2) : ((Math.random() - 0.5) * halfX * 2)
+    positions[posIndex + 1] = 0.45 + Math.random() * 7.4
+    positions[posIndex + 2] = (Math.random() - 0.5) * halfZ * 2
+    seed[seedIndex] = 0.56 + Math.random() * 0.68
+    seed[seedIndex + 1] = Math.random() * Math.PI * 2
+    seed[seedIndex + 2] = Math.random() * Math.PI * 2
+    seed[seedIndex + 3] = 0.05 + Math.random() * 0.15
+    seed[seedIndex + 4] = (Math.random() - 0.5) * 0.28
+    seed[seedIndex + 5] = 0.12 + Math.random() * 0.28
+    seed[seedIndex + 6] = 0.2 + Math.random() * 0.65
+    seed[seedIndex + 7] = 0.6 + Math.random() * 1.8
+    seed[seedIndex + 8] = 0.8 + Math.random() * 2.4
+    seed[seedIndex + 9] = 0.35 + Math.random() * 1.35
+    seed[seedIndex + 10] = 0.14 + Math.random() * 0.18
+    seed[seedIndex + 11] = 0.18 + Math.random() * 0.26
   }
 
   function rebuildWeatherRain(config) {
@@ -2268,57 +2583,64 @@
     weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
   }
 
-  function rebuildWeatherWind(config) {
+  async function rebuildWeatherWind(config) {
     if (!weatherRuntime.group || !THREE) return
+    if (!weatherWindInstanceDummy) weatherWindInstanceDummy = new THREE.Object3D()
     if (!config.wind || config.windParticleCount <= 0) {
+      weatherRuntime.windBuildToken += 1
       disposeWeatherWind()
+      weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
       return
     }
-    if (weatherRuntime.windDust && weatherRuntime.windDustCount === config.windParticleCount && weatherRuntime.configKey === (state.layout?.weatherPreset || 'clear')) {
+    const texturePath = String(config.windParticleTexturePath || '').trim()
+    if (weatherRuntime.windDust
+      && weatherRuntime.windDustCount === config.windParticleCount
+      && weatherRuntime.configKey === (state.layout?.weatherPreset || 'clear')
+      && weatherRuntime.windTexturePath === texturePath) {
       return
     }
 
     disposeWeatherWind()
+    const buildToken = ++weatherRuntime.windBuildToken
+    const windTexture = await ensureWeatherParticleTexture(texturePath)
+    if (buildToken !== weatherRuntime.windBuildToken) return
 
     const count = Math.max(40, Math.min(800, Math.round(asNumber(config.windParticleCount, 0))))
     const positions = new Float32Array(count * 3)
-    const seed = new Float32Array(count * 5)
+    const seed = new Float32Array(count * 12)
+    const halfX = 16
+    const halfZ = 12
     for (let i = 0; i < count; i++) {
       const p = i * 3
-      const s = i * 5
-      const x = (Math.random() - 0.5) * 28
-      const y = 0.35 + Math.random() * 7.5
-      const z = (Math.random() - 0.5) * 22
-      positions[p] = x
-      positions[p + 1] = y
-      positions[p + 2] = z
-      seed[s] = x
-      seed[s + 1] = y
-      seed[s + 2] = z
-      seed[s + 3] = 0.8 + Math.random() * 0.7
-      seed[s + 4] = Math.random() * Math.PI * 2
+      const s = i * 12
+      seedWeatherWindParticle(seed, s, positions, p, { halfX, halfZ, resetX: false })
     }
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-
-    const material = new THREE.PointsMaterial({
-      color: 0xdfeaf3,
-      size: config.windParticleSpeed > 7 ? 0.18 : 0.14,
-      sizeAttenuation: true,
+    const material = new THREE.MeshBasicMaterial({
+      color: windTexture ? 0xffffff : 0xe8f1f8,
       transparent: true,
-      opacity: config.windParticleSpeed > 7 ? 0.22 : 0.16,
-      depthWrite: false
+      opacity: windTexture ? 0.82 : 0.34,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false
     })
+    if (windTexture) {
+      material.map = windTexture
+      material.alphaTest = 0.02
+    }
 
-    const windDust = new THREE.Points(geometry, material)
+    const geometry = new THREE.PlaneGeometry(1, 1)
+    const windDust = new THREE.InstancedMesh(geometry, material, count)
     windDust.frustumCulled = false
     windDust.renderOrder = 3
+    windDust.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     weatherRuntime.group.add(windDust)
     weatherRuntime.windDust = windDust
     weatherRuntime.windDustCount = count
     weatherRuntime.windDustPositions = positions
     weatherRuntime.windDustSeed = seed
+    weatherRuntime.windTexturePath = texturePath
+    weatherRuntime.configKey = state.layout?.weatherPreset || 'clear'
   }
 
   function applyWeatherLightingState(flashStrength = weatherRuntime.flashStrength) {
@@ -2415,42 +2737,76 @@
   }
 
   function updateWeatherWind(config, dt, time = weatherRuntime.time) {
-    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed) return
+    if (!weatherRuntime.windDust || !weatherRuntime.windDustPositions || !weatherRuntime.windDustSeed || !weatherWindInstanceDummy) return
     const positions = weatherRuntime.windDustPositions
     const seed = weatherRuntime.windDustSeed
     const count = weatherRuntime.windDustCount
     const halfX = 16
     const halfZ = 12
     const speed = Math.max(0, asNumber(config.windParticleSpeed, 0))
+    const maxDistance = Math.max(2, asNumber(config.windParticleMaxDistance, 12))
+    const maxDistanceSq = maxDistance * maxDistance
+    const cameraPos = camera ? camera.position : null
+    const downSpeed = speed * 0.06
+    const gust = 0.78 + Math.sin(time * 0.85) * 0.14 + Math.sin(time * 0.31 + 0.8) * 0.08
 
     for (let i = 0; i < count; i++) {
       const p = i * 3
-      const s = i * 5
+      const s = i * 12
       let x = positions[p]
       let y = positions[p + 1]
       let z = positions[p + 2]
-      const speedMul = seed[s + 3]
-      const phase = seed[s + 4]
+      const speedMul = seed[s]
+      const phase = seed[s + 1]
+      const phaseB = seed[s + 2]
+      const fallMul = seed[s + 3]
+      const driftZ = seed[s + 4]
+      const wobbleY = seed[s + 5]
+      const wobbleZ = seed[s + 6]
+      const rotSpeedX = seed[s + 7]
+      const rotSpeedY = seed[s + 8]
+      const rotSpeedZ = seed[s + 9]
+      const scaleX = seed[s + 10]
+      const scaleY = seed[s + 11]
 
-      x += dt * speed * speedMul
-      y = seed[s + 1] + Math.sin(time * 1.8 + phase) * 0.18
-      z = seed[s + 2] + Math.cos(time * 1.35 + phase) * 0.45
+      x += dt * speed * speedMul * (0.82 + gust * 0.35)
+      y += dt * (-downSpeed * fallMul + Math.sin(time * 2.2 + phase) * wobbleY)
+      z += dt * (driftZ * speed * 0.36 + Math.cos(time * 1.45 + phaseB) * wobbleZ)
 
-      if (x > halfX + 3) {
-        x = -halfX - Math.random() * 3
-        seed[s + 1] = 0.35 + Math.random() * 7.5
-        seed[s + 2] = (Math.random() - 0.5) * halfZ * 2
-        seed[s + 3] = 0.8 + Math.random() * 0.7
-        y = seed[s + 1]
-        z = seed[s + 2]
+      if (x > halfX + 3.5 || y < -0.8 || y > 10.5 || z < -halfZ - 3 || z > halfZ + 3) {
+        seedWeatherWindParticle(seed, s, positions, p, { halfX, halfZ, resetX: true })
+        x = positions[p]
+        y = positions[p + 1]
+        z = positions[p + 2]
       }
 
       positions[p] = x
       positions[p + 1] = y
       positions[p + 2] = z
+
+      const dx = cameraPos ? (x - cameraPos.x) : 0
+      const dy = cameraPos ? (y - cameraPos.y) : 0
+      const dz = cameraPos ? (z - cameraPos.z) : 0
+      const distSq = cameraPos ? (dx * dx + dy * dy + dz * dz) : 0
+      const visible = !cameraPos || distSq <= maxDistanceSq
+
+      weatherWindInstanceDummy.position.set(x, y, z)
+      if (visible) {
+        weatherWindInstanceDummy.rotation.set(
+          Math.sin(time * rotSpeedX + phase) * 0.8 + Math.cos(time * 1.6 + phaseB) * 0.2,
+          time * rotSpeedY + phaseB,
+          Math.sin(time * rotSpeedZ + phase) * 0.6 + driftZ * 0.9
+        )
+        weatherWindInstanceDummy.scale.set(scaleX, scaleY, 1)
+      } else {
+        weatherWindInstanceDummy.rotation.set(0, 0, 0)
+        weatherWindInstanceDummy.scale.set(0.0001, 0.0001, 0.0001)
+      }
+      weatherWindInstanceDummy.updateMatrix()
+      weatherRuntime.windDust.setMatrixAt(i, weatherWindInstanceDummy.matrix)
     }
 
-    weatherRuntime.windDust.geometry.attributes.position.needsUpdate = true
+    weatherRuntime.windDust.instanceMatrix.needsUpdate = true
   }
 
   function updateWeatherAffectedGroups(config, time = 0) {
@@ -2489,7 +2845,7 @@
       weatherRuntime.lightningCooldown = 2.8
     }
     rebuildWeatherRain(config)
-    rebuildWeatherWind(config)
+    void rebuildWeatherWind(config)
     syncWeatherInputs()
     applyWeatherLightingState(0)
     updateWeatherAffectedGroups(config, weatherRuntime.time)
@@ -3481,6 +3837,776 @@
     const key = pendingCameraEventKey
     pendingCameraEventKey = ''
     triggerCameraEvent(key)
+  }
+
+  function ensureBlockEventState() {
+    if (!state.layout.blockEvents || typeof state.layout.blockEvents !== 'object') {
+      state.layout.blockEvents = normalizeBlockEventConfig(null)
+    }
+    const cfg = state.layout.blockEvents
+    if (typeof cfg.enabled !== 'boolean') cfg.enabled = true
+    if (!cfg.cameraShots || typeof cfg.cameraShots !== 'object' || Array.isArray(cfg.cameraShots)) cfg.cameraShots = {}
+    if (!Array.isArray(cfg.rules)) cfg.rules = []
+    return cfg
+  }
+
+  function getCurrentCameraFrameSnapshot() {
+    const fallbackCamera = state.layout?.camera || DEFAULT_LAYOUT.camera
+    const safePosition = camera
+      ? { x: camera.position.x, y: camera.position.y, z: camera.position.z }
+      : ensureVec3(fallbackCamera.position, DEFAULT_LAYOUT.camera.position)
+    const safeTarget = orbit?.target
+      ? { x: orbit.target.x, y: orbit.target.y, z: orbit.target.z }
+      : ensureVec3(fallbackCamera.target, DEFAULT_LAYOUT.camera.target)
+    return {
+      position: safePosition,
+      target: safeTarget,
+      fov: clampCameraFov(camera?.fov, fallbackCamera.fov || DEFAULT_CAMERA_FOV)
+    }
+  }
+
+  function healBlockEventConfig() {
+    const cfg = ensureBlockEventState()
+    if (!cfg.cameraShots || typeof cfg.cameraShots !== 'object' || Array.isArray(cfg.cameraShots)) cfg.cameraShots = {}
+    cfg.rules = cfg.rules.map((rule, index) => normalizeBlockEventRule(rule, index)).filter(Boolean)
+    // 不再自动添加默认规则，允许用户清空所有规则
+    cfg.rules.forEach((rule) => {
+      if (!Array.isArray(rule.actions)) {
+        rule.actions = []
+      }
+    })
+    return cfg
+  }
+
+  function bindEditableValue(node, callback) {
+    if (!node || typeof callback !== 'function') return
+    const handler = () => {
+      try { callback() } catch (error) { console.error('[CharacterModel3D] 积木编辑值更新失败:', error) }
+    }
+    node.addEventListener('change', handler)
+    const tagName = String(node.tagName || '').toUpperCase()
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+      node.addEventListener('input', handler)
+    }
+    node.addEventListener('blur', handler)
+  }
+
+  function getBlockEventRuleById(ruleId) {
+    const cfg = ensureBlockEventState()
+    const id = String(ruleId || '').trim()
+    if (!id) return null
+    return cfg.rules.find(item => item && item.id === id) || null
+  }
+
+  function getBlockEventActionById(ruleId, actionId) {
+    const rule = getBlockEventRuleById(ruleId)
+    if (!rule || !Array.isArray(rule.actions)) return null
+    const id = String(actionId || '').trim()
+    if (!id) return null
+    return rule.actions.find(item => item && item.id === id) || null
+  }
+
+  function getBlockCameraShotEntries() {
+    const blockEvents = ensureBlockEventState()
+    return Object.values(blockEvents.cameraShots || {}).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN'))
+  }
+
+  function createBlockCameraShotId() {
+    return `shot_${Date.now()}_${Math.floor(Math.random() * 100000)}`
+  }
+
+  function createBlockCameraShotName() {
+    const entries = getBlockCameraShotEntries()
+    return `镜头点位 ${entries.length + 1}`
+  }
+
+  function requestBlockEventWorkspaceSave() {
+    if (blocklyWorkspaceSaveTimer) clearTimeout(blocklyWorkspaceSaveTimer)
+    blocklyWorkspaceSaveTimer = window.setTimeout(() => {
+      blocklyWorkspaceSaveTimer = null
+      scheduleSaveLayout()
+    }, 220)
+  }
+
+  function saveBlockEventWorkspaceToLayout(shouldSchedule = true) {
+    ensureBlockEventState()
+    if (shouldSchedule) requestBlockEventWorkspaceSave()
+  }
+
+  function getBlockCameraShotOptions() {
+    const entries = getBlockCameraShotEntries()
+    if (!entries.length) return [['请先记录镜头点位', '']]
+    return entries.map(entry => [String(entry.name || entry.id), entry.id])
+  }
+
+  function getBlockWeatherOptions() {
+    return Object.keys(WEATHER_PRESETS).map((key) => [WEATHER_PRESETS[key]?.label || key, key])
+  }
+
+  function getBlockCameraEventOptions() {
+    return CAMERA_EVENT_OPTIONS.map(item => [item.label, item.key])
+  }
+
+  function refreshBlockEventSummary() {
+    if (!dom.blockEventSummary) return
+    const cfg = ensureBlockEventState()
+    const entries = getBlockCameraShotEntries()
+    dom.blockEventSummary.textContent = cfg.enabled
+      ? `积木事件: 已启用 / ${(cfg.rules || []).length} 条规则 / ${entries.length} 个镜头点位`
+      : `积木事件: 已关闭 / ${(cfg.rules || []).length} 条规则 / ${entries.length} 个镜头点位`
+  }
+
+  function rerenderBlocklyWorkspace() {
+    renderBlockEventRuleEditor()
+  }
+
+  function renderBlockCameraShotList() {
+    if (!dom.blockCameraShotList) return
+    const entries = getBlockCameraShotEntries()
+    if (!entries.length) {
+      dom.blockCameraShotList.innerHTML = '<div class="modal-empty">还没有镜头点位。点击“记录当前视角为新点位”即可生成一个可在积木里复用的镜头位置。</div>'
+      refreshBlockEventSummary()
+      return
+    }
+    dom.blockCameraShotList.innerHTML = ''
+    entries.forEach((entry) => {
+      const card = document.createElement('div')
+      card.className = 'block-shot-card'
+      const label = document.createElement('label')
+      label.textContent = '点位名称'
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.value = entry.name || entry.id
+      input.addEventListener('change', () => {
+        const cfg = ensureBlockEventState()
+        if (!cfg.cameraShots[entry.id]) return
+        cfg.cameraShots[entry.id].name = String(input.value || '').trim() || entry.id
+        renderBlockCameraShotList()
+        renderBlockEventRuleEditor()
+        scheduleSaveLayout()
+      })
+      label.appendChild(input)
+      card.appendChild(label)
+
+      const actions = document.createElement('div')
+      actions.className = 'block-shot-actions'
+
+      const overwriteBtn = document.createElement('button')
+      overwriteBtn.className = 'btn'
+      overwriteBtn.type = 'button'
+      overwriteBtn.textContent = '用当前视角覆盖'
+      overwriteBtn.addEventListener('click', () => {
+        const cfg = ensureBlockEventState()
+        if (!cfg.cameraShots[entry.id]) return
+        cfg.cameraShots[entry.id] = { ...cfg.cameraShots[entry.id], ...getCurrentCameraFrameSnapshot() }
+        renderBlockCameraShotList()
+        scheduleSaveLayout()
+        setStatus(`已覆盖镜头点位: ${cfg.cameraShots[entry.id].name}`)
+      })
+      actions.appendChild(overwriteBtn)
+
+      const previewBtn = document.createElement('button')
+      previewBtn.className = 'btn'
+      previewBtn.type = 'button'
+      previewBtn.textContent = '预览'
+      previewBtn.addEventListener('click', () => {
+        startCameraTransition(entry, Math.max(50, asNumber(state.layout?.cameraTransitionMs, 900)), `预览镜头点位 ${entry.name}`)
+      })
+      actions.appendChild(previewBtn)
+
+      const removeBtn = document.createElement('button')
+      removeBtn.className = 'btn'
+      removeBtn.type = 'button'
+      removeBtn.textContent = '删除'
+      removeBtn.addEventListener('click', () => {
+        const cfg = ensureBlockEventState()
+        delete cfg.cameraShots[entry.id]
+        renderBlockCameraShotList()
+        renderBlockEventRuleEditor()
+        scheduleSaveLayout()
+      })
+      actions.appendChild(removeBtn)
+
+      card.appendChild(actions)
+
+      const meta = document.createElement('div')
+      meta.className = 'block-shot-meta'
+      meta.textContent = `位置: ${entry.position.x.toFixed(2)}, ${entry.position.y.toFixed(2)}, ${entry.position.z.toFixed(2)}\n目标: ${entry.target.x.toFixed(2)}, ${entry.target.y.toFixed(2)}, ${entry.target.z.toFixed(2)}\nFOV: ${entry.fov.toFixed(1)}`
+      card.appendChild(meta)
+      dom.blockCameraShotList.appendChild(card)
+    })
+    refreshBlockEventSummary()
+  }
+
+  function recordBlockCameraShotFromCurrent(preferredAction = null) {
+    const cfg = healBlockEventConfig()
+    const id = createBlockCameraShotId()
+    cfg.cameraShots[id] = {
+      id,
+      name: createBlockCameraShotName(),
+      ...getCurrentCameraFrameSnapshot()
+    }
+    cfg.rules.forEach((rule) => {
+      rule.actions.forEach((action) => {
+        if (action.type === 'move_camera' && !String(action.shotId || '').trim()) {
+          action.shotId = id
+        }
+      })
+    })
+    if (preferredAction && typeof preferredAction === 'object') {
+      preferredAction.shotId = id
+    }
+    renderBlockCameraShotList()
+    renderBlockEventRuleEditor()
+    scheduleSaveLayout()
+    setBlockEventModalStatus(`已记录镜头点位“${cfg.cameraShots[id].name}”，可直接用于“移动视角到点位”。`)
+    setStatus(`已记录积木镜头点位: ${cfg.cameraShots[id].name}`)
+    return id
+  }
+
+  function createDefaultBlockEventRule() {
+    return normalizeBlockEventRule({
+      id: `rule_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
+      eventType: 'survivor_count_selected',
+      survivorIndex: 1,
+      actions: [
+        createDefaultBlockEventAction('move_camera'),
+        createDefaultBlockEventAction('weather'),
+        createDefaultBlockEventAction('wait')
+      ]
+    })
+  }
+
+  function createDefaultBlockEventAction(type = 'wait') {
+    return normalizeBlockEventAction({
+      id: `action_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
+      type
+    })
+  }
+
+  function ensureBlockEventWorkspace() {
+    if (!dom.blocklyWorkspace) return null
+    renderBlockEventRuleEditor()
+    return dom.blocklyWorkspace
+  }
+
+  function syncBlockEventWorkspaceFromLayout() {
+    renderBlockEventRuleEditor()
+  }
+
+  function renderBlockEventRuleEditor() {
+    if (!dom.blocklyWorkspace) return
+    const cfg = ensureBlockEventState()
+    // 只在首次或规则为空且不需要删除操作时才调用 heal
+    if (!Array.isArray(cfg.rules) || !cfg.rules.length) {
+      // 不强制添加默认规则，让用户可以清空
+    }
+    dom.blocklyWorkspace.innerHTML = ''
+    const rules = Array.isArray(cfg.rules) ? cfg.rules : []
+    if (!rules.length) {
+      dom.blocklyWorkspace.innerHTML = '<div class="block-rule-empty">还没有事件积木。点击上方"新增事件积木"，或者直接点"清空积木区"恢复为默认模板。默认模板会从"选择第 1 个求生者"开始，方便你立刻改。</div>'
+      return
+    }
+    const list = document.createElement('div')
+    list.className = 'block-rule-list'
+    rules.forEach((rule) => {
+      const card = document.createElement('div')
+      card.className = 'block-rule-card'
+
+      const eventBox = document.createElement('div')
+      eventBox.className = 'block-rule-event'
+      const eventHead = document.createElement('div')
+      eventHead.className = 'block-rule-head'
+      const title = document.createElement('div')
+      title.className = 'block-rule-title'
+      title.textContent = '当 事件发生'
+      const deleteRuleBtn = document.createElement('button')
+      deleteRuleBtn.className = 'btn'
+      deleteRuleBtn.type = 'button'
+      deleteRuleBtn.textContent = '删除事件积木'
+      deleteRuleBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        const currentCfg = ensureBlockEventState()
+        currentCfg.rules = currentCfg.rules.filter(item => item.id !== rule.id)
+        renderBlockEventRuleEditor()
+        saveBlockEventWorkspaceToLayout(true)
+        refreshBlockEventSummary()
+        setBlockEventModalStatus('已删除一个事件积木。')
+      })
+      eventHead.appendChild(title)
+      eventHead.appendChild(deleteRuleBtn)
+      eventBox.appendChild(eventHead)
+
+      const eventForm = document.createElement('div')
+      eventForm.className = 'block-form-grid'
+      const eventTypeSelect = document.createElement('select')
+      ;[
+        ['页面初始化完成', 'page_init'],
+        ['选择第 x 个求生者', 'survivor_count_selected'],
+        ['选择了求生者', 'survivor_selected_any'],
+        ['选择了监管者', 'hunter_selected'],
+        ['增加了第 x 个 ban 位', 'round_ban_added_index'],
+        ['增加了 x 个全局 ban 位', 'global_ban_added_count'],
+        ['增加了 ban 位', 'ban_added']
+      ].forEach(([label, value]) => {
+        const option = document.createElement('option')
+        option.value = value
+        option.textContent = label
+        if (rule.eventType === value) option.selected = true
+        eventTypeSelect.appendChild(option)
+      })
+      bindEditableValue(eventTypeSelect, () => {
+        const liveRule = getBlockEventRuleById(rule.id)
+        if (!liveRule) return
+        liveRule.eventType = eventTypeSelect.value
+        renderBlockEventRuleEditor()
+        saveBlockEventWorkspaceToLayout(true)
+        setBlockEventModalStatus(`事件已切换为“${eventTypeSelect.options[eventTypeSelect.selectedIndex]?.textContent || liveRule.eventType}”。`)
+      })
+      const eventLabel = document.createElement('label')
+      eventLabel.textContent = '事件'
+      eventLabel.appendChild(eventTypeSelect)
+      eventForm.appendChild(eventLabel)
+
+      if (rule.eventType === 'survivor_count_selected') {
+        const input = document.createElement('input')
+        input.type = 'number'
+        input.min = '1'
+        input.max = '4'
+        input.step = '1'
+        input.value = String(rule.survivorIndex || 1)
+        bindEditableValue(input, () => {
+          rule.survivorIndex = Math.max(1, Math.min(4, Math.round(asNumber(input.value, 1))))
+          input.value = String(rule.survivorIndex)
+          saveBlockEventWorkspaceToLayout(true)
+        })
+        const label = document.createElement('label')
+        label.textContent = '第几个'
+        label.appendChild(input)
+        eventForm.appendChild(label)
+      }
+
+      if (rule.eventType === 'round_ban_added_index' || rule.eventType === 'global_ban_added_count' || rule.eventType === 'ban_added') {
+        const sideSelect = document.createElement('select')
+        ;[['求生者', 'survivor'], ['监管者', 'hunter']].forEach(([label, value]) => {
+          const option = document.createElement('option')
+          option.value = value
+          option.textContent = label
+          if (rule.banSide === value) option.selected = true
+          sideSelect.appendChild(option)
+        })
+        bindEditableValue(sideSelect, () => {
+          rule.banSide = sideSelect.value
+          saveBlockEventWorkspaceToLayout(true)
+        })
+        const sideLabel = document.createElement('label')
+        sideLabel.textContent = '阵营'
+        sideLabel.appendChild(sideSelect)
+        eventForm.appendChild(sideLabel)
+      }
+
+      if (rule.eventType === 'round_ban_added_index' || rule.eventType === 'global_ban_added_count') {
+        const countInput = document.createElement('input')
+        countInput.type = 'number'
+        countInput.min = '1'
+        countInput.max = '8'
+        countInput.step = '1'
+        countInput.value = String(rule.banCount || 1)
+        bindEditableValue(countInput, () => {
+          rule.banCount = Math.max(1, Math.min(8, Math.round(asNumber(countInput.value, 1))))
+          countInput.value = String(rule.banCount)
+          saveBlockEventWorkspaceToLayout(true)
+        })
+        const countLabel = document.createElement('label')
+        countLabel.textContent = rule.eventType === 'round_ban_added_index' ? '第几个' : '数量'
+        countLabel.appendChild(countInput)
+        eventForm.appendChild(countLabel)
+      }
+
+      if (rule.eventType === 'ban_added') {
+        const scopeSelect = document.createElement('select')
+        ;[['任意', 'any'], ['回合 ban', 'round'], ['全局 ban', 'global']].forEach(([label, value]) => {
+          const option = document.createElement('option')
+          option.value = value
+          option.textContent = label
+          if (rule.banScope === value) option.selected = true
+          scopeSelect.appendChild(option)
+        })
+        bindEditableValue(scopeSelect, () => {
+          rule.banScope = scopeSelect.value
+          saveBlockEventWorkspaceToLayout(true)
+        })
+        const scopeLabel = document.createElement('label')
+        scopeLabel.textContent = '类型'
+        scopeLabel.appendChild(scopeSelect)
+        eventForm.appendChild(scopeLabel)
+      }
+
+      eventBox.appendChild(eventForm)
+      card.appendChild(eventBox)
+
+      const actionsBox = document.createElement('div')
+      actionsBox.className = 'block-rule-actions'
+      const actionsHead = document.createElement('div')
+      actionsHead.className = 'block-rule-head'
+      const actionsTitle = document.createElement('div')
+      actionsTitle.className = 'block-rule-title'
+      actionsTitle.textContent = '执行这些动作'
+      const addActionBtn = document.createElement('button')
+      addActionBtn.className = 'btn'
+      addActionBtn.type = 'button'
+      addActionBtn.textContent = '新增动作积木'
+      addActionBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        const currentRule = getBlockEventRuleById(rule.id)
+        if (currentRule) {
+          if (!Array.isArray(currentRule.actions)) currentRule.actions = []
+          currentRule.actions.push(createDefaultBlockEventAction('wait'))
+        }
+        renderBlockEventRuleEditor()
+        saveBlockEventWorkspaceToLayout(true)
+        refreshBlockEventSummary()
+        setBlockEventModalStatus('已添加一个动作积木。')
+      })
+      actionsHead.appendChild(actionsTitle)
+      actionsHead.appendChild(addActionBtn)
+      actionsBox.appendChild(actionsHead)
+
+      if (!Array.isArray(rule.actions) || !rule.actions.length) {
+        const empty = document.createElement('div')
+        empty.className = 'block-rule-empty'
+        empty.textContent = '这个事件还没有动作。点击“新增动作积木”即可追加。'
+        actionsBox.appendChild(empty)
+      } else {
+        rule.actions.forEach((action) => {
+          const actionCard = document.createElement('div')
+          actionCard.className = 'block-action-card'
+          const actionHead = document.createElement('div')
+          actionHead.className = 'block-action-head'
+          const actionTitle = document.createElement('div')
+          actionTitle.className = 'block-action-title'
+          actionTitle.textContent = '执行'
+          const removeActionBtn = document.createElement('button')
+          removeActionBtn.className = 'btn'
+          removeActionBtn.type = 'button'
+          removeActionBtn.textContent = '删除动作'
+          removeActionBtn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            const currentRule = getBlockEventRuleById(rule.id)
+            if (currentRule && Array.isArray(currentRule.actions)) {
+              currentRule.actions = currentRule.actions.filter(item => item.id !== action.id)
+            }
+            renderBlockEventRuleEditor()
+            saveBlockEventWorkspaceToLayout(true)
+            refreshBlockEventSummary()
+            setBlockEventModalStatus('已删除一个动作积木。')
+          })
+          actionHead.appendChild(actionTitle)
+          actionHead.appendChild(removeActionBtn)
+          actionCard.appendChild(actionHead)
+
+          const actionForm = document.createElement('div')
+          actionForm.className = 'block-form-grid'
+          const typeSelect = document.createElement('select')
+          ;[
+            ['移动视角到点位', 'move_camera'],
+            ['触发原关键帧事件', 'trigger_keyframe'],
+            ['切换天气', 'weather'],
+            ['切换摄像机内容', 'camera_content'],
+            ['等待', 'wait']
+          ].forEach(([label, value]) => {
+            const option = document.createElement('option')
+            option.value = value
+            option.textContent = label
+            if (action.type === value) option.selected = true
+            typeSelect.appendChild(option)
+          })
+          bindEditableValue(typeSelect, () => {
+            const liveAction = getBlockEventActionById(rule.id, action.id)
+            if (!liveAction) return
+            liveAction.type = typeSelect.value
+            renderBlockEventRuleEditor()
+            saveBlockEventWorkspaceToLayout(true)
+            setBlockEventModalStatus(`动作已切换为“${typeSelect.options[typeSelect.selectedIndex]?.textContent || liveAction.type}”。`)
+          })
+          const typeLabel = document.createElement('label')
+          typeLabel.textContent = '动作'
+          typeLabel.appendChild(typeSelect)
+          actionForm.appendChild(typeLabel)
+
+          if (action.type === 'move_camera') {
+            const shotSelect = document.createElement('select')
+            getBlockCameraShotOptions().forEach(([label, value]) => {
+              const option = document.createElement('option')
+              option.value = value
+              option.textContent = label
+              if (action.shotId === value) option.selected = true
+              shotSelect.appendChild(option)
+            })
+            bindEditableValue(shotSelect, () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              if (!liveAction) return
+              liveAction.shotId = shotSelect.value
+              saveBlockEventWorkspaceToLayout(true)
+            })
+            const shotLabel = document.createElement('label')
+            shotLabel.textContent = '点位'
+            shotLabel.appendChild(shotSelect)
+            actionForm.appendChild(shotLabel)
+
+            const quickRecordBtn = document.createElement('button')
+            quickRecordBtn.className = 'btn'
+            quickRecordBtn.type = 'button'
+            quickRecordBtn.textContent = '记录并绑定当前视角'
+            quickRecordBtn.addEventListener('click', () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              recordBlockCameraShotFromCurrent(liveAction || action)
+            })
+            actionForm.appendChild(quickRecordBtn)
+
+            if (!getBlockCameraShotEntries().length) {
+              const hint = document.createElement('div')
+              hint.className = 'block-action-hint'
+              hint.textContent = '还没有镜头点位。可以直接点右边“记录当前视角为新点位”，或者点这里的“记录并绑定当前视角”。'
+              actionForm.appendChild(hint)
+            }
+
+            const durationInput = document.createElement('input')
+            durationInput.type = 'number'
+            durationInput.min = '50'
+            durationInput.max = '10000'
+            durationInput.step = '50'
+            durationInput.value = String(action.durationMs || 900)
+            bindEditableValue(durationInput, () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              if (!liveAction) return
+              liveAction.durationMs = Math.max(50, Math.min(10000, Math.round(asNumber(durationInput.value, 900))))
+              durationInput.value = String(liveAction.durationMs)
+              saveBlockEventWorkspaceToLayout(true)
+            })
+            const durationLabel = document.createElement('label')
+            durationLabel.textContent = '时长 ms'
+            durationLabel.appendChild(durationInput)
+            actionForm.appendChild(durationLabel)
+          } else if (action.type === 'trigger_keyframe') {
+            const eventSelect = document.createElement('select')
+            getBlockCameraEventOptions().forEach(([label, value]) => {
+              const option = document.createElement('option')
+              option.value = value
+              option.textContent = label
+              if (action.eventKey === value) option.selected = true
+              eventSelect.appendChild(option)
+            })
+            bindEditableValue(eventSelect, () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              if (!liveAction) return
+              liveAction.eventKey = eventSelect.value
+              saveBlockEventWorkspaceToLayout(true)
+            })
+            const eventLabel = document.createElement('label')
+            eventLabel.textContent = '关键帧'
+            eventLabel.appendChild(eventSelect)
+            actionForm.appendChild(eventLabel)
+          } else if (action.type === 'weather') {
+            const weatherSelect = document.createElement('select')
+            getBlockWeatherOptions().forEach(([label, value]) => {
+              const option = document.createElement('option')
+              option.value = value
+              option.textContent = label
+              if (action.weatherPreset === value) option.selected = true
+              weatherSelect.appendChild(option)
+            })
+            bindEditableValue(weatherSelect, () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              if (!liveAction) return
+              liveAction.weatherPreset = weatherSelect.value
+              saveBlockEventWorkspaceToLayout(true)
+            })
+            const weatherLabel = document.createElement('label')
+            weatherLabel.textContent = '天气'
+            weatherLabel.appendChild(weatherSelect)
+            actionForm.appendChild(weatherLabel)
+          } else if (action.type === 'camera_content') {
+            const modeSelect = document.createElement('select')
+            ;[['启用虚拟摄像机主镜头', 'virtual_on'], ['关闭虚拟摄像机主镜头', 'virtual_off'], ['切换虚拟摄像机主镜头', 'virtual_toggle']].forEach(([label, value]) => {
+              const option = document.createElement('option')
+              option.value = value
+              option.textContent = label
+              if (action.cameraMode === value) option.selected = true
+              modeSelect.appendChild(option)
+            })
+            bindEditableValue(modeSelect, () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              if (!liveAction) return
+              liveAction.cameraMode = modeSelect.value
+              saveBlockEventWorkspaceToLayout(true)
+            })
+            const modeLabel = document.createElement('label')
+            modeLabel.textContent = '模式'
+            modeLabel.appendChild(modeSelect)
+            actionForm.appendChild(modeLabel)
+          } else if (action.type === 'wait') {
+            const waitInput = document.createElement('input')
+            waitInput.type = 'number'
+            waitInput.min = '0'
+            waitInput.max = '60'
+            waitInput.step = '0.1'
+            waitInput.value = String(action.waitSeconds || 0)
+            bindEditableValue(waitInput, () => {
+              const liveAction = getBlockEventActionById(rule.id, action.id)
+              if (!liveAction) return
+              liveAction.waitSeconds = Math.max(0, Math.min(60, asNumber(waitInput.value, 0)))
+              waitInput.value = String(liveAction.waitSeconds)
+              saveBlockEventWorkspaceToLayout(true)
+            })
+            const waitLabel = document.createElement('label')
+            waitLabel.textContent = '秒数'
+            waitLabel.appendChild(waitInput)
+            actionForm.appendChild(waitLabel)
+          }
+
+          actionCard.appendChild(actionForm)
+          actionsBox.appendChild(actionCard)
+        })
+      }
+      card.appendChild(actionsBox)
+      list.appendChild(card)
+    })
+    dom.blocklyWorkspace.appendChild(list)
+  }
+
+  function syncBlockEventUi() {
+    const cfg = ensureBlockEventState()
+    if (dom.blockEventEnabled) dom.blockEventEnabled.checked = cfg.enabled !== false
+    refreshBlockEventSummary()
+    renderBlockCameraShotList()
+    renderBlockEventRuleEditor()
+    if (cfg.rules.length) {
+      setBlockEventModalStatus(`当前有 ${cfg.rules.length} 条事件规则，可直接修改事件条件、动作类型和参数。`)
+    } else {
+      setBlockEventModalStatus('当前还没有规则，点“新增事件积木”或“清空积木区”恢复默认模板。')
+    }
+  }
+
+  function openBlockEventModal() {
+    if (!dom.blockEventModal) return
+    dom.blockEventModal.classList.add('open')
+    dom.blockEventModal.setAttribute('aria-hidden', 'false')
+    const cfg = healBlockEventConfig()
+    if (!Array.isArray(cfg.rules) || !cfg.rules.length) {
+      cfg.rules = [createDefaultBlockEventRule()]
+    }
+    ensureBlockEventWorkspace()
+    syncBlockEventWorkspaceFromLayout()
+    syncBlockEventUi()
+    triggerBlockEventInitOnce()
+  }
+
+  function closeBlockEventModal() {
+    if (!dom.blockEventModal) return
+    dom.blockEventModal.classList.remove('open')
+    dom.blockEventModal.setAttribute('aria-hidden', 'true')
+    saveBlockEventWorkspaceToLayout(false)
+    scheduleSaveLayout()
+  }
+
+  function isBlockEventMatch(block, event) {
+    if (!block || !event) return false
+    switch (block.eventType) {
+      case 'page_init':
+        return event.type === 'page_init'
+      case 'survivor_count_selected':
+        return event.type === 'survivor_count_selected' && event.count === Math.round(asNumber(block.survivorIndex, 1))
+      case 'survivor_selected_any':
+        return event.type === 'survivor_selected_any'
+      case 'hunter_selected':
+        return event.type === 'hunter_selected'
+      case 'round_ban_added_index':
+        return event.type === 'round_ban_added_index'
+          && event.side === String(block.banSide || '')
+          && event.index === Math.round(asNumber(block.banCount, 1))
+      case 'global_ban_added_count':
+        return event.type === 'global_ban_added_count'
+          && event.side === String(block.banSide || '')
+          && event.count === Math.round(asNumber(block.banCount, 1))
+      case 'ban_added': {
+        if (event.type !== 'ban_added') return false
+        const scope = String(block.banScope || 'any')
+        const side = String(block.banSide || '')
+        return side === event.side && (scope === 'any' || scope === event.scope)
+      }
+      default:
+        return false
+    }
+  }
+
+  function sleepMs(ms) {
+    return new Promise(resolve => window.setTimeout(resolve, Math.max(0, ms)))
+  }
+
+  async function executeBlockAction(block) {
+    if (!block) return
+    switch (block.type) {
+      case 'move_camera': {
+        const shotId = String(block.shotId || '')
+        const shot = ensureBlockEventState().cameraShots?.[shotId]
+        if (!shot) return
+        const duration = Math.max(50, Math.min(10000, Math.round(asNumber(block.durationMs, state.layout?.cameraTransitionMs || 900))))
+        startCameraTransition(shot, duration, `积木事件镜头 ${shot.name}`)
+        await sleepMs(duration + 40)
+        return
+      }
+      case 'trigger_keyframe': {
+        const key = String(block.eventKey || '')
+        if (key) triggerCameraEvent(key)
+        return
+      }
+      case 'camera_content': {
+        const mode = String(block.cameraMode || '')
+        if (mode === 'virtual_on') enableVirtualCameraMode()
+        else if (mode === 'virtual_off') disableVirtualCameraMode()
+        else toggleVirtualCameraMode()
+        return
+      }
+      case 'weather': {
+        const preset = String(block.weatherPreset || 'clear')
+        applyWeatherPreset(preset, false)
+        return
+      }
+      case 'wait': {
+        const seconds = Math.max(0, asNumber(block.waitSeconds, 0))
+        await sleepMs(seconds * 1000)
+        return
+      }
+      default:
+        return
+    }
+  }
+
+  async function executeBlockStatementChain(actions) {
+    const list = Array.isArray(actions) ? actions : []
+    for (const action of list) {
+      await executeBlockAction(action)
+    }
+  }
+
+  function dispatchBlockEvent(event) {
+    const cfg = ensureBlockEventState()
+    if (!cfg.enabled) return
+    const rules = Array.isArray(cfg.rules) ? cfg.rules : []
+    rules.forEach((rule) => {
+      if (!isBlockEventMatch(rule, event)) return
+      void executeBlockStatementChain(rule.actions)
+    })
+  }
+
+  function triggerBlockEventInitOnce() {
+    if (blocklyInitTriggered) return
+    blocklyInitTriggered = true
+    dispatchBlockEvent({ type: 'page_init' })
   }
 
   function applyTransformToGroup(key, transform) {
@@ -4941,7 +6067,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (cached && !/^https?:\/\//i.test(cached)) return cached
     }
 
-    // 1) 强制优先从本机 official-models 目录解析
+    // 1) 强制优先从本机 official-models 目录解析 (Electron 环境)
     try {
       if (window.electronAPI && window.electronAPI.invoke) {
         const res = await window.electronAPI.invoke('localBp:getOfficialModelLocalPath', roleName)
@@ -4958,15 +6084,64 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       console.warn('[CharacterModel3D] 获取本地官方模型失败:', roleName, error)
     }
 
+    // 2) 浏览器模式：通过 HTTP API 获取模型映射
+    if (runtimeEnv.isBrowserHosted && window.location.protocol.startsWith('http')) {
+      try {
+        // 每次都重新获取模型映射，确保数据最新
+        const mapRes = await fetch('/api/official-model-map')
+        if (mapRes.ok) {
+          const mapData = await mapRes.json()
+          if (mapData && typeof mapData === 'object' && Object.keys(mapData).length > 0) {
+            state.officialModelMap = mapData
+            state.officialModelMapLoaded = true
+            // 尝试多种匹配方式
+            const mappedPath = mapData[roleName] || mapData[clean] || ''
+            if (mappedPath) {
+              state.roleModelPathCache[cacheKey] = mappedPath
+              return mappedPath
+            }
+            // 模糊匹配：遍历映射表查找包含角色名的条目
+            for (const [key, path] of Object.entries(mapData)) {
+              if (key.includes(clean) || key.includes(roleName) || clean.includes(key) || roleName.includes(key)) {
+                state.roleModelPathCache[cacheKey] = path
+                return path
+              }
+            }
+          }
+        }
+        // 直接尝试标准路径格式
+        const nameToUse = clean || roleName
+        const encodedName = encodeURIComponent(nameToUse)
+        const standardPaths = [
+          `/official-models/${encodedName}/${encodedName}.glb`,
+          `/official-models/${encodedName}/${encodedName}.gltf`,
+          `/official-models/${encodedName}.glb`,
+          `/official-models/${encodedName}.gltf`
+        ]
+        for (const testPath of standardPaths) {
+          try {
+            const headRes = await fetch(testPath, { method: 'HEAD' })
+            if (headRes.ok) {
+              state.roleModelPathCache[cacheKey] = testPath
+              return testPath
+            }
+          } catch { /* ignore */ }
+        }
+      } catch (error) {
+        console.warn('[CharacterModel3D] 浏览器模式获取官方模型失败:', roleName, error)
+      }
+    }
+
+    // 3) 从已加载的映射中查找
     const directMap = state.officialModelMap && typeof state.officialModelMap === 'object'
-      ? (state.officialModelMap[clean] || state.officialModelMap[roleName] || '')
+      ? (state.officialModelMap[roleName] || state.officialModelMap[clean] || '')
       : ''
     if (typeof directMap === 'string' && directMap.trim()) {
       state.roleModelPathCache[cacheKey] = directMap.trim()
       return directMap.trim()
     }
 
-    // 2) 浏览器模式允许显式配置的 HTTP(S) / blob URL / 相对路径映射
+    // 4) 浏览器模式允许显式配置的 HTTP(S) / blob URL / 相对路径映射
     return ''
   }
 
@@ -4981,6 +6156,9 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     for (let i = 0; i < 4; i++) {
       const roleName = survivors[i] || ''
       const slotKey = `survivor${i + 1}`
+      const runtime = slotRuntime.get(slotKey)
+      const prevRoleName = state.slotDisplayNames[slotKey] || ''
+      const prevModelPath = state.slotModelPaths[slotKey] || ''
       state.slotDisplayNames[slotKey] = roleName || ''
       applyTransformToGroup(slotKey, state.layout.slots[slotKey])
       const modelPath = survivorModels[i] || ''
@@ -4988,10 +6166,19 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       if (roleName && !modelPath) {
         setStatus(`未命中本地模型: ${slotKey} -> ${roleName}`)
       }
-      await loadModelForSlot(slotKey, modelPath)
-      await new Promise((r) => setTimeout(r, 0))
+      const needsReload = prevRoleName !== roleName
+        || prevModelPath !== modelPath
+        || !runtime?.model
+        || runtime?.loadingPath
+      if (needsReload) {
+        await loadModelForSlot(slotKey, modelPath)
+        await new Promise((r) => setTimeout(r, 0))
+      }
     }
     const hunterName = state.bp.hunter || ''
+    const hunterRuntime = slotRuntime.get('hunter')
+    const prevHunterName = state.slotDisplayNames.hunter || ''
+    const prevHunterModel = state.slotModelPaths.hunter || ''
     state.slotDisplayNames.hunter = hunterName || ''
     applyTransformToGroup('hunter', state.layout.slots.hunter)
     const hunterModel = await findOfficialModel(hunterName)
@@ -4999,7 +6186,13 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (hunterName && !hunterModel) {
       setStatus(`未命中本地模型: hunter -> ${hunterName}`)
     }
-    await loadModelForSlot('hunter', hunterModel)
+    const hunterNeedsReload = prevHunterName !== hunterName
+      || prevHunterModel !== hunterModel
+      || !hunterRuntime?.model
+      || hunterRuntime?.loadingPath
+    if (hunterNeedsReload) {
+      await loadModelForSlot('hunter', hunterModel)
+    }
     renderSlotTabs()
     syncRoleScaleModal(false)
   }
@@ -5231,6 +6424,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
   function closeAnyOpenModal() {
     closeRoleScaleModal()
     closeCameraCurveModal()
+    closeBlockEventModal()
   }
 
   function applyRoleScaleOverrideToRole(roleName) {
@@ -5408,6 +6602,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncCameraEditorInputs()
     syncEntranceParticleUi()
     syncWeatherInputs()
+    syncBlockEventUi()
     syncStylizedRenderInputs()
     syncAdvancedRenderInputs()
     if (dom.maxFps) dom.maxFps.value = String(Math.max(10, Math.min(240, asNumber(state.layout.maxFps, 60))))
@@ -5439,12 +6634,14 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
   }
 
   function collectPersistLayout() {
+    healBlockEventConfig()
     const payload = deepClone(state.layout)
     if (runtimeEnv.isBrowserHosted) {
       if (String(payload?.scene?.modelPath || '').startsWith('blob:')) payload.scene.modelPath = ''
       if (String(payload?.videoScreen?.path || '').startsWith('blob:')) payload.videoScreen.path = ''
       if (String(payload?.customModelPath || '').startsWith('blob:')) payload.customModelPath = ''
       if (String(payload?.entranceParticle?.path || '').startsWith('blob:')) payload.entranceParticle.path = ''
+      if (String(payload?.weather?.particleTexturePath || '').startsWith('blob:')) payload.weather.particleTexturePath = ''
     }
     return payload
   }
@@ -6151,6 +7348,56 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     setStatus('已导入出场粒子特效')
   }
 
+  async function importWeatherParticleTexture() {
+    let selectedPath = ''
+    try {
+      if (window.electronAPI && window.electronAPI.selectFileWithFilter) {
+        const result = await window.electronAPI.selectFileWithFilter({
+          filters: [{ name: '图片', extensions: ['png', 'webp', 'jpg', 'jpeg'] }]
+        })
+        if (result && result.success && result.path) selectedPath = result.path
+      } else {
+        const picked = await selectAssetPathForBrowser({
+          accept: '.png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg',
+          preferredExtensions: ['.png', '.webp', '.jpg', '.jpeg'],
+          promptText: '请输入风粒子图片 URL（推荐透明 PNG / WebP）:',
+          defaultValue: state.layout?.weather?.particleTexturePath || ''
+        })
+        if (picked && picked.path) selectedPath = picked.path
+      }
+    } catch (error) {
+      console.error('[CharacterModel3D] 选择风粒子图片失败:', error)
+    }
+    if (!selectedPath) {
+      const input = window.prompt('请输入风粒子图片路径(URL 或本地路径，推荐透明 PNG / WebP):', state.layout?.weather?.particleTexturePath || '')
+      if (!input) return
+      selectedPath = input.trim()
+    }
+    if (!selectedPath) return
+    selectedPath = await importAssetForPack(selectedPath, 'single')
+    const texture = await ensureWeatherParticleTexture(selectedPath)
+    if (!texture) {
+      window.alert('风粒子图片加载失败，请确认文件存在且为可用图片格式')
+      return
+    }
+    const next = ensureWeatherSettings()
+    next.particleTexturePath = selectedPath
+    syncWeatherInputs()
+    applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
+    scheduleSaveLayout()
+    setStatus('已导入风粒子图片')
+  }
+
+  function clearWeatherParticleTexture() {
+    const next = ensureWeatherSettings()
+    next.particleTexturePath = ''
+    disposeWeatherParticleTextureAsset()
+    syncWeatherInputs()
+    applyWeatherPreset(state.layout?.weatherPreset || 'clear', false)
+    scheduleSaveLayout()
+    setStatus('已恢复默认风粒子白块')
+  }
+
   function clearEntranceParticle() {
     if (!state.layout.entranceParticle) state.layout.entranceParticle = { path: '' }
     state.layout.entranceParticle.path = ''
@@ -6183,6 +7430,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.customModelClearBtn) dom.customModelClearBtn.addEventListener('click', clearCustomModel)
     if (dom.particleImportBtn) dom.particleImportBtn.addEventListener('click', importEntranceParticle)
     if (dom.particleClearBtn) dom.particleClearBtn.addEventListener('click', clearEntranceParticle)
+    if (dom.weatherParticleTextureImportBtn) dom.weatherParticleTextureImportBtn.addEventListener('click', importWeatherParticleTexture)
+    if (dom.weatherParticleTextureClearBtn) dom.weatherParticleTextureClearBtn.addEventListener('click', clearWeatherParticleTexture)
     if (dom.videoImportBtn) dom.videoImportBtn.addEventListener('click', importVideoScreen)
     if (dom.videoClearBtn) dom.videoClearBtn.addEventListener('click', clearVideoScreen)
     if (dom.applyVideoSettingsBtn) dom.applyVideoSettingsBtn.addEventListener('click', applyVideoSettingsFromInputs)
@@ -6203,6 +7452,8 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.closeRoleScaleModalBtn) dom.closeRoleScaleModalBtn.addEventListener('click', closeRoleScaleModal)
     if (dom.openCameraCurveModalBtn) dom.openCameraCurveModalBtn.addEventListener('click', openCameraCurveModal)
     if (dom.closeCameraCurveModalBtn) dom.closeCameraCurveModalBtn.addEventListener('click', closeCameraCurveModal)
+    if (dom.openBlockEventModalBtn) dom.openBlockEventModalBtn.addEventListener('click', openBlockEventModal)
+    if (dom.closeBlockEventModalBtn) dom.closeBlockEventModalBtn.addEventListener('click', closeBlockEventModal)
     if (dom.errorPanelCloseBtn) dom.errorPanelCloseBtn.addEventListener('click', () => setPersistentError(''))
     if (dom.roleScaleRoleSelect) {
       dom.roleScaleRoleSelect.addEventListener('change', () => {
@@ -6221,6 +7472,39 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         if (e.target === dom.cameraCurveModal) closeCameraCurveModal()
       })
     }
+    if (dom.blockEventModal) {
+      dom.blockEventModal.addEventListener('click', (e) => {
+        if (e.target === dom.blockEventModal) closeBlockEventModal()
+      })
+    }
+    if (dom.blockEventEnabled) {
+      dom.blockEventEnabled.addEventListener('change', () => {
+        const cfg = ensureBlockEventState()
+        cfg.enabled = !!dom.blockEventEnabled.checked
+        refreshBlockEventSummary()
+        scheduleSaveLayout()
+      })
+    }
+    if (dom.addBlockEventRuleBtn) {
+      dom.addBlockEventRuleBtn.addEventListener('click', () => {
+        const cfg = ensureBlockEventState()
+        cfg.rules.push(createDefaultBlockEventRule())
+        renderBlockEventRuleEditor()
+        saveBlockEventWorkspaceToLayout(true)
+        setBlockEventModalStatus('已新增一个默认事件积木，从“选择第 1 个求生者”开始。')
+      })
+    }
+    if (dom.recordBlockCameraShotBtn) dom.recordBlockCameraShotBtn.addEventListener('click', recordBlockCameraShotFromCurrent)
+    if (dom.clearBlockWorkspaceBtn) {
+      dom.clearBlockWorkspaceBtn.addEventListener('click', () => {
+        const cfg = ensureBlockEventState()
+        cfg.rules = [createDefaultBlockEventRule()]
+        renderBlockEventRuleEditor()
+        saveBlockEventWorkspaceToLayout(true)
+        setBlockEventModalStatus('已恢复默认积木模板。')
+      })
+    }
+    if (dom.refreshBlockShotListBtn) dom.refreshBlockShotListBtn.addEventListener('click', renderBlockCameraShotList)
     if (dom.focusSelectedBtn) dom.focusSelectedBtn.addEventListener('click', focusCameraOnSelectedSlot)
     if (dom.cameraEventSelect) {
       dom.cameraEventSelect.addEventListener('change', () => {
@@ -6329,6 +7613,21 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
     if (dom.weatherWindIntensity) {
       dom.weatherWindIntensity.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherParticleDensity) {
+      dom.weatherParticleDensity.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherParticleSpeed) {
+      dom.weatherParticleSpeed.addEventListener('change', () => {
+        applyWeatherSettingsFromInputs(true)
+      })
+    }
+    if (dom.weatherParticleMaxDistance) {
+      dom.weatherParticleMaxDistance.addEventListener('change', () => {
         applyWeatherSettingsFromInputs(true)
       })
     }
@@ -6512,6 +7811,11 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dom.blockEventModal?.classList.contains('open')) {
+        e.preventDefault()
+        closeBlockEventModal()
+        return
+      }
       if (e.key === 'Escape' && isCameraCurveModalOpen()) {
         e.preventDefault()
         closeCameraCurveModal()
@@ -6739,6 +8043,10 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (runtimeEnv.isBrowserHosted && nextState.characterModel3DLayout && typeof nextState.characterModel3DLayout === 'object') {
       void applyExternalLayout(nextState.characterModel3DLayout)
     }
+    const prevHunterBannedSurvivors = Array.isArray(state.bp.hunterBannedSurvivors) ? state.bp.hunterBannedSurvivors.slice() : []
+    const prevSurvivorBannedHunters = Array.isArray(state.bp.survivorBannedHunters) ? state.bp.survivorBannedHunters.slice() : []
+    const prevGlobalBannedSurvivors = Array.isArray(state.bp.globalBannedSurvivors) ? state.bp.globalBannedSurvivors.slice() : []
+    const prevGlobalBannedHunters = Array.isArray(state.bp.globalBannedHunters) ? state.bp.globalBannedHunters.slice() : []
     const prevSurvivorCount = state.bpSelectionState.survivorCount || 0
     const prevHunterSelected = !!state.bpSelectionState.hunterSelected
     const prevRoundBanCount = state.bpSelectionState.roundBanCount || 0
@@ -6775,6 +8083,45 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         requestCameraEvent(cameraEventKey)
       }
     }
+
+    if (nextSurvivorCount > prevSurvivorCount) {
+      for (let count = prevSurvivorCount + 1; count <= nextSurvivorCount; count++) {
+        const roleName = state.bp.survivors[count - 1] || ''
+        dispatchBlockEvent({ type: 'survivor_count_selected', count, roleName })
+        dispatchBlockEvent({ type: 'survivor_selected_any', count, roleName })
+      }
+    }
+    if (!prevHunterSelected && nextHunterSelected) {
+      dispatchBlockEvent({ type: 'hunter_selected', roleName: state.bp.hunter || '' })
+    }
+
+    const roundSides = [
+      { side: 'survivor', prev: prevHunterBannedSurvivors, next: state.bp.hunterBannedSurvivors },
+      { side: 'hunter', prev: prevSurvivorBannedHunters, next: state.bp.survivorBannedHunters }
+    ]
+    roundSides.forEach(({ side, prev, next }) => {
+      const prevCount = countNamedEntries(prev)
+      const nextCount = countNamedEntries(next)
+      if (nextCount <= prevCount) return
+      for (let index = prevCount + 1; index <= nextCount; index++) {
+        dispatchBlockEvent({ type: 'round_ban_added_index', side, index })
+        dispatchBlockEvent({ type: 'ban_added', side, scope: 'round', index })
+      }
+    })
+
+    const globalSides = [
+      { side: 'survivor', prev: prevGlobalBannedSurvivors, next: state.bp.globalBannedSurvivors },
+      { side: 'hunter', prev: prevGlobalBannedHunters, next: state.bp.globalBannedHunters }
+    ]
+    globalSides.forEach(({ side, prev, next }) => {
+      const prevCount = countNamedEntries(prev)
+      const nextCount = countNamedEntries(next)
+      if (nextCount <= prevCount) return
+      for (let count = prevCount + 1; count <= nextCount; count++) {
+        dispatchBlockEvent({ type: 'global_ban_added_count', side, count })
+        dispatchBlockEvent({ type: 'ban_added', side, scope: 'global', count })
+      }
+    })
 
     // 注意：这里不覆盖本窗口相机/布局，避免切换视角后被回退。
     // 只做 BP 角色同步。
@@ -7003,6 +8350,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     await refreshCameraDevices(false)
     await loadOfficialModelMap()
     await loadInitialState()
+    syncBlockEventUi()
     bindBrowserInterop()
     bindRealtimeBpSync()
     renderLoop()

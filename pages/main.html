@@ -3221,6 +3221,101 @@
 
     // Helper to get element by ID
     const $id = (id) => document.getElementById(id);
+
+    // 愚人节彩蛋：4月1日卡片乱飞
+    (function aprilFoolsEgg() {
+      const today = new Date();
+      const isAprilFools = today.getMonth() === 3 && today.getDate() === 1; // 月份从0开始，3代表4月
+      
+      if (!isAprilFools) return;
+
+      // 只在设置中心页面激活时触发
+      const settingsView = document.getElementById('view-settings');
+      if (!settingsView) return;
+
+      // 监听设置中心页面显示事件
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            const isActive = settingsView.classList.contains('active');
+            if (isActive && !settingsView.dataset.aprilFoolsTriggered) {
+              settingsView.dataset.aprilFoolsTriggered = 'true';
+              triggerAprilFoolsChaos();
+            }
+          }
+        });
+      });
+
+      observer.observe(settingsView, { attributes: true });
+
+      // 如果设置中心已经激活，立即触发
+      if (settingsView.classList.contains('active')) {
+        settingsView.dataset.aprilFoolsTriggered = 'true';
+        setTimeout(triggerAprilFoolsChaos, 500);
+      }
+
+      function triggerAprilFoolsChaos() {
+        const cards = document.querySelectorAll('#view-settings .feature-card');
+        if (cards.length === 0) return;
+
+        // 保存原始位置信息
+        const originalStyles = [];
+        cards.forEach((card) => {
+          originalStyles.push({
+            element: card,
+            position: card.style.position,
+            left: card.style.left,
+            top: card.style.top,
+            transform: card.style.transform,
+            zIndex: card.style.zIndex,
+            transition: card.style.transition
+          });
+        });
+
+        // 显示提示消息
+        showStatus('愚人节快乐！卡片要飞走啦~', 'info');
+
+        // 让卡片乱飞
+        cards.forEach((card, index) => {
+          setTimeout(() => {
+            card.style.position = 'fixed';
+            card.style.zIndex = '9999';
+            card.style.transition = 'all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+            
+            // 随机位置
+            const randomX = Math.random() * (window.innerWidth - 300);
+            const randomY = Math.random() * (window.innerHeight - 200);
+            const randomRotation = (Math.random() - 0.5) * 60; // -30到30度旋转
+            const randomScale = 0.8 + Math.random() * 0.4; // 0.8到1.2倍缩放
+            
+            card.style.left = randomX + 'px';
+            card.style.top = randomY + 'px';
+            card.style.transform = `rotate(${randomRotation}deg) scale(${randomScale})`;
+          }, index * 100);
+        });
+
+        // 5秒后复位
+        setTimeout(() => {
+          showStatus('好啦好啦，卡片回来啦~', 'info');
+          
+          cards.forEach((card, index) => {
+            setTimeout(() => {
+              card.style.transform = 'rotate(0deg) scale(1)';
+              
+              setTimeout(() => {
+                const original = originalStyles[index];
+                card.style.position = original.position;
+                card.style.left = original.left;
+                card.style.top = original.top;
+                card.style.transform = original.transform;
+                card.style.zIndex = original.zIndex;
+                card.style.transition = original.transition;
+              }, 500);
+            }, index * 50);
+          });
+        }, 5000);
+      }
+    })();
   </script>
 </body>
 
