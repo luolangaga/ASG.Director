@@ -185,6 +185,7 @@ const electronAPI = {
   logSetLevel: (level) => ipcRenderer.invoke('log:set-level', level),
   logClear: () => ipcRenderer.invoke('log:clear'),
   logOpenDir: () => ipcRenderer.invoke('log:open-dir'),
+  openLicense: () => ipcRenderer.invoke('open-license'),
 
   // 插件系统
   openPluginManager: () => ipcRenderer.invoke('open-plugin-manager'),

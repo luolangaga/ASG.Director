@@ -28,16 +28,39 @@
 
     <div class="sidebar-nav">
       <button class="nav-item active" id="nav-home" onclick="switchView('home')">
-        <span class="nav-icon">📋</span> 本地 BP
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="9" y1="21" x2="9" y2="9"/>
+          </svg>
+        </span> 本地 BP
       </button>
       <button class="nav-item" id="nav-online" onclick="switchView('online')">
-        <span class="nav-icon">🌐</span> 联网 BP
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </span> 联网 BP
       </button>
       <button class="nav-item" id="nav-settings" onclick="switchView('settings')">
-        <span class="nav-icon">⚙️</span> 设置中心
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span> 设置中心
       </button>
-      <button class="nav-item" id="nav-partners" onclick="switchView('partners')">
-        <span class="nav-icon">🏆</span> 使用该软件的赛事
+      <button class="nav-item" id="nav-about" onclick="switchView('about')">
+        <span class="nav-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </span> 关于软件
       </button>
 
       <div style="height:1px; background:var(--border-color); margin: 8px 16px;"></div>
@@ -57,12 +80,22 @@
       <div style="display:flex; gap:10px; margin-top:12px;">
         <button class="btn-ghost" id="updateBtn" onclick="checkUpdate()" title="检查更新"
           style="flex:1; justify-content:center;"><span class="update-text">更新</span></button>
-        <button class="btn-ghost" id="themeToggleBtn" onclick="toggleTheme()"
-          style="flex:1; justify-content:center;"><span id="themeIcon">🌙</span></button>
+      <button class="btn-ghost" id="themeToggleBtn" onclick="toggleTheme()"
+        style="flex:1; justify-content:center;">
+        <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
         <button class="btn-ghost" id="languageToggleBtn" onclick="toggleLanguage()"
           style="flex:1; justify-content:center;" title="切换语言（部分页面）">中</button>
         <button class="btn-ghost" id="helpBtn" onclick="ASGOnboarding.forceStart()" title="新手引导"
-          style="flex:1; justify-content:center;">❓</button>
+          style="flex:1; justify-content:center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
@@ -84,7 +117,13 @@
               <p style="font-size: 16px; margin-bottom: 24px;">单机导播，快速启动，无需联网连接。</p>
               <button class="btn btn-primary btn-lg" id="localBpBtn">立即开始</button>
             </div>
-            <div style="font-size:100px; opacity:0.8;">📋</div>
+            <div style="font-size:100px; opacity:0.8; color: #555;">
+              <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+            </div>
           </div>
 
           <div class="grid-2">
@@ -96,14 +135,24 @@
                 </div>
                 <button class="btn btn-primary" onclick="switchView('settings')">打开设置</button>
               </div>
-              <div style="font-size:60px; opacity:0.15; margin-top:10px; text-align:right;">⚙️</div>
+              <div style="font-size:60px; opacity:0.15; margin-top:10px; text-align:right; color: #555;">
+              <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </div>
             </div>
 
             <div class="feature-card">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <h3>赛程管理</h3>
-                <button class="btn btn-secondary" id="refreshScheduleBtn" onclick="loadIdveventSchedules()">
-                  🔄 刷新
+                <button class="btn btn-secondary" id="refreshScheduleBtn" onclick="loadIdveventSchedules()" style="display:inline-flex; align-items:center; gap:4px;">
+                  <span aria-hidden="true" style="display:inline-flex; align-items:center;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                  </span>
+                  <span>刷新</span>
                 </button>
               </div>
 
@@ -168,40 +217,218 @@
           </div>
         </div>
 
-        <!-- View: Partners -->
-        <div id="view-partners" class="view-section">
+        <!-- View: About -->
+        <div id="view-about" class="view-section">
           <div class="section-header">
-            <h1 class="section-title">使用该软件的赛事</h1>
-            <p class="section-desc">已接入赛事合作伙伴信息（Logo、简介、官网）。</p>
+            <h1 class="section-title">关于软件</h1>
+            <p class="section-desc">了解 Idvevent Director 的详细信息</p>
           </div>
-          <div class="partners-contact-tip">
-            如果需要加入你们赛事，可以联系邮件：<a href="mailto:luolan233@outlook.com">luolan233@outlook.com</a>
+
+          <div class="about-hero">
+            <div class="about-logo">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+            </div>
+            <div class="about-info">
+              <h2>Idvevent Director</h2>
+              <p class="about-version">版本 3.0.3</p>
+              <p class="about-desc">专业的赛事导播工具，支持本地 BP、联网 BP、自定义页面等功能</p>
+            </div>
           </div>
-          <div style="margin-top: 18px;">
-            <div class="feature-card partner-hub-card">
-              <div class="partner-hub-header">
-                <div>
-                  <h3>赛事名单</h3>
-                  <p>来自 ASG.API 的赛事合作伙伴信息（Logo、简介、官网）。</p>
+
+          <div class="about-grid">
+            <div class="about-card">
+              <div class="about-card-header">
+                <span class="about-card-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                </span>
+                <h3>开源协议</h3>
+              </div>
+              <div class="about-card-content">
+                <p>本软件基于 <strong>MIT</strong> 开源协议开源。</p>
+                <p>您可以自由使用、修改和分发本软件，但需遵循开源协议的相关条款。</p>
+                <div class="about-license-links">
+                  <a href="#" onclick="openLicense()" class="about-link">查看完整协议</a>
                 </div>
-                <button class="btn btn-secondary" id="refreshPartnersBtn" onclick="loadPublicPartners()">
-                  🔄 刷新
-                </button>
               </div>
+            </div>
 
-              <div class="partners-toolbar">
-                <input type="text" id="partnerSearchInput" class="form-input partners-search-input"
-                  placeholder="搜索赛事名称 / 简介 / 类型" oninput="onPartnerSearchInput()">
-                <span id="partnersCount" class="status-badge partners-count-badge">0 条</span>
+            <div class="about-card">
+              <div class="about-card-header">
+                <span class="about-card-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </span>
+                <h3>作者</h3>
               </div>
+              <div class="about-card-content">
+                <div class="about-author-list">
+                  <div class="about-author-item">
+                    <div class="about-author-avatar">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                      </svg>
+                    </div>
+                    <div class="about-author-info">
+                      <span class="about-author-name">哈基毅</span>
+                      <span class="about-author-role">主开发者</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="about-contact">
+                  <span>邮箱: </span>
+                  <a href="mailto:luolan233@outlook.com" class="about-link">luolan233@outlook.com</a>
+                </div>
+              </div>
+            </div>
 
-              <div id="partnersList">
-                <div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px;">
-                  正在加载...
+            <div class="about-card">
+              <div class="about-card-header">
+                <span class="about-card-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                </span>
+                <h3>组件包素材提供者</h3>
+              </div>
+              <div class="about-card-content">
+                <p>感谢以下创作者提供的组件包素材：</p>
+                <div class="about-credit-list">
+                  <div class="about-credit-item">
+                    <span class="about-credit-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      </svg>
+                    </span>
+                    <span>BP前台贴图：LRaku</span>
+                  </div>
+                  <div class="about-credit-item">
+                    <span class="about-credit-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                      </svg>
+                    </span>
+                    <span>3D模型：不知道</span>
+                  </div>
+                  <div class="about-credit-item">
+                    <span class="about-credit-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                        <line x1="9" y1="9" x2="9.01" y2="9"/>
+                        <line x1="15" y1="9" x2="15.01" y2="9"/>
+                      </svg>
+                    </span>
+                    <span>部分美术资源：HYB赛事</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="about-card">
+              <div class="about-card-header">
+                <span class="about-card-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                  </svg>
+                </span>
+                <h3>感谢名单</h3>
+              </div>
+              <div class="about-card-content">
+                <p>感谢以下个人和组织的支持与贡献：</p>
+                <div class="about-credit-list">
+                  <div class="about-credit-item">
+                    <span class="about-credit-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="4"/>
+                      </svg>
+                    </span>
+                    <span>紫洋葱</span>
+                  </div>
+                  <div class="about-credit-item">
+                    <span class="about-credit-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                    </span>
+                    <span>所有使用该软件的朋友</span>
+                  </div>
+                  <div class="about-credit-item">
+                    <span class="about-credit-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                    </span>
+                    <span>ASG.API 赛事合作伙伴</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <div class="about-footer">
+            <p>© 2024-2026 Idvevent Director. All rights reserved.</p>
+            <p>基于 Electron 构建 | 使用 Node.js 技术栈</p>
+          </div>
+
+          <div class="partners-section">
+            <div class="section-header" style="margin-top: 40px;">
+              <h1 class="section-title">使用该软件的赛事</h1>
+              <p class="section-desc">已接入赛事合作伙伴信息（Logo、简介、官网）。</p>
+            </div>
+            <div class="partners-contact-tip">
+              如果需要加入你们赛事，可以联系邮件：<a href="mailto:luolan233@outlook.com">luolan233@outlook.com</a>
+            </div>
+            <div style="margin-top: 18px;">
+              <div class="feature-card partner-hub-card">
+                <div class="partner-hub-header">
+                  <div>
+                    <h3>赛事名单</h3>
+                    <p>来自 ASG.API 的赛事合作伙伴信息（Logo、简介、官网）。</p>
+                  </div>
+                  <button class="btn btn-secondary" id="refreshPartnersBtn" onclick="loadPublicPartners()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;display:inline-block;vertical-align:middle;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>刷新
+                  </button>
+                </div>
+
+                <div class="partners-toolbar">
+                  <input type="text" id="partnerSearchInput" class="form-input partners-search-input"
+                    placeholder="搜索赛事名称 / 简介 / 类型" oninput="onPartnerSearchInput()">
+                  <span id="partnersCount" class="status-badge partners-count-badge">0 条</span>
+                </div>
+
+                <div id="partnersList">
+                  <div style="text-align:center; padding:20px; color:var(--text-secondary); font-size:13px;">
+                    正在加载...
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- View: Partners (保留，备用) -->
+        <div id="view-partners" class="view-section">
         </div>
 
         <!-- View: Online -->
@@ -236,7 +463,15 @@
                   <input type="checkbox" id="globalBan" checked> <span style="font-size:14px;">启用全局禁选</span>
                 </label>
               </div>
-              <button class="btn btn-primary" id="createBtn" style="width:100%">🚀 创建房间</button>
+              <button class="btn btn-primary" id="createBtn" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+                <span aria-hidden="true" style="display:inline-flex; align-items:center;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13"/>
+                    <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+                  </svg>
+                </span>
+                <span>创建房间</span>
+              </button>
 
               <div id="linksContainer"
                 style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border-color);">
@@ -334,15 +569,23 @@
               <h3>布局管理</h3>
               <p>导入或导出您的 BP 布局包，或重置为默认值。</p>
               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
-                <button class="btn btn-secondary" onclick="importBpPack()">📥 导入</button>
-                <button class="btn btn-secondary" onclick="exportBpPack()">📤 导出</button>
-                <button class="btn btn-ghost" onclick="resetLayout()" style="width:100%; border: 1px solid rgba(255,255,255,0.1); margin-top:10px;">🔄 重置为默认</button>
+                <button class="btn btn-secondary" onclick="importBpPack()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 导入
+                </button>
+                <button class="btn btn-secondary" onclick="exportBpPack()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> 导出
+                </button>
+                <button class="btn btn-ghost" onclick="resetLayout()" style="width:100%; border: 1px solid rgba(255,255,255,0.1); margin-top:10px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> 重置为默认
+                </button>
               </div>
             </div>
 
             <div id="pluginCardsSection" style="margin-top:30px; display:none; border-top: 1px solid var(--border-color); padding-top: 30px;">
               <div class="section-header" style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
-                <h2 class="section-title" style="font-size:20px; margin:0;">🧩 插件</h2>
+                <h2 class="section-title" style="font-size:20px; margin:0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px; vertical-align:middle;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>插件
+                </h2>
                 <span class="section-desc">来自已安装的插件</span>
               </div>
               <div id="pluginCardsGrid" class="grid-2"></div>
@@ -350,7 +593,9 @@
 
             <div id="pluginSettingsSection" style="margin-top:30px; display:none; border-top: 1px solid var(--border-color); padding-top: 30px;">
               <div class="section-header" style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
-                <h2 class="section-title" style="font-size:20px; margin:0;">🔌 插件页面</h2>
+                <h2 class="section-title" style="font-size:20px; margin:0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px; vertical-align:middle;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>插件页面
+                </h2>
                 <span class="section-desc">插件注册的设置入口</span>
               </div>
               <div id="pluginSettingsMenu" class="grid-2"></div>
@@ -365,10 +610,18 @@
             <div class="feature-card" id="settings-assets-manage-card">
               <h3>资源管理</h3>
               <div class="grid-2">
-                <button class="btn btn-secondary" onclick="openCharacterManager()">🎭 角色图片管理</button>
-                <button class="btn btn-secondary" onclick="openFontSettings()">🔤 全局字体设置</button>
-                <button class="btn btn-primary" onclick="openComponentEditor()">🎨 自定义组件设计器</button>
-                <button class="btn btn-primary" onclick="openAnimationEditor()">🎬 动画编辑器</button>
+                <button class="btn btn-secondary" onclick="openCharacterManager()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> 角色图片管理
+                </button>
+                <button class="btn btn-secondary" onclick="openFontSettings()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg> 全局字体设置
+                </button>
+                <button class="btn btn-primary" onclick="openComponentEditor()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> 自定义组件设计器
+                </button>
+                <button class="btn btn-primary" onclick="openAnimationEditor()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg> 动画编辑器
+                </button>
               </div>
             </div>
           </div>
@@ -648,7 +901,9 @@
                   <button class="btn btn-primary" onclick="openCharacterModel3DFromSettings()">打开角色模型3D展示</button>
                   <button class="btn btn-secondary" onclick="checkOfficialModelsAndDownloadFromSettings()">检测/下载官方模型</button>
                   <button class="btn btn-secondary" onclick="refreshCharacterModel3DSettingsStatus()">刷新状态</button>
-                  <button class="btn btn-ghost" onclick="openCharacterManager()">🎭 角色图片管理</button>
+                  <button class="btn btn-ghost" onclick="openCharacterManager()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> 角色图片管理
+                  </button>
                 </div>
               </div>
             </div>
@@ -846,15 +1101,17 @@
         return `
           <div class="room-history-item ${isActive ? 'active' : ''}" data-room-id="${room.roomId}">
             <div class="room-history-info">
-              <div class="room-history-id">🎮 房间 ${room.roomId}</div>
+              <div class="room-history-id">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><rect x="4" y="9" width="16" height="8" rx="4"/><rect x="8" y="11" width="4" height="2"/><rect x="9" y="10" width="2" height="4"/><circle cx="16" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/></svg> 房间 ${room.roomId}
+              </div>
               <div class="room-history-meta">
                 ${room.teamAName} vs ${room.teamBName} • BO${room.boType} • ${date}
               </div>
               ${hasLinks ? `
                 <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap;">
-                  ${room.teamALink ? `<button class="room-history-btn" style="background: rgba(100, 181, 246, 0.2); color: #64b5f6; font-size: 10px;" onclick="copyRoomLink('${room.teamALink}', 'A队')">📋 A队</button>` : ''}
-                  ${room.teamBLink ? `<button class="room-history-btn" style="background: rgba(239, 83, 80, 0.2); color: #ef5350; font-size: 10px;" onclick="copyRoomLink('${room.teamBLink}', 'B队')">📋 B队</button>` : ''}
-                  ${room.spectatorLink ? `<button class="room-history-btn" style="background: rgba(255, 215, 0, 0.2); color: #ffd700; font-size: 10px;" onclick="copyRoomLink('${room.spectatorLink}', '观众')">📋 观众</button>` : ''}
+                  ${room.teamALink ? `<button class="room-history-btn" style="background: rgba(100, 181, 246, 0.2); color: #64b5f6; font-size: 10px; display:inline-flex; align-items:center; gap:2px;" onclick="copyRoomLink('${room.teamALink}', 'A队')"><span aria-hidden="true" style="display:inline-flex; align-items:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg></span><span>A队</span></button>` : ''}
+                  ${room.teamBLink ? `<button class="room-history-btn" style="background: rgba(239, 83, 80, 0.2); color: #ef5350; font-size: 10px; display:inline-flex; align-items:center; gap:2px;" onclick="copyRoomLink('${room.teamBLink}', 'B队')"><span aria-hidden="true" style="display:inline-flex; align-items:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg></span><span>B队</span></button>` : ''}
+                  ${room.spectatorLink ? `<button class="room-history-btn" style="background: rgba(255, 215, 0, 0.2); color: #ffd700; font-size: 10px; display:inline-flex; align-items:center; gap:2px;" onclick="copyRoomLink('${room.spectatorLink}', '观众')"><span aria-hidden="true" style="display:inline-flex; align-items:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span><span>观众</span></button>` : ''}
                 </div>
               ` : ''}
             </div>
@@ -1116,7 +1373,7 @@
       } finally {
         if (btn) {
           btn.disabled = false
-          btn.textContent = '🔄 刷新'
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;display:inline-block;vertical-align:middle;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>刷新'
         }
       }
     }
@@ -1170,7 +1427,11 @@
                   ${logoUrl
             ? `<img class="partner-logo" src="${logoUrl}" alt="${name}" onerror="this.style.display='none'; this.parentElement.classList.add('fallback')">`
             : ''}
-                  <span class="partner-logo-fallback">🏆</span>
+                  <span class="partner-logo-fallback">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                  </span>
                 </div>
                 <div class="partner-content">
                   <div class="partner-title">${name}</div>
@@ -1257,10 +1518,10 @@
       const navOnline = document.getElementById('nav-online')
       const navSettings = document.getElementById('nav-settings')
       const navPartners = document.getElementById('nav-partners')
-      if (navHome) navHome.innerHTML = `<span class="nav-icon">📋</span> ${isEn ? 'Local BP' : '本地 BP'}`
-      if (navOnline) navOnline.innerHTML = `<span class="nav-icon">🌐</span> ${isEn ? 'Online BP' : '联网 BP'}`
-      if (navSettings) navSettings.innerHTML = `<span class="nav-icon">⚙️</span> ${isEn ? 'Settings' : '设置中心'}`
-      if (navPartners) navPartners.innerHTML = `<span class="nav-icon">🏆</span> ${isEn ? 'Events Using This App' : '使用该软件的赛事'}`
+      if (navHome) navHome.innerHTML = `<span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></span> ${isEn ? 'Local BP' : '本地 BP'}`
+      if (navOnline) navOnline.innerHTML = `<span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> ${isEn ? 'Online BP' : '联网 BP'}`
+      if (navSettings) navSettings.innerHTML = `<span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> ${isEn ? 'Settings' : '设置中心'}`
+      if (navPartners) navPartners.innerHTML = `<span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span> ${isEn ? 'About' : '关于软件'}`
 
       const startupTitle = document.querySelector('.startup-overlay-title')
       const startupHint = document.getElementById('startupOverlayHint')
@@ -1310,7 +1571,7 @@
         const eventIdInput = homeCards[1].querySelector('#idveventEventId')
         const listPlaceholder = homeCards[1].querySelector('#idveventScheduleList > div')
         if (title) title.textContent = isEn ? 'Schedule' : '赛程管理'
-        if (refreshBtn) refreshBtn.textContent = isEn ? '🔄 Refresh' : '🔄 刷新'
+        if (refreshBtn) refreshBtn.innerHTML = isEn ? '🔄 Refresh' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;display:inline-block;vertical-align:middle;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>刷新'
         if (label) label.textContent = isEn ? 'Event ID (optional)' : '赛事ID (可选)'
         if (eventIdInput) eventIdInput.placeholder = isEn ? 'Leave empty for all events' : '留空获取所有'
         if (listPlaceholder && listPlaceholder.textContent.includes('刷新')) listPlaceholder.textContent = isEn ? 'Click "Refresh" to load schedules' : '点击"刷新"加载赛程'
@@ -1330,6 +1591,107 @@
         if (labels[1]) labels[1].textContent = isEn ? 'HTML Directory' : 'HTML 目录'
         if (labels[2]) labels[2].textContent = isEn ? 'Base URL' : '访问地址'
         if (aiBtn) aiBtn.textContent = isEn ? 'AI Generate Single HTML' : 'AI 生成单页 HTML'
+      }
+
+      const aboutTitle = document.querySelector('#view-about .section-title')
+      const aboutDesc = document.querySelector('#view-about .section-desc')
+      if (aboutTitle) aboutTitle.textContent = isEn ? 'About' : '关于软件'
+      if (aboutDesc) aboutDesc.textContent = isEn ? 'Learn more about Idvevent Director' : '了解 Idvevent Director 的详细信息'
+
+      const aboutHeroTitle = document.querySelector('#view-about .about-info h2')
+      const aboutHeroVersion = document.querySelector('#view-about .about-version')
+      const aboutHeroDesc = document.querySelector('#view-about .about-desc')
+      if (aboutHeroTitle) aboutHeroTitle.textContent = 'Idvevent Director'
+      if (aboutHeroDesc) aboutHeroDesc.textContent = isEn ? 'Professional event directing tool with local BP, online BP, custom pages and more' : '专业的赛事导播工具，支持本地 BP、联网 BP、自定义页面等功能'
+
+      const aboutCards = document.querySelectorAll('#view-about .about-card')
+      const cardTitles = ['Open Source License', 'Author', 'Component Pack Contributors', 'Acknowledgments']
+      const cardTitlesZh = ['开源协议', '作者', '组件包素材提供者', '感谢名单']
+      const cardContents = [
+        isEn ? 'This software is open source under the MIT license.' : '本软件基于 MIT 开源协议开源。',
+        isEn ? 'You can freely use, modify and distribute this software.' : '您可以自由使用、修改和分发本软件，但需遵循开源协议的相关条款。',
+        isEn ? 'View Full License' : '查看完整协议'
+      ]
+      const authorRole = isEn ? 'Lead Developer' : '主开发者'
+      const authorName = '哈基毅'
+      const contactLabel = isEn ? 'Email: ' : '邮箱: '
+      const creditLabels = [
+        isEn ? 'BP Front Texture: LRaku' : 'BP前台贴图：LRaku',
+        isEn ? '3D Models: Buzhidao' : '3D模型：不知道',
+        isEn ? 'Art Resources: HYB Event' : '部分美术资源：HYB赛事'
+      ]
+      const creditLabels2 = [
+        isEn ? 'Purple Onion' : '紫洋葱',
+        isEn ? 'All friends using this software' : '所有使用该软件的朋友',
+        isEn ? 'ASG.API Event Partners' : 'ASG.API 赛事合作伙伴'
+      ]
+      const aboutFooterText1 = isEn ? '© 2024-2026 Idvevent Director. All rights reserved.' : '© 2024-2026 Idvevent Director. All rights reserved.'
+      const aboutFooterText2 = isEn ? 'Built with Electron | Powered by Node.js' : '基于 Electron 构建 | 使用 Node.js 技术栈'
+
+      if (aboutCards[0]) {
+        const h3 = aboutCards[0].querySelector('h3')
+        const p = aboutCards[0].querySelectorAll('p')
+        const link = aboutCards[0].querySelector('.about-link')
+        if (h3) h3.textContent = cardTitlesZh[0]
+        if (p[0]) p[0].textContent = cardContents[0]
+        if (p[1]) p[1].textContent = cardContents[1]
+        if (link) link.textContent = cardContents[2]
+      }
+      if (aboutCards[1]) {
+        const h3 = aboutCards[1].querySelector('h3')
+        const role = aboutCards[1].querySelector('.about-author-role')
+        const contact = aboutCards[1].querySelector('.about-contact span')
+        const authorNameEl = aboutCards[1].querySelector('.about-author-name')
+        if (h3) h3.textContent = cardTitlesZh[1]
+        if (role) role.textContent = authorRole
+        if (contact) contact.textContent = contactLabel
+        if (authorNameEl) authorNameEl.textContent = authorName
+      }
+      if (aboutCards[2]) {
+        const h3 = aboutCards[2].querySelector('h3')
+        const p = aboutCards[2].querySelector('p')
+        const items = aboutCards[2].querySelectorAll('.about-credit-item span:last-child')
+        if (h3) h3.textContent = cardTitlesZh[2]
+        if (p) p.textContent = isEn ? 'Thanks to the following creators for their component pack assets:' : '感谢以下创作者提供的组件包素材：'
+        if (items[0]) items[0].textContent = creditLabels[0]
+        if (items[1]) items[1].textContent = creditLabels[1]
+        if (items[2]) items[2].textContent = creditLabels[2]
+      }
+      if (aboutCards[3]) {
+        const h3 = aboutCards[3].querySelector('h3')
+        const p = aboutCards[3].querySelector('p')
+        const items = aboutCards[3].querySelectorAll('.about-credit-item span:last-child')
+        if (h3) h3.textContent = cardTitlesZh[3]
+        if (p) p.textContent = isEn ? 'Thanks to the following individuals and organizations for their support and contributions:' : '感谢以下个人和组织的支持与贡献：'
+        if (items[0]) items[0].textContent = creditLabels2[0]
+        if (items[1]) items[1].textContent = creditLabels2[1]
+        if (items[2]) items[2].textContent = creditLabels2[2]
+      }
+
+      const partnersSection = document.querySelector('.partners-section .section-title')
+      const partnersDesc = document.querySelector('.partners-section .section-desc')
+      const partnersTip = document.querySelector('.partners-section .partners-contact-tip')
+      const partnersCardTitle = document.querySelector('.partners-section .partner-hub-header h3')
+      const partnersCardDesc = document.querySelector('.partners-section .partner-hub-header p')
+      const refreshBtn = document.querySelector('.partners-section #refreshPartnersBtn')
+      const searchInput = document.querySelector('.partners-section #partnerSearchInput')
+      if (partnersSection) partnersSection.textContent = isEn ? 'Events Using This App' : '使用该软件的赛事'
+      if (partnersDesc) partnersDesc.textContent = isEn ? 'Event partner information (Logo, Description, Website).' : '已接入赛事合作伙伴信息（Logo、简介、官网）。'
+      if (partnersTip) partnersTip.innerHTML = isEn 
+        ? 'If you want to add your event, contact: <a href="mailto:luolan233@outlook.com">luolan233@outlook.com</a>'
+        : '如果需要加入你们赛事，可以联系邮件：<a href="mailto:luolan233@outlook.com">luolan233@outlook.com</a>'
+      if (partnersCardTitle) partnersCardTitle.textContent = isEn ? 'Event List' : '赛事名单'
+      if (partnersCardDesc) partnersCardDesc.textContent = isEn 
+        ? 'Event partner information from ASG.API (Logo, Description, Website).'
+        : '来自 ASG.API 的赛事合作伙伴信息（Logo、简介、官网）。'
+      if (refreshBtn) refreshBtn.innerHTML = isEn ? '🔄 Refresh' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;display:inline-block;vertical-align:middle;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>刷新'
+      if (searchInput) searchInput.placeholder = isEn ? 'Search event name / description / type' : '搜索赛事名称 / 简介 / 类型'
+
+      const aboutFooter = document.querySelector('.about-footer')
+      if (aboutFooter) {
+        const ps = aboutFooter.querySelectorAll('p')
+        if (ps[0]) ps[0].textContent = aboutFooterText1
+        if (ps[1]) ps[1].textContent = aboutFooterText2
       }
     }
 
@@ -1497,6 +1859,21 @@
         }
       } catch (e) {
         showStatus('打开日志查看器失败: ' + (e?.message || '未知错误'), 'error')
+      }
+    }
+
+    async function openLicense() {
+      try {
+        if (!window.electronAPI || typeof window.electronAPI.openLicense !== 'function') {
+          showStatus('当前版本不支持查看开源协议', 'error')
+          return
+        }
+        const result = await window.electronAPI.openLicense()
+        if (result && result.success === false) {
+          showStatus('打开开源协议失败: ' + (result.error || '未知错误'), 'error')
+        }
+      } catch (e) {
+        showStatus('打开开源协议失败: ' + (e?.message || '未知错误'), 'error')
       }
     }
 
@@ -2124,7 +2501,7 @@
         const conn = await connectToServer()
         if (!conn) {
           createBtn.disabled = false
-          createBtn.innerHTML = '<span>🚀</span> 创建房间'
+          createBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> 创建房间'
           return
         }
 
@@ -2165,12 +2542,12 @@
 
         // 重置按钮状态，允许继续创建
         createBtn.disabled = false
-        createBtn.innerHTML = '<span>🚀</span> 创建房间'
+        createBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> 创建房间'
 
       } catch (error) {
         showStatus(`创建失败: ${error.message}`, 'error')
         createBtn.disabled = false
-        createBtn.innerHTML = '<span>🚀</span> 创建房间'
+        createBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> 创建房间'
       }
     }
 
@@ -2326,6 +2703,10 @@
         if (versionBadge) {
           versionBadge.textContent = `v${version}`
           versionBadge.title = '点击检查更新'
+        }
+        const aboutVersion = document.querySelector('.about-version')
+        if (aboutVersion) {
+          aboutVersion.textContent = `版本 ${version}`
         }
       } catch (e) {
         console.error('获取版本失败:', e)
@@ -2867,7 +3248,7 @@
         // 恢复按钮状态
         if (btn) {
           btn.disabled = false
-          btn.innerHTML = '🔄 刷新'
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;display:inline-block;vertical-align:middle;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>刷新'
         }
       }
     }
@@ -2880,7 +3261,12 @@
       if (!matches || matches.length === 0) {
         listContainer.innerHTML = `
           <div style="text-align:center; padding:40px; color:var(--text-secondary);">
-            <div style="font-size:32px; margin-bottom:12px;">📭</div>
+            <div style="font-size:32px; margin-bottom:12px; color: #666;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
             <div>暂无赛程数据</div>
           </div>
         `
@@ -2901,15 +3287,19 @@
               <div class="schedule-item-time">${matchTime}</div>
             </div>
             <div class="schedule-item-info">
-              <span>🏆 ${eventName}</span>
-              ${stage ? `<span>📍 ${stage}</span>` : ''}
+                            <span style="color: #ffd700; margin-right: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </span> ${eventName}
+              ${stage ? `<span style="color: #888; margin-left: 8px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${stage}</span>` : ''}
             </div>
             <div class="schedule-item-actions">
               <button class="btn btn-primary btn-sm" onclick="importMatchToASG('${match.id}')">
-                📥 导入对局信息
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导入对局信息
               </button>
               <button class="btn btn-secondary btn-sm" onclick="importTeamLogos('${match.id}')">
-                🖼️ 导入队伍Logo
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>导入队伍Logo
               </button>
             </div>
           </div>
@@ -3198,21 +3588,26 @@
       const isLight = saved === 'light';
       document.body.classList.toggle('light-theme', isLight);
       const icon = document.getElementById('themeIcon');
-      if (icon) icon.textContent = isLight ? '☀️' : '🌙';
+      if (icon) {
+        if (isLight) {
+          icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+        } else {
+          icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+        }
+      }
     }
 
     window.toggleTheme = function () {
       const isLight = document.body.classList.contains('light-theme');
+      const icon = document.getElementById('themeIcon');
       if (isLight) {
         document.body.classList.remove('light-theme');
         localStorage.setItem('theme', 'dark');
-        const icon = document.getElementById('themeIcon');
-        if (icon) icon.textContent = '🌙';
+        if (icon) icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
       } else {
         document.body.classList.add('light-theme');
         localStorage.setItem('theme', 'light');
-        const icon = document.getElementById('themeIcon');
-        if (icon) icon.textContent = '☀️';
+        if (icon) icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
       }
     }
 

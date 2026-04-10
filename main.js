@@ -325,6 +325,19 @@ ipcMain.handle('log:open-dir', async () => {
   }
 })
 
+ipcMain.handle('open-license', async () => {
+  try {
+    const licensePath = path.join(__dirname, 'license_zh_CN.html')
+    const openResult = await shell.openPath(licensePath)
+    if (openResult) {
+      return { success: false, error: openResult }
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) }
+  }
+})
+
 app.on('web-contents-created', (event, contents) => {
   contents.on('render-process-gone', (evt, details) => {
     appLogger.error('[RendererCrash] render-process-gone', {
@@ -6196,12 +6209,6 @@ function __normalizeLocalBpStateInPlace__() {
   m3d.hunterScale = Math.max(0.001, Number.isFinite(Number(m3d.hunterScale))
     ? Number(m3d.hunterScale)
     : Number.isFinite(Number(m3d?.slots?.hunter?.scale?.x)) ? Number(m3d.slots.hunter.scale.x) : 1.1)
-  if (!m3d.roleScaleOverrides || typeof m3d.roleScaleOverrides !== 'object') m3d.roleScaleOverrides = {}
-  for (const rsk of Object.keys(m3d.roleScaleOverrides)) {
-    const rsv = Number(m3d.roleScaleOverrides[rsk])
-    if (!Number.isFinite(rsv) || rsv <= 0) delete m3d.roleScaleOverrides[rsk]
-    else m3d.roleScaleOverrides[rsk] = Math.max(0.001, rsv)
-  }
   if (!m3d.videoScreen || typeof m3d.videoScreen !== 'object') m3d.videoScreen = {}
   m3d.videoScreen.path = (typeof m3d.videoScreen.path === 'string') ? m3d.videoScreen.path : ''
   m3d.videoScreen.loop = m3d.videoScreen.loop !== false
@@ -8203,19 +8210,6 @@ function normalizeBlockEventsInput(input) {
   }
 }
 
-function normalizeRoleScaleOverridesForPersist(input) {
-  if (!input || typeof input !== 'object') return {}
-  const result = {}
-  for (const key of Object.keys(input)) {
-    const val = Number(input[key])
-    if (Number.isFinite(val) && val > 0) {
-      const sanitizedKey = String(key).replace(/\s+/g, ' ').trim()
-      if (sanitizedKey) result[sanitizedKey] = Math.max(0.001, val)
-    }
-  }
-  return result
-}
-
 function normalizeCharacterModel3DLayoutInput(input) {
   const base = (input && typeof input === 'object') ? input : {}
   const ensureVec3 = (v, fallback = { x: 0, y: 0, z: 0 }) => {
@@ -8351,8 +8345,7 @@ function normalizeCharacterModel3DLayoutInput(input) {
       hunterSelected: normalizeCameraKeyframe(base?.cameraKeyframes?.hunterSelected),
       banUpdated: normalizeCameraKeyframe(base?.cameraKeyframes?.banUpdated)
     },
-    blockEvents: normalizeBlockEventsInput(base?.blockEvents),
-    roleScaleOverrides: normalizeRoleScaleOverridesForPersist(base?.roleScaleOverrides)
+    blockEvents: normalizeBlockEventsInput(base?.blockEvents)
   }
 
   const slotKeys = ['video1', 'custom1', 'survivor1', 'survivor2', 'survivor3', 'survivor4', 'hunter']
@@ -8497,10 +8490,6 @@ ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
       ? localBpState.characterModel3DLayout
       : {}
     const incoming = normalizeCharacterModel3DLayoutInput(layout)
-    const mergedRoleScale = {
-      ...(prev.roleScaleOverrides || {}),
-      ...(incoming.roleScaleOverrides || {})
-    }
     localBpState.characterModel3DLayout = {
       ...prev,
       ...incoming,
@@ -8508,8 +8497,7 @@ ipcMain.handle('localBp:saveCharacterModel3DLayout', (event, layout) => {
       slots: { ...(prev.slots || {}), ...(incoming.slots || {}) },
       lights: { ...(prev.lights || {}), ...(incoming.lights || {}) },
       camera: { ...(prev.camera || {}), ...(incoming.camera || {}) },
-      blockEvents: incoming.blockEvents || { enabled: false, rules: [], cameraShots: {} },
-      roleScaleOverrides: mergedRoleScale
+      blockEvents: incoming.blockEvents || { enabled: false, rules: [], cameraShots: {} }
     }
     __normalizeLocalBpStateInPlace__()
     __persistCharacterModel3DLayoutToDisk__()
