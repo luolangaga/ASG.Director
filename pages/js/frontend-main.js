@@ -1420,6 +1420,49 @@ function ensureCharacterNameLayoutDefaults(layout, rawLayout = null) {
   return layout
 }
 
+function getCharacterNameControlLabel(boxId) {
+  switch (boxId) {
+    case 'survivor1': return '求生者1 名字'
+    case 'survivor2': return '求生者2 名字'
+    case 'survivor3': return '求生者3 名字'
+    case 'survivor4': return '求生者4 名字'
+    case 'hunter': return '监管者 名字'
+    default: return '角色名字'
+  }
+}
+
+function ensureCharacterNameComponents() {
+  CHARACTER_NAME_LAYOUT_LINKS.forEach(({ boxId, nameId, textId }) => {
+    if (document.getElementById(nameId)) return
+
+    const container = document.createElement('div')
+    container.id = nameId
+    container.className = 'draggable-container character-name-box'
+    container.dataset.type = 'info'
+    container.dataset.editableColor = 'true'
+    container.dataset.linkedBox = boxId
+
+    const label = document.createElement('div')
+    label.className = 'control-label'
+    label.textContent = getCharacterNameControlLabel(boxId)
+    container.appendChild(label)
+
+    const text = document.createElement('span')
+    text.id = textId
+    text.className = 'character-name-value'
+    container.appendChild(text)
+
+    ;['nw', 'ne', 'sw', 'se'].forEach(dir => {
+      const handle = document.createElement('div')
+      handle.className = `resize-handle ${dir}`
+      handle.dataset.dir = dir
+      container.appendChild(handle)
+    })
+
+    document.body.appendChild(container)
+  })
+}
+
 function setCharacterNameDisplay(boxId, text) {
   const link = CHARACTER_NAME_LAYOUT_LINKS.find(item => item.boxId === boxId)
   const normalizedText = text || ''
@@ -2550,6 +2593,8 @@ function applyLayout() {
   console.log('[Frontend] currentLayout 内容:', currentLayout)
   let appliedCount = 0
   let notFoundCount = 0
+
+  ensureCharacterNameComponents()
 
   // 处理透明背景设置
   if (currentLayout && currentLayout.transparentBackground) {

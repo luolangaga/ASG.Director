@@ -159,6 +159,35 @@
               <!-- 当前选择显示 -->
               <div class="section">
                 <div class="section-title">当前选择</div>
+                <div class="player-names-section" style="margin-top: 10px; margin-bottom: 12px;">
+                  <div class="player-names-grid">
+                    <div class="player-name-input-wrapper">
+                      <label class="player-name-label" for="player-name-0">求生1</label>
+                      <input type="text" id="player-name-0" class="player-name-input" placeholder="输入选手名字"
+                        oninput="updatePlayerName(0, this.value)">
+                    </div>
+                    <div class="player-name-input-wrapper">
+                      <label class="player-name-label" for="player-name-1">求生2</label>
+                      <input type="text" id="player-name-1" class="player-name-input" placeholder="输入选手名字"
+                        oninput="updatePlayerName(1, this.value)">
+                    </div>
+                    <div class="player-name-input-wrapper">
+                      <label class="player-name-label" for="player-name-2">求生3</label>
+                      <input type="text" id="player-name-2" class="player-name-input" placeholder="输入选手名字"
+                        oninput="updatePlayerName(2, this.value)">
+                    </div>
+                    <div class="player-name-input-wrapper">
+                      <label class="player-name-label" for="player-name-3">求生4</label>
+                      <input type="text" id="player-name-3" class="player-name-input" placeholder="输入选手名字"
+                        oninput="updatePlayerName(3, this.value)">
+                    </div>
+                    <div class="player-name-input-wrapper">
+                      <label class="player-name-label" for="player-name-4">监管</label>
+                      <input type="text" id="player-name-4" class="player-name-input hunter-input" placeholder="输入选手名字"
+                        oninput="updatePlayerName(4, this.value)">
+                    </div>
+                  </div>
+                </div>
                 <div class="slot-swap-tip">拖拽板块可以交换选角</div>
                 <div class="selected-display">
                   <div class="slot" id="slot-0" onclick="openPickModal('survivor', 0)">
