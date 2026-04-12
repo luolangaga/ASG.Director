@@ -22,10 +22,16 @@
       <button id="toolbarCollapseBtn" class="btn btn-collapse" type="button">收起面板</button>
     </div>
     <div id="toolbarBody" class="toolbar-body">
+      <div id="toolbarTabs" class="toolbar-tabs" role="tablist" aria-label="控制面板分组">
+        <button class="toolbar-tab-btn active" type="button" data-toolbar-tab="common" role="tab" aria-selected="true">常用</button>
+        <button class="toolbar-tab-btn" type="button" data-toolbar-tab="scene" role="tab" aria-selected="false">场景</button>
+        <button class="toolbar-tab-btn" type="button" data-toolbar-tab="camera" role="tab" aria-selected="false">镜头</button>
+        <button class="toolbar-tab-btn" type="button" data-toolbar-tab="advanced" role="tab" aria-selected="false">高级</button>
+      </div>
       <div class="toolbar-layout">
-      <section class="toolbar-section">
+      <section class="toolbar-section" data-toolbar-tab="common">
         <h3 class="section-title">场景与资源</h3>
-        <div class="toolbar-row">
+        <div class="toolbar-row" data-toolbar-tab="common">
           <button id="modeToggleBtn" class="btn">切换到渲染模式 (F2)</button>
           <button id="sceneImportBtn" class="btn">导入场景(GLTF/GLB)</button>
           <button id="sceneClearBtn" class="btn">清空场景</button>
@@ -57,9 +63,9 @@
         </div>
       </section>
 
-      <section class="toolbar-section">
+      <section class="toolbar-section" data-toolbar-tab="scene advanced">
         <h3 class="section-title">环境与渲染</h3>
-        <div class="toolbar-row">
+        <div class="toolbar-row" data-toolbar-tab="scene">
           <span class="label">天空与光影预设</span>
           <select id="environmentPresetSelect">
             <option value="duskCinema">电影感黄昏</option>
@@ -89,7 +95,7 @@
           <label><input id="droneModeEnabled" type="checkbox"> 无人机模式</label>
           <label>最大FPS<input id="maxFps" type="number" step="1" min="10" max="240" value="60"></label>
         </div>
-        <div class="toolbar-row">
+        <div class="toolbar-row" data-toolbar-tab="scene">
           <span class="label">天气预设</span>
           <select id="weatherPresetSelect">
             <option value="clear">关闭天气</option>
@@ -100,7 +106,7 @@
           <button id="applyWeatherPresetBtn" class="btn">应用天气</button>
           <span id="weatherPresetInfo" class="label">天气: 关闭</span>
         </div>
-        <div class="toolbar-row">
+        <div class="toolbar-row" data-toolbar-tab="scene">
           <span class="label">天气控制</span>
           <label>风力倍率<input id="weatherWindIntensity" type="number" step="0.1" min="0" max="3" value="1.35"></label>
           <label>风粒子密度<input id="weatherParticleDensity" type="number" step="0.1" min="0" max="4" value="1"></label>
@@ -113,7 +119,7 @@
           <span id="weatherParticleTextureInfo" class="label">风粒子图片: 默认白块</span>
           <button id="applyWeatherSettingsBtn" class="btn">应用天气参数</button>
         </div>
-        <div class="toolbar-row">
+        <div class="toolbar-row" data-toolbar-tab="scene">
           <span class="label">出场动画</span>
           <select id="entranceEffectSelect">
             <option value="fade">淡入</option>
@@ -128,10 +134,10 @@
           <button id="particleClearBtn" class="btn">清除粒子特效</button>
           <span id="particleFileInfo" class="label">粒子: 未配置</span>
         </div>
-        <details class="advanced-panel">
+        <details class="advanced-panel" data-toolbar-tab="advanced" open>
           <summary class="advanced-summary">高级选项：风格化渲染 / 光效精度</summary>
           <div class="advanced-panel-body">
-            <div class="toolbar-row">
+            <div class="toolbar-row" data-toolbar-tab="advanced">
               <span class="label">风格化渲染</span>
               <label><input id="stylizedToonEnabled" type="checkbox"> 三渲二</label>
               <label>阶数
@@ -147,7 +153,7 @@
               <label>颜色<input id="stylizedOutlineColor" type="color" value="#000000"></label>
               <label>透明<input id="stylizedOutlineAlpha" type="number" step="0.05" min="0" max="1" value="1"></label>
             </div>
-            <div class="toolbar-row">
+            <div class="toolbar-row" data-toolbar-tab="advanced">
               <span class="label">高级光效与精度</span>
               <label><input id="advAntialiasEnabled" type="checkbox" checked> 抗锯齿</label>
               <label>曝光<input id="advExposure" type="number" step="0.01" min="0.6" max="2.2" value="1"></label>
@@ -168,7 +174,7 @@
               <label>Shadow Bias<input id="advShadowBias" type="number" step="0.00001" min="-0.001" max="0.001" value="-0.00012"></label>
               <label>Normal Bias<input id="advShadowNormalBias" type="number" step="0.001" min="0" max="0.1" value="0.01"></label>
             </div>
-            <div class="toolbar-row">
+            <div class="toolbar-row" data-toolbar-tab="advanced">
               <span class="label">高级灯光倍率</span>
               <label><input id="advLightTextureEnabled" type="checkbox" checked> 启用风格化光影贴图</label>
               <label>环境光<input id="advAmbientBoost" type="number" step="0.05" min="0" max="3" value="1"></label>
@@ -184,7 +190,7 @@
         </details>
       </section>
 
-      <section class="toolbar-section">
+      <section class="toolbar-section" data-toolbar-tab="common">
         <h3 class="section-title">对象编辑</h3>
         <div class="toolbar-row">
           <span class="label">编辑对象</span>
@@ -209,7 +215,7 @@
         </div>
       </section>
 
-      <section class="toolbar-section">
+      <section class="toolbar-section" data-toolbar-tab="camera">
         <h3 class="section-title">摄像机与光源</h3>
         <div class="toolbar-row">
           <span class="label">摄像机关键帧</span>
@@ -264,7 +270,7 @@
         </div>
       </section>
 
-      <div class="toolbar-row hint">
+      <div class="toolbar-row hint" data-toolbar-tab="common camera">
         左键拖拽旋转，右键拖拽(或 Shift+左键)平移视角，滚轮缩放。WASD前后左右，QE上下；按住 Shift + WASD 调整摄像机朝向。F2 切换编辑/渲染，F6 切换虚拟摄像机主镜头。
       </div>
       </div>

@@ -373,6 +373,7 @@
   const DEFAULT_LAYOUT = {
     mode: 'edit',
     toolbarCollapsed: false,
+    activeToolbarTab: 'common',
     advancedRender: deepClone(ADVANCED_RENDER_DEFAULT),
     transparentBackground: true,
     environmentPreset: 'duskCinema',
@@ -650,6 +651,9 @@
   const dom = {
     toolbar: document.getElementById('toolbar'),
     toolbarBody: document.getElementById('toolbarBody'),
+    toolbarTabs: document.getElementById('toolbarTabs'),
+    toolbarTabButtons: Array.from(document.querySelectorAll('#toolbarTabs [data-toolbar-tab]')),
+    toolbarTabbedItems: Array.from(document.querySelectorAll('#toolbarBody .toolbar-layout [data-toolbar-tab]')),
     toolbarCollapseBtn: document.getElementById('toolbarCollapseBtn'),
     renderRoot: document.getElementById('renderRoot'),
     fogOverlay: document.getElementById('fogOverlay'),
@@ -1047,6 +1051,11 @@
     const out = deepClone(DEFAULT_LAYOUT)
     out.mode = base.mode === 'render' ? 'render' : 'edit'
     out.toolbarCollapsed = !!base.toolbarCollapsed
+    out.activeToolbarTab = (
+      base.activeToolbarTab === 'scene'
+      || base.activeToolbarTab === 'camera'
+      || base.activeToolbarTab === 'advanced'
+    ) ? base.activeToolbarTab : 'common'
     out.advancedRender = deepClone(ADVANCED_RENDER_DEFAULT)
     const adv = (base?.advancedRender && typeof base.advancedRender === 'object') ? base.advancedRender : {}
     out.advancedRender.antialiasEnabled = adv.antialiasEnabled !== false
@@ -1854,6 +1863,7 @@
     if (dom.cinemaOverlay) dom.cinemaOverlay.style.opacity = String(q.cinemaOverlay)
 
     if (dom.renderQualitySelect) dom.renderQualitySelect.value = key
+    syncWeatherOverlayPerformanceMode()
     applyAdvancedRenderSettings(false)
     if (shouldSave) scheduleSaveLayout()
   }
@@ -1966,6 +1976,7 @@
         dom.renderRoot.style.filter = 'none'
       }
     }
+    syncWeatherOverlayPerformanceMode()
     refreshSceneEnvironment()
     applyLightSettings('light1')
 
@@ -2683,14 +2694,28 @@
     }
   }
 
+  function syncWeatherOverlayPerformanceMode() {
+    const qualityKey = state.layout?.qualityPreset || 'high'
+    const adv = state.layout?.advancedRender || ADVANCED_RENDER_DEFAULT
+    const lowFpsMode = Math.max(10, Math.min(240, asNumber(state.layout?.maxFps, 60))) <= 30
+    const liteMode = qualityKey === 'low'
+      || qualityKey === 'medium'
+      || adv.renderScale <= 0.9
+      || lowFpsMode
+    document.body.classList.toggle('weather-overlay-lite', liteMode)
+  }
+
   function updateWeatherOverlays(config, time = 0) {
     const gustPulse = config.wind ? (0.86 + Math.sin(time * 2.1) * 0.12 + Math.sin(time * 0.63 + 1.4) * 0.08) : 0
     if (dom.weatherOverlay) {
       dom.weatherOverlay.style.opacity = String(Math.max(0, config.overlayOpacity).toFixed(3))
     }
     if (dom.weatherWindOverlay) {
+      const shiftX = -weatherRuntime.windScroll * 26
+      const shiftY = Math.sin(time * 0.42) * 8 + Math.cos(time * 0.23) * 3
+      const tilt = Math.sin(time * 0.34 + 0.6) * 1.6
       dom.weatherWindOverlay.style.opacity = String(Math.max(0, config.windOverlayOpacity * Math.max(0.18, gustPulse)).toFixed(3))
-      dom.weatherWindOverlay.style.backgroundPosition = `${(-weatherRuntime.windScroll * 84).toFixed(1)}px ${(-weatherRuntime.windScroll * 10).toFixed(1)}px, ${(-weatherRuntime.windScroll * 52).toFixed(1)}px ${(weatherRuntime.windScroll * 8).toFixed(1)}px, ${(-weatherRuntime.windScroll * 66).toFixed(1)}px ${(weatherRuntime.windScroll * 5).toFixed(1)}px, 0px 0px`
+      dom.weatherWindOverlay.style.transform = `translate3d(${shiftX.toFixed(1)}px, ${shiftY.toFixed(1)}px, 0) rotate(${tilt.toFixed(2)}deg) scale(1.04)`
     }
     if (dom.weatherFlashOverlay) {
       dom.weatherFlashOverlay.style.opacity = String(Math.max(0, Math.pow(weatherRuntime.flashStrength, 1.15) * 0.88).toFixed(3))
@@ -6612,6 +6637,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     updateKeyLightShadowFrustum()
     applyMode(state.layout.mode)
     applyToolbarCollapsed(state.layout.toolbarCollapsed, false)
+    applyToolbarTab(state.layout.activeToolbarTab || 'common', false)
     applyAdvancedRenderSettings(false, false)
     applyOrbitFromLayout()
     renderSlotTabs()
@@ -6650,6 +6676,33 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     if (dom.toolbarCollapseBtn) {
       dom.toolbarCollapseBtn.textContent = next ? '展开面板' : '收起面板'
       dom.toolbarCollapseBtn.setAttribute('aria-expanded', next ? 'false' : 'true')
+    }
+    if (shouldSave) scheduleSaveLayout()
+  }
+
+  function matchesToolbarTab(value, activeTab) {
+    return String(value || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .includes(activeTab)
+  }
+
+  function applyToolbarTab(tabKey, shouldSave = true) {
+    const next = (tabKey === 'scene' || tabKey === 'camera' || tabKey === 'advanced') ? tabKey : 'common'
+    state.layout.activeToolbarTab = next
+    if (Array.isArray(dom.toolbarTabButtons)) {
+      dom.toolbarTabButtons.forEach((btn) => {
+        const active = String(btn.dataset.toolbarTab || '') === next
+        btn.classList.toggle('active', active)
+        btn.setAttribute('aria-selected', active ? 'true' : 'false')
+        btn.tabIndex = active ? 0 : -1
+      })
+    }
+    if (Array.isArray(dom.toolbarTabbedItems)) {
+      dom.toolbarTabbedItems.forEach((node) => {
+        const visible = matchesToolbarTab(node.dataset.toolbarTab, next)
+        node.hidden = !visible
+      })
     }
     if (shouldSave) scheduleSaveLayout()
   }
@@ -7442,6 +7495,13 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
         applyToolbarCollapsed(!state.layout.toolbarCollapsed, true)
       })
     }
+    if (Array.isArray(dom.toolbarTabButtons)) {
+      dom.toolbarTabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          applyToolbarTab(btn.dataset.toolbarTab || 'common', true)
+        })
+      })
+    }
     dom.modeToggleBtn.addEventListener('click', () => {
       applyMode(state.layout.mode === 'edit' ? 'render' : 'edit')
     })
@@ -7701,6 +7761,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
       dom.maxFps.addEventListener('change', () => {
         state.layout.maxFps = Math.max(10, Math.min(240, Math.round(asNumber(dom.maxFps.value, 60))))
         dom.maxFps.value = String(state.layout.maxFps)
+        syncWeatherOverlayPerformanceMode()
         scheduleSaveLayout()
       })
     }
@@ -7987,16 +8048,21 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     }, { passive: false })
   }
 
-  function renderLoop() {
+  function requestNextFrame() {
+    if (rafId) return
     rafId = requestAnimationFrame(renderLoop)
-    const now = performance.now()
+  }
+
+  function renderLoop(now = performance.now()) {
+    rafId = 0
+    requestNextFrame()
     const maxFps = Math.max(10, Math.min(240, asNumber(state.layout?.maxFps, 60)))
     const minFrameMs = 1000 / maxFps
-    if (frameLimiterLastAt > 0 && (now - frameLimiterLastAt) < minFrameMs) {
+    if (frameLimiterLastAt > 0 && (now - frameLimiterLastAt) < (minFrameMs - 0.5)) {
       return
     }
     frameLimiterLastAt = now
-    const dt = clock.getDelta()
+    const dt = Math.min(0.1, clock.getDelta())
     fpsAccum += dt
     fpsFrames += 1
     if (fpsAccum >= 0.4) {
@@ -8374,7 +8440,7 @@ diffuseColor.rgb += vec3(1.0, 0.82, 0.25) * asgEdge * 0.28;
     syncBlockEventUi()
     bindBrowserInterop()
     bindRealtimeBpSync()
-    renderLoop()
+    requestNextFrame()
     setStatus('就绪')
   }
 
